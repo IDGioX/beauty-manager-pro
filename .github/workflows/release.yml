@@ -10,7 +10,18 @@ jobs:
   release:
     permissions:
       contents: write
-    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: 'macos-latest'
+            args: '--target aarch64-apple-darwin'
+          - platform: 'macos-latest'
+            args: '--target x86_64-apple-darwin'
+          - platform: 'windows-latest'
+            args: ''
+
+    runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
 
@@ -21,6 +32,8 @@ jobs:
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
       - name: Install frontend dependencies
         run: npm install
@@ -35,8 +48,14 @@ jobs:
           tagName: v__VERSION__
           releaseName: 'Beauty Manager Pro v__VERSION__'
           releaseBody: |
-            ## Download per Windows
-            - **Installer (consigliato)**: `Beauty.Manager.Pro_*_x64-setup.exe`
-            - **MSI**: `Beauty.Manager.Pro_*_x64_en-US.msi`
+            ## Download
+
+            **Windows:**
+            - `Beauty.Manager.Pro_*_x64-setup.exe` - Installer (consigliato)
+
+            **macOS:**
+            - `Beauty.Manager.Pro_*_aarch64.dmg` - Apple Silicon (M1/M2/M3)
+            - `Beauty.Manager.Pro_*_x64.dmg` - Intel
           releaseDraft: true
           prerelease: false
+          args: ${{ matrix.args }}
