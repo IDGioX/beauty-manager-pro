@@ -1,5 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Search, User, Phone, Mail, Settings, LogOut, ChevronDown } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import {
+  Search, User, Phone, Mail, Settings, LogOut, ChevronDown,
+  LayoutDashboard, Calendar, Users, Scissors, Package, MessageSquare,
+  BarChart3, TrendingUp, TrendingDown, History, ClipboardList, UserPlus,
+  CalendarPlus, FileText, Database, Palette, Bell, Command
+} from 'lucide-react';
 import { clientiService } from '../../services/clienti';
 import { Cliente } from '../../types/cliente';
 import { useAuthStore } from '../../stores/authStore';
@@ -9,17 +14,284 @@ interface HeaderProps {
   onNavigate: (page: string) => void;
 }
 
+interface SearchCommand {
+  id: string;
+  label: string;
+  description: string;
+  keywords: string[];
+  icon: React.ReactNode;
+  type: 'page' | 'action';
+  page?: string;
+  action?: () => void;
+}
+
 export const Header: React.FC<HeaderProps> = ({ title, onNavigate }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<Cliente[]>([]);
   const [showResults, setShowResults] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState(-1);
   const searchRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const [showUserMenu, setShowUserMenu] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
   const { user, logout } = useAuthStore();
+
+  // Definizione comandi di ricerca globale
+  const searchCommands: SearchCommand[] = useMemo(() => [
+    // Pagine di navigazione
+    {
+      id: 'nav-dashboard',
+      label: 'Dashboard',
+      description: 'Vai alla dashboard principale',
+      keywords: ['dashboard', 'home', 'principale', 'inizio', 'kpi', 'statistiche'],
+      icon: <LayoutDashboard size={18} />,
+      type: 'page',
+      page: 'dashboard'
+    },
+    {
+      id: 'nav-agenda',
+      label: 'Agenda',
+      description: 'Calendario appuntamenti',
+      keywords: ['agenda', 'calendario', 'appuntamenti', 'prenotazioni', 'booking'],
+      icon: <Calendar size={18} />,
+      type: 'page',
+      page: 'agenda'
+    },
+    {
+      id: 'nav-clienti',
+      label: 'Clienti',
+      description: 'Gestione anagrafica clienti',
+      keywords: ['clienti', 'anagrafica', 'rubrica', 'contatti', 'persone'],
+      icon: <Users size={18} />,
+      type: 'page',
+      page: 'clienti'
+    },
+    {
+      id: 'nav-operatrici',
+      label: 'Operatrici',
+      description: 'Gestione staff e operatrici',
+      keywords: ['operatrici', 'operatori', 'staff', 'dipendenti', 'personale', 'team'],
+      icon: <Users size={18} />,
+      type: 'page',
+      page: 'operatrici'
+    },
+    {
+      id: 'nav-trattamenti',
+      label: 'Trattamenti',
+      description: 'Catalogo servizi e trattamenti',
+      keywords: ['trattamenti', 'servizi', 'catalogo', 'listino', 'prezzi'],
+      icon: <Scissors size={18} />,
+      type: 'page',
+      page: 'trattamenti'
+    },
+    {
+      id: 'nav-magazzino',
+      label: 'Magazzino',
+      description: 'Gestione inventario prodotti',
+      keywords: ['magazzino', 'inventario', 'prodotti', 'stock', 'giacenze'],
+      icon: <Package size={18} />,
+      type: 'page',
+      page: 'magazzino'
+    },
+    {
+      id: 'nav-comunicazioni',
+      label: 'Comunicazioni',
+      description: 'SMS, Email e campagne marketing',
+      keywords: ['comunicazioni', 'sms', 'email', 'messaggi', 'marketing', 'campagne', 'newsletter'],
+      icon: <MessageSquare size={18} />,
+      type: 'page',
+      page: 'comunicazioni'
+    },
+    {
+      id: 'nav-report',
+      label: 'Report',
+      description: 'Statistiche e analytics',
+      keywords: ['report', 'statistiche', 'analytics', 'grafici', 'ricavi', 'fatturato', 'incassi'],
+      icon: <BarChart3 size={18} />,
+      type: 'page',
+      page: 'report'
+    },
+    {
+      id: 'nav-settings',
+      label: 'Impostazioni',
+      description: 'Configurazione sistema',
+      keywords: ['impostazioni', 'settings', 'configurazione', 'preferenze', 'opzioni'],
+      icon: <Settings size={18} />,
+      type: 'page',
+      page: 'settings'
+    },
+    // Azioni rapide - Magazzino
+    {
+      id: 'action-carico',
+      label: 'Carico Prodotti',
+      description: 'Registra arrivo merce in magazzino',
+      keywords: ['carico', 'arrivo', 'merce', 'entrata', 'rifornimento', 'acquisto'],
+      icon: <TrendingUp size={18} />,
+      type: 'action',
+      page: 'magazzino',
+      action: () => {
+        sessionStorage.setItem('magazzinoTab', 'carico');
+        window.dispatchEvent(new CustomEvent('magazzinoTabChange', { detail: 'carico' }));
+      }
+    },
+    {
+      id: 'action-scarico',
+      label: 'Scarico Prodotti',
+      description: 'Registra uscita prodotti dal magazzino',
+      keywords: ['scarico', 'uscita', 'consumo', 'vendita', 'uso'],
+      icon: <TrendingDown size={18} />,
+      type: 'action',
+      page: 'magazzino',
+      action: () => {
+        sessionStorage.setItem('magazzinoTab', 'scarichi');
+        window.dispatchEvent(new CustomEvent('magazzinoTabChange', { detail: 'scarichi' }));
+      }
+    },
+    {
+      id: 'action-movimenti',
+      label: 'Movimenti Magazzino',
+      description: 'Storico movimenti di magazzino',
+      keywords: ['movimenti', 'storico', 'log', 'cronologia', 'magazzino'],
+      icon: <History size={18} />,
+      type: 'action',
+      page: 'magazzino',
+      action: () => {
+        sessionStorage.setItem('magazzinoTab', 'movimenti');
+        window.dispatchEvent(new CustomEvent('magazzinoTabChange', { detail: 'movimenti' }));
+      }
+    },
+    {
+      id: 'action-inventario',
+      label: 'Inventario',
+      description: 'Gestione inventario fisico',
+      keywords: ['inventario', 'conta', 'verifica', 'giacenze', 'controllo'],
+      icon: <ClipboardList size={18} />,
+      type: 'action',
+      page: 'magazzino',
+      action: () => {
+        sessionStorage.setItem('magazzinoTab', 'inventario');
+        window.dispatchEvent(new CustomEvent('magazzinoTabChange', { detail: 'inventario' }));
+      }
+    },
+    // Azioni rapide - Clienti
+    {
+      id: 'action-nuovo-cliente',
+      label: 'Nuovo Cliente',
+      description: 'Aggiungi un nuovo cliente',
+      keywords: ['nuovo', 'cliente', 'aggiungi', 'crea', 'inserisci', 'registra'],
+      icon: <UserPlus size={18} />,
+      type: 'action',
+      page: 'clienti',
+      action: () => {
+        sessionStorage.setItem('clientiAction', 'nuovo');
+        window.dispatchEvent(new CustomEvent('clientiAction', { detail: 'nuovo' }));
+      }
+    },
+    {
+      id: 'action-storico-clienti',
+      label: 'Storico Clienti',
+      description: 'Visualizza storico visite clienti',
+      keywords: ['storico', 'cronologia', 'visite', 'storia', 'passato', 'clienti'],
+      icon: <History size={18} />,
+      type: 'page',
+      page: 'clienti'
+    },
+    // Azioni rapide - Agenda
+    {
+      id: 'action-nuovo-appuntamento',
+      label: 'Nuovo Appuntamento',
+      description: 'Prenota un nuovo appuntamento',
+      keywords: ['nuovo', 'appuntamento', 'prenota', 'prenotazione', 'booking', 'agenda'],
+      icon: <CalendarPlus size={18} />,
+      type: 'action',
+      page: 'agenda',
+      action: () => {
+        sessionStorage.setItem('agendaAction', 'nuovo');
+        window.dispatchEvent(new CustomEvent('agendaAction', { detail: 'nuovo' }));
+      }
+    },
+    // Azioni rapide - Settings
+    {
+      id: 'action-backup',
+      label: 'Backup Database',
+      description: 'Crea backup del database',
+      keywords: ['backup', 'salva', 'esporta', 'database', 'sicurezza', 'copia'],
+      icon: <Database size={18} />,
+      type: 'action',
+      page: 'settings',
+      action: () => {
+        sessionStorage.setItem('settingsTab', 'backup');
+        window.dispatchEvent(new CustomEvent('settingsTabChange', { detail: 'backup' }));
+      }
+    },
+    {
+      id: 'action-tema',
+      label: 'Cambia Tema',
+      description: 'Personalizza aspetto dell\'app',
+      keywords: ['tema', 'colore', 'colori', 'aspetto', 'dark', 'light', 'scuro', 'chiaro', 'personalizza'],
+      icon: <Palette size={18} />,
+      type: 'action',
+      page: 'settings',
+      action: () => {
+        sessionStorage.setItem('settingsTab', 'aspetto');
+        window.dispatchEvent(new CustomEvent('settingsTabChange', { detail: 'aspetto' }));
+      }
+    },
+    // Comunicazioni
+    {
+      id: 'action-template',
+      label: 'Template Messaggi',
+      description: 'Gestisci template SMS/Email',
+      keywords: ['template', 'modelli', 'messaggi', 'sms', 'email'],
+      icon: <FileText size={18} />,
+      type: 'action',
+      page: 'comunicazioni',
+      action: () => {
+        sessionStorage.setItem('comunicazioniTab', 'templates');
+        window.dispatchEvent(new CustomEvent('comunicazioniTabChange', { detail: 'templates' }));
+      }
+    },
+    {
+      id: 'action-promemoria',
+      label: 'Promemoria Appuntamenti',
+      description: 'Configura reminder automatici',
+      keywords: ['promemoria', 'reminder', 'notifiche', 'avvisi', 'automatici'],
+      icon: <Bell size={18} />,
+      type: 'action',
+      page: 'comunicazioni',
+      action: () => {
+        sessionStorage.setItem('comunicazioniTab', 'automazioni');
+        window.dispatchEvent(new CustomEvent('comunicazioniTabChange', { detail: 'automazioni' }));
+      }
+    },
+  ], []);
+
+  // Filtra comandi in base al termine di ricerca
+  const filteredCommands = useMemo(() => {
+    if (searchTerm.trim().length < 1) return [];
+
+    const term = searchTerm.toLowerCase().trim();
+    return searchCommands.filter(cmd =>
+      cmd.label.toLowerCase().includes(term) ||
+      cmd.description.toLowerCase().includes(term) ||
+      cmd.keywords.some(kw => kw.includes(term))
+    );
+  }, [searchTerm, searchCommands]);
+
+  // Raggruppa per tipo
+  const groupedCommands = useMemo(() => {
+    const pages = filteredCommands.filter(c => c.type === 'page');
+    const actions = filteredCommands.filter(c => c.type === 'action');
+    return { pages, actions };
+  }, [filteredCommands]);
+
+  // Conta totale risultati per navigazione tastiera
+  const totalResults = useMemo(() => {
+    return groupedCommands.pages.length + groupedCommands.actions.length + searchResults.length;
+  }, [groupedCommands, searchResults]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -35,23 +307,77 @@ export const Header: React.FC<HeaderProps> = ({ title, onNavigate }) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Keyboard shortcut per aprire la ricerca (Cmd/Ctrl + K)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        inputRef.current?.focus();
+        setShowResults(true);
+      }
+      if (e.key === 'Escape') {
+        setShowResults(false);
+        inputRef.current?.blur();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Navigazione con tastiera nei risultati
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!showResults) return;
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedIndex(prev => Math.min(prev + 1, totalResults - 1));
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedIndex(prev => Math.max(prev - 1, -1));
+      } else if (e.key === 'Enter' && selectedIndex >= 0) {
+        e.preventDefault();
+        handleSelectByIndex(selectedIndex);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [showResults, selectedIndex, totalResults, groupedCommands, searchResults]);
+
+  const handleSelectByIndex = (index: number) => {
+    const pagesCount = groupedCommands.pages.length;
+    const actionsCount = groupedCommands.actions.length;
+
+    if (index < pagesCount) {
+      handleCommandClick(groupedCommands.pages[index]);
+    } else if (index < pagesCount + actionsCount) {
+      handleCommandClick(groupedCommands.actions[index - pagesCount]);
+    } else {
+      const clienteIndex = index - pagesCount - actionsCount;
+      if (searchResults[clienteIndex]) {
+        handleClienteClick(searchResults[clienteIndex]);
+      }
+    }
+  };
+
   const handleLogout = async () => {
     await logout();
   };
 
+  // Ricerca clienti (con debounce)
   useEffect(() => {
     const searchClienti = async () => {
       if (searchTerm.trim().length < 2) {
         setSearchResults([]);
-        setShowResults(false);
         return;
       }
 
       setLoading(true);
       try {
-        const results = await clientiService.getClienti(searchTerm, 10, 0);
+        const results = await clientiService.getClienti(searchTerm, 5, 0);
         setSearchResults(results);
-        setShowResults(true);
       } catch (error) {
         console.error('Errore ricerca:', error);
         setSearchResults([]);
@@ -64,7 +390,28 @@ export const Header: React.FC<HeaderProps> = ({ title, onNavigate }) => {
     return () => clearTimeout(debounceTimer);
   }, [searchTerm]);
 
-  const handleResultClick = (cliente: Cliente) => {
+  // Mostra risultati quando si digita
+  useEffect(() => {
+    if (searchTerm.trim().length >= 1) {
+      setShowResults(true);
+      setSelectedIndex(-1);
+    } else {
+      setShowResults(false);
+    }
+  }, [searchTerm]);
+
+  const handleCommandClick = (command: SearchCommand) => {
+    if (command.page) {
+      onNavigate(command.page);
+    }
+    if (command.action) {
+      setTimeout(() => command.action!(), 100);
+    }
+    setShowResults(false);
+    setSearchTerm('');
+  };
+
+  const handleClienteClick = (cliente: Cliente) => {
     sessionStorage.setItem('selectedClienteId', cliente.id);
     onNavigate('clienti');
     setTimeout(() => {
@@ -73,6 +420,9 @@ export const Header: React.FC<HeaderProps> = ({ title, onNavigate }) => {
     setShowResults(false);
     setSearchTerm('');
   };
+
+  const hasResults = filteredCommands.length > 0 || searchResults.length > 0 || loading;
+  const showEmptyState = searchTerm.trim().length >= 2 && !loading && filteredCommands.length === 0 && searchResults.length === 0;
 
   return (
     <header
@@ -108,20 +458,31 @@ export const Header: React.FC<HeaderProps> = ({ title, onNavigate }) => {
             >
               <Search size={18} style={{ color: 'var(--color-text-muted)' }} />
               <input
+                ref={inputRef}
                 type="text"
-                placeholder="Cerca clienti..."
+                placeholder="Cerca..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                onFocus={() => searchTerm.trim().length >= 2 && setShowResults(true)}
+                onFocus={() => searchTerm.trim().length >= 1 && setShowResults(true)}
                 className="bg-transparent border-none outline-none w-56 text-sm"
                 style={{ color: 'var(--color-text-primary)' }}
               />
+              <kbd
+                className="hidden sm:flex items-center gap-1 px-1.5 py-0.5 rounded text-xs"
+                style={{
+                  background: 'var(--glass-border)',
+                  color: 'var(--color-text-muted)',
+                  fontSize: '10px'
+                }}
+              >
+                <Command size={10} />K
+              </kbd>
             </div>
 
             {/* Search Results Dropdown */}
-            {showResults && (
+            {showResults && (hasResults || showEmptyState) && (
               <div
-                className="absolute top-full mt-2 w-96 rounded-2xl max-h-96 overflow-y-auto z-50"
+                className="absolute top-full mt-2 w-[420px] rounded-2xl max-h-[480px] overflow-y-auto z-50"
                 style={{
                   background: 'var(--card-hover)',
                   backdropFilter: 'blur(20px)',
@@ -129,44 +490,183 @@ export const Header: React.FC<HeaderProps> = ({ title, onNavigate }) => {
                   boxShadow: '0 8px 32px var(--glass-shadow)',
                 }}
               >
-                {loading ? (
-                  <div className="p-4 text-center" style={{ color: 'var(--color-text-muted)' }}>
-                    Ricerca in corso...
+                {/* Hint */}
+                {searchTerm.trim().length < 2 && filteredCommands.length > 0 && (
+                  <div
+                    className="px-4 py-2 text-xs"
+                    style={{
+                      color: 'var(--color-text-muted)',
+                      borderBottom: '1px solid var(--glass-border)'
+                    }}
+                  >
+                    Digita almeno 2 caratteri per cercare clienti
                   </div>
-                ) : searchResults.length === 0 ? (
-                  <div className="p-4 text-center" style={{ color: 'var(--color-text-muted)' }}>
-                    Nessun risultato trovato
-                  </div>
-                ) : (
-                  <div className="py-2">
-                    {searchResults.map((cliente) => (
+                )}
+
+                {/* Pagine */}
+                {groupedCommands.pages.length > 0 && (
+                  <div>
+                    <div
+                      className="px-4 py-2 text-xs font-semibold uppercase tracking-wider"
+                      style={{ color: 'var(--color-text-muted)' }}
+                    >
+                      Pagine
+                    </div>
+                    {groupedCommands.pages.map((cmd, idx) => (
                       <button
-                        key={cliente.id}
-                        onClick={() => handleResultClick(cliente)}
-                        className="w-full px-4 py-3 text-left transition-colors hover:bg-[color-mix(in_srgb,var(--color-primary)_8%,transparent)]"
-                        style={{ borderBottom: '1px solid var(--glass-border)' }}
+                        key={cmd.id}
+                        onClick={() => handleCommandClick(cmd)}
+                        className={`w-full px-4 py-2.5 text-left flex items-center gap-3 transition-colors ${
+                          selectedIndex === idx ? 'bg-[color-mix(in_srgb,var(--color-primary)_12%,transparent)]' : ''
+                        } hover:bg-[color-mix(in_srgb,var(--color-primary)_8%,transparent)]`}
                       >
-                        <div className="font-medium" style={{ color: 'var(--color-text-primary)' }}>
-                          {cliente.nome} {cliente.cognome}
+                        <div
+                          className="p-1.5 rounded-lg"
+                          style={{ background: 'var(--color-primary)', color: 'white' }}
+                        >
+                          {cmd.icon}
                         </div>
-                        <div className="mt-1 space-y-1">
-                          {cliente.cellulare && (
-                            <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--color-text-secondary)' }}>
-                              <Phone size={14} />
-                              <span>{cliente.cellulare}</span>
-                            </div>
-                          )}
-                          {cliente.email && (
-                            <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--color-text-secondary)' }}>
-                              <Mail size={14} />
-                              <span>{cliente.email}</span>
-                            </div>
-                          )}
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium" style={{ color: 'var(--color-text-primary)' }}>
+                            {cmd.label}
+                          </div>
+                          <div className="text-xs truncate" style={{ color: 'var(--color-text-muted)' }}>
+                            {cmd.description}
+                          </div>
                         </div>
                       </button>
                     ))}
                   </div>
                 )}
+
+                {/* Azioni */}
+                {groupedCommands.actions.length > 0 && (
+                  <div>
+                    <div
+                      className="px-4 py-2 text-xs font-semibold uppercase tracking-wider"
+                      style={{
+                        color: 'var(--color-text-muted)',
+                        borderTop: groupedCommands.pages.length > 0 ? '1px solid var(--glass-border)' : 'none'
+                      }}
+                    >
+                      Azioni
+                    </div>
+                    {groupedCommands.actions.map((cmd, idx) => (
+                      <button
+                        key={cmd.id}
+                        onClick={() => handleCommandClick(cmd)}
+                        className={`w-full px-4 py-2.5 text-left flex items-center gap-3 transition-colors ${
+                          selectedIndex === groupedCommands.pages.length + idx
+                            ? 'bg-[color-mix(in_srgb,var(--color-primary)_12%,transparent)]'
+                            : ''
+                        } hover:bg-[color-mix(in_srgb,var(--color-primary)_8%,transparent)]`}
+                      >
+                        <div
+                          className="p-1.5 rounded-lg"
+                          style={{ background: 'var(--color-success)', color: 'white' }}
+                        >
+                          {cmd.icon}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium" style={{ color: 'var(--color-text-primary)' }}>
+                            {cmd.label}
+                          </div>
+                          <div className="text-xs truncate" style={{ color: 'var(--color-text-muted)' }}>
+                            {cmd.description}
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Clienti */}
+                {(searchResults.length > 0 || (loading && searchTerm.trim().length >= 2)) && (
+                  <div>
+                    <div
+                      className="px-4 py-2 text-xs font-semibold uppercase tracking-wider"
+                      style={{
+                        color: 'var(--color-text-muted)',
+                        borderTop: filteredCommands.length > 0 ? '1px solid var(--glass-border)' : 'none'
+                      }}
+                    >
+                      Clienti
+                    </div>
+                    {loading ? (
+                      <div className="px-4 py-3 text-sm" style={{ color: 'var(--color-text-muted)' }}>
+                        Ricerca in corso...
+                      </div>
+                    ) : (
+                      searchResults.map((cliente, idx) => (
+                        <button
+                          key={cliente.id}
+                          onClick={() => handleClienteClick(cliente)}
+                          className={`w-full px-4 py-2.5 text-left flex items-center gap-3 transition-colors ${
+                            selectedIndex === groupedCommands.pages.length + groupedCommands.actions.length + idx
+                              ? 'bg-[color-mix(in_srgb,var(--color-primary)_12%,transparent)]'
+                              : ''
+                          } hover:bg-[color-mix(in_srgb,var(--color-primary)_8%,transparent)]`}
+                        >
+                          <div
+                            className="w-9 h-9 rounded-lg flex items-center justify-center text-white text-sm font-semibold"
+                            style={{ background: 'linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%)' }}
+                          >
+                            {cliente.nome?.charAt(0).toUpperCase()}{cliente.cognome?.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium" style={{ color: 'var(--color-text-primary)' }}>
+                              {cliente.nome} {cliente.cognome}
+                            </div>
+                            <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                              {cliente.cellulare && (
+                                <span className="flex items-center gap-1">
+                                  <Phone size={12} />
+                                  {cliente.cellulare}
+                                </span>
+                              )}
+                              {cliente.email && (
+                                <span className="flex items-center gap-1 truncate">
+                                  <Mail size={12} />
+                                  {cliente.email}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+
+                {/* Empty State */}
+                {showEmptyState && (
+                  <div className="p-6 text-center" style={{ color: 'var(--color-text-muted)' }}>
+                    <Search size={32} className="mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">Nessun risultato per "{searchTerm}"</p>
+                  </div>
+                )}
+
+                {/* Keyboard hints */}
+                <div
+                  className="px-4 py-2 flex items-center gap-4 text-xs"
+                  style={{
+                    borderTop: '1px solid var(--glass-border)',
+                    color: 'var(--color-text-muted)'
+                  }}
+                >
+                  <span className="flex items-center gap-1">
+                    <kbd className="px-1 rounded" style={{ background: 'var(--glass-border)' }}>↑↓</kbd>
+                    naviga
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <kbd className="px-1 rounded" style={{ background: 'var(--glass-border)' }}>⏎</kbd>
+                    seleziona
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <kbd className="px-1 rounded" style={{ background: 'var(--glass-border)' }}>esc</kbd>
+                    chiudi
+                  </span>
+                </div>
               </div>
             )}
           </div>

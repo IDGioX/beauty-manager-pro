@@ -10,7 +10,7 @@ import { updaterService, UpdateInfo, UpdateProgress, UpdateStatus } from '../ser
 import type { ConfigSmtp, SaveSmtpConfigInput } from '../types/comunicazione';
 import { useAuthStore } from '../stores/authStore';
 import { useThemeStore } from '../stores/themeStore';
-import { Database, Download, Upload, Trash2, Calendar, HardDrive, FolderOpen, Info, Settings as SettingsIcon, Building2, Key, UserCircle, Eye, EyeOff, Save, Mail, CheckCircle, AlertCircle, Loader2, Palette, Check, Sun, Moon, Monitor, RefreshCw, Rocket } from 'lucide-react';
+import { Database, Download, Upload, Trash2, Calendar, HardDrive, FolderOpen, Info, Building2, Key, UserCircle, Eye, EyeOff, Save, Mail, CheckCircle, AlertCircle, Loader2, Palette, Check, Sun, Moon, Monitor, RefreshCw, Rocket } from 'lucide-react';
 import { LicenseInfo } from '../components/license/LicenseInfo';
 
 interface ToastState {
@@ -18,7 +18,7 @@ interface ToastState {
   type: 'success' | 'error';
 }
 
-type SettingsTab = 'account' | 'aspetto' | 'backup' | 'general' | 'database' | 'azienda' | 'license' | 'smtp' | 'updates';
+type SettingsTab = 'account' | 'aspetto' | 'backup' | 'azienda' | 'license' | 'smtp' | 'updates';
 
 export function Settings() {
   const [activeTab, setActiveTab] = useState<SettingsTab>('azienda');
@@ -345,8 +345,6 @@ export function Settings() {
     { id: 'license' as SettingsTab, label: 'Licenza', icon: Key },
     { id: 'backup' as SettingsTab, label: 'Backup & Ripristino', icon: Database },
     { id: 'updates' as SettingsTab, label: 'Aggiornamenti', icon: RefreshCw },
-    { id: 'general' as SettingsTab, label: 'Generali', icon: SettingsIcon },
-    { id: 'database' as SettingsTab, label: 'Database', icon: HardDrive },
   ];
 
   // Funzioni per gli aggiornamenti
@@ -1333,109 +1331,6 @@ export function Settings() {
             </div>
           )}
 
-          {activeTab === 'general' && (
-            <div className="space-y-6">
-              {/* Informazioni Applicazione */}
-              <div
-                className="rounded-2xl p-6"
-                style={{
-                  background: 'var(--card-bg)',
-                  border: '1px solid var(--glass-border)',
-                }}
-              >
-                <div className="flex items-center gap-3 mb-6">
-                  <div
-                    className="p-2 rounded-xl"
-                    style={{
-                      background: 'color-mix(in srgb, var(--color-secondary) 15%, transparent)',
-                    }}
-                  >
-                    <Info className="w-6 h-6" style={{ color: 'var(--color-secondary)' }} />
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-semibold" style={{ color: 'var(--color-text-primary)' }}>Informazioni Applicazione</h2>
-                    <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>Dettagli sulla versione e configurazione</p>
-                  </div>
-                </div>
-
-                <div
-                  className="rounded-xl p-6"
-                  style={{
-                    background: 'linear-gradient(135deg, color-mix(in srgb, var(--color-primary) 10%, transparent) 0%, color-mix(in srgb, var(--color-secondary) 10%, transparent) 100%)',
-                    border: '1px solid var(--glass-border)',
-                  }}
-                >
-                  <div className="grid grid-cols-2 gap-6">
-                    <div>
-                      <label className="text-sm font-medium block mb-1" style={{ color: 'var(--color-text-secondary)' }}>Versione</label>
-                      <p className="text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>0.1.0</p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium block mb-1" style={{ color: 'var(--color-text-secondary)' }}>Database</label>
-                      <p className="text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>SQLite</p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium block mb-1" style={{ color: 'var(--color-text-secondary)' }}>Ambiente</label>
-                      <p className="text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>Development</p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium block mb-1" style={{ color: 'var(--color-text-secondary)' }}>Build</label>
-                      <p className="text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>Tauri 2.0</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Preferenze Generali */}
-              <div
-                className="rounded-2xl p-6"
-                style={{
-                  background: 'var(--card-bg)',
-                  border: '1px solid var(--glass-border)',
-                }}
-              >
-                <h3 className="font-semibold mb-4" style={{ color: 'var(--color-text-primary)' }}>Preferenze</h3>
-                <div className="space-y-4">
-                  <div
-                    className="flex items-center justify-between py-3"
-                    style={{ borderBottom: '1px solid var(--glass-border)' }}
-                  >
-                    <div>
-                      <label className="font-medium" style={{ color: 'var(--color-text-primary)' }}>Lingua</label>
-                      <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Seleziona la lingua dell'interfaccia</p>
-                    </div>
-                    <select
-                      className="px-3 py-2 rounded-xl focus:outline-none focus:ring-2"
-                      style={{
-                        background: 'var(--card-hover)',
-                        border: '1px solid var(--glass-border)',
-                        color: 'var(--color-text-primary)',
-                      }}
-                    >
-                      <option>Italiano</option>
-                      <option>English</option>
-                    </select>
-                  </div>
-
-                  <div className="flex items-center justify-between py-3">
-                    <div>
-                      <label className="font-medium" style={{ color: 'var(--color-text-primary)' }}>Aspetto</label>
-                      <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Personalizza colori e tema nel tab "Aspetto"</p>
-                    </div>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => setActiveTab('aspetto')}
-                    >
-                      <Palette className="w-4 h-4 mr-1" />
-                      Vai ad Aspetto
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* TAB AGGIORNAMENTI */}
           {activeTab === 'updates' && (
             <div className="space-y-6">
@@ -1620,99 +1515,6 @@ export function Settings() {
             </div>
           )}
 
-          {activeTab === 'database' && (
-            <div className="space-y-6">
-              {/* Gestione Database */}
-              <div
-                className="rounded-2xl p-6"
-                style={{
-                  background: 'var(--card-bg)',
-                  border: '1px solid var(--glass-border)',
-                }}
-              >
-                <div className="flex items-center gap-3 mb-6">
-                  <div
-                    className="p-2 rounded-xl"
-                    style={{
-                      background: 'color-mix(in srgb, var(--color-success) 15%, transparent)',
-                    }}
-                  >
-                    <Database className="w-6 h-6" style={{ color: 'var(--color-success)' }} />
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-semibold" style={{ color: 'var(--color-text-primary)' }}>Gestione Database</h2>
-                    <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>Manutenzione e ottimizzazione del database</p>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div
-                    className="rounded-xl p-4"
-                    style={{
-                      background: 'color-mix(in srgb, var(--color-accent) 10%, transparent)',
-                      border: '1px solid color-mix(in srgb, var(--color-accent) 30%, transparent)',
-                    }}
-                  >
-                    <h3 className="font-semibold mb-2" style={{ color: 'var(--color-text-primary)' }}>Statistiche Database</h3>
-                    <div className="grid grid-cols-3 gap-4 mt-4">
-                      <div>
-                        <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>Dimensione</p>
-                        <p className="text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>340 KB</p>
-                      </div>
-                      <div>
-                        <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>Tabelle</p>
-                        <p className="text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>8</p>
-                      </div>
-                      <div>
-                        <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>Record Totali</p>
-                        <p className="text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>--</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div
-                    className="rounded-xl p-4"
-                    style={{
-                      background: 'color-mix(in srgb, var(--color-warning) 10%, transparent)',
-                      border: '1px solid color-mix(in srgb, var(--color-warning) 30%, transparent)',
-                    }}
-                  >
-                    <h3 className="font-semibold mb-2" style={{ color: 'var(--color-text-primary)' }}>Manutenzione</h3>
-                    <p className="text-sm mb-4" style={{ color: 'var(--color-text-secondary)' }}>Ottimizza il database per migliorare le performance</p>
-                    <Button variant="secondary" size="sm" disabled>
-                      <Database className="w-4 h-4 mr-2" />
-                      Ottimizza Database (Prossimamente)
-                    </Button>
-                  </div>
-
-                  <div
-                    className="rounded-xl p-4"
-                    style={{
-                      background: 'color-mix(in srgb, var(--color-danger) 10%, transparent)',
-                      border: '1px solid color-mix(in srgb, var(--color-danger) 30%, transparent)',
-                    }}
-                  >
-                    <h3 className="font-semibold mb-2 flex items-center gap-2" style={{ color: 'var(--color-text-primary)' }}>
-                      <AlertCircle className="w-5 h-5" style={{ color: 'var(--color-danger)' }} />
-                      Zona Pericolosa
-                    </h3>
-                    <p className="text-sm mb-4" style={{ color: 'var(--color-text-secondary)' }}>Queste operazioni non sono reversibili</p>
-                    <button
-                      disabled
-                      className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium opacity-50 cursor-not-allowed"
-                      style={{
-                        background: 'color-mix(in srgb, var(--color-danger) 15%, transparent)',
-                        color: 'var(--color-danger)',
-                      }}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      Elimina Tutti i Dati (Prossimamente)
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </>

@@ -35,7 +35,8 @@ jobs:
           tagName: v__VERSION__
           releaseName: 'Beauty Manager Pro v__VERSION__'
           releaseBody: |
-            Scarica l'installer per Windows:
-            - **Windows**: `Beauty.Manager.Pro_*_x64-setup.exe`
+            ## Download per Windows
+            - **Installer (consigliato)**: `Beauty.Manager.Pro_*_x64-setup.exe`
+            - **MSI**: `Beauty.Manager.Pro_*_x64_en-US.msi`
           releaseDraft: true
           prerelease: false
