@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import resourceTimeGridPlugin from '@fullcalendar/resource-timegrid';
 import dayGridPlugin from '@fullcalendar/daygrid';
-import interactionPlugin from '@fullcalendar/interaction';
+import interactionPlugin, { EventResizeDoneArg } from '@fullcalendar/interaction';
 import itLocale from '@fullcalendar/core/locales/it';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Filter, X, FileDown } from 'lucide-react';
 import { useAgendaStore } from '../stores/agendaStore';
@@ -11,7 +11,7 @@ import { ExportModal } from '../components/agenda/ExportModal';
 import { WeekViewCalendar } from '../components/agenda/WeekViewCalendar';
 import { Button } from '../components/ui/Button';
 import type { AppuntamentoWithDetails } from '../types/agenda';
-import type { EventClickArg, DateSelectArg, EventDropArg, EventResizeDoneArg, DateClickArg } from '@fullcalendar/core';
+import type { EventClickArg, DateSelectArg, EventDropArg } from '@fullcalendar/core';
 
 interface AgendaProps {
   openAppuntamentoId?: string | null;

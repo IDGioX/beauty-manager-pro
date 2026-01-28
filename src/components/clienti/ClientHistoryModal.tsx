@@ -6,7 +6,6 @@ import {
   Clock,
   Award,
   Scissors,
-  X,
   Loader2,
 } from 'lucide-react';
 import { Modal } from '../ui/Modal';

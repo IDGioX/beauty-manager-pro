@@ -191,6 +191,7 @@ export interface ComunicazioniStats {
   errori: number;
   oggi: number;
   questa_settimana: number;
+  questo_mese: number;
   per_tipo: TipoCount[];
   per_canale: CanaleCount[];
 }

@@ -10,7 +10,7 @@ import {
   Scissors,
   Crown,
 } from 'lucide-react';
-import { analyticsService, PeriodAnalytics, TrattamentoStats, ClienteTopRicavo, SpesaMensile } from '../services/analytics';
+import { analyticsService, PeriodAnalytics, TrattamentoStats, ClienteTopRicavo } from '../services/analytics';
 import {
   startOfDay,
   endOfDay,
