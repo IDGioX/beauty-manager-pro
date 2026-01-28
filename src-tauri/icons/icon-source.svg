@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#EC4899"/>
+      <stop offset="50%" style="stop-color:#8B5CF6"/>
+      <stop offset="100%" style="stop-color:#3B82F6"/>
+    </linearGradient>
+    <linearGradient id="innerGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:rgba(255,255,255,0.2)"/>
+      <stop offset="100%" style="stop-color:rgba(255,255,255,0)"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="20" flood-color="rgba(139,92,246,0.3)"/>
+    </filter>
+  </defs>
+
+  <!-- Background rounded square -->
+  <rect x="32" y="32" width="960" height="960" rx="220" ry="220" fill="url(#bgGrad)" filter="url(#shadow)"/>
+
+  <!-- Inner glow overlay -->
+  <rect x="32" y="32" width="960" height="960" rx="220" ry="220" fill="url(#innerGlow)"/>
+
+  <!-- Main sparkle/star - center -->
+  <g transform="translate(512, 480)">
+    <!-- 4-point star shape -->
+    <path d="M0,-180 C20,-60 60,-20 180,0 C60,20 20,60 0,180 C-20,60 -60,20 -180,0 C-60,-20 -20,-60 0,-180 Z"
+          fill="white" opacity="0.95"/>
+  </g>
+
+  <!-- Small sparkle - top right -->
+  <g transform="translate(700, 300)">
+    <path d="M0,-60 C8,-20 20,-8 60,0 C20,8 8,20 0,60 C-8,20 -20,8 -60,0 C-20,-8 -8,-20 0,-60 Z"
+          fill="white" opacity="0.8"/>
+  </g>
+
+  <!-- Small sparkle - bottom left -->
+  <g transform="translate(340, 670)">
+    <path d="M0,-45 C6,-15 15,-6 45,0 C15,6 6,15 0,45 C-6,15 -15,6 -45,0 C-15,-6 -6,-15 0,-45 Z"
+          fill="white" opacity="0.7"/>
+  </g>
+
+  <!-- Tiny sparkle - top left -->
+  <g transform="translate(330, 340)">
+    <path d="M0,-25 C4,-8 8,-4 25,0 C8,4 4,8 0,25 C-4,8 -8,4 -25,0 C-8,-4 -4,-8 0,-25 Z"
+          fill="white" opacity="0.6"/>
+  </g>
+
+  <!-- Subtle "B" letterform hint in the sparkle -->
+  <!-- Small dot accents -->
+  <circle cx="680" cy="620" r="12" fill="white" opacity="0.4"/>
+  <circle cx="400" cy="280" r="8" fill="white" opacity="0.35"/>
+</svg>

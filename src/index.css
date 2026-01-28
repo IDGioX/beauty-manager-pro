@@ -1,0 +1,820 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* CSS Custom Properties - Valori default (verranno sovrascritti da JavaScript) */
+:root {
+  /* Colori principali */
+  --color-primary: #E8927C;
+  --color-primary-light: #F5B5A5;
+  --color-primary-dark: #D4745E;
+
+  /* Colori secondari */
+  --color-secondary: #9B8AA8;
+  --color-secondary-light: #C4B5CF;
+  --color-secondary-dark: #7A6B88;
+
+  /* Colore accento */
+  --color-accent: #7AACA8;
+  --color-accent-light: #A5CBC8;
+  --color-accent-dark: #5E8B87;
+
+  /* Sfondi */
+  --bg-base: #FBF8F4;
+  --bg-secondary: #F5F0E8;
+  --bg-tertiary: #EDE7DB;
+
+  /* Testo */
+  --color-text-primary: #2D2A26;
+  --color-text-secondary: #5C574F;
+  --color-text-muted: #9A948A;
+
+  /* Glass effect */
+  --glass-bg: rgba(255, 255, 255, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.5);
+  --glass-shadow: rgba(45, 42, 38, 0.08);
+
+  /* Card */
+  --card-bg: rgba(255, 255, 255, 0.85);
+  --card-hover: rgba(255, 255, 255, 0.95);
+
+  /* Sidebar */
+  --sidebar-bg: #2D2A26;
+  --sidebar-gradient-end: #1A1816;
+  --sidebar-text: rgba(255, 255, 255, 0.7);
+  --sidebar-text-active: #FFFFFF;
+  --sidebar-hover: rgba(255, 255, 255, 0.08);
+
+  /* Status colors */
+  --color-success: #7CB87C;
+  --color-warning: #E8B47C;
+  --color-danger: #E87C7C;
+
+  /* Font size */
+  --font-size-base: 16px;
+}
+
+/* Dark mode overrides - applicate via JavaScript */
+.dark {
+  color-scheme: dark;
+}
+
+@layer base {
+  body {
+    background: linear-gradient(135deg, var(--bg-base) 0%, var(--bg-secondary) 50%, var(--bg-tertiary) 100%);
+    background-attachment: fixed;
+    color: var(--color-text-primary);
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: var(--font-size-base);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    transition: background 0.3s ease, color 0.3s ease;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-weight: 600;
+    color: var(--color-text-primary);
+    letter-spacing: -0.02em;
+  }
+
+  h1 { font-size: 2rem; font-weight: 700; }
+  h2 { font-size: 1.5rem; }
+  h3 { font-size: 1.25rem; }
+  h4 { font-size: 1.125rem; }
+
+  /* Nasconde scrollbar mantenendo funzionalita scroll */
+  * {
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE/Edge */
+  }
+
+  *::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Opera */
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-text-secondary);
+  }
+}
+
+@layer components {
+  /* Modern glass card */
+  .card {
+    background: var(--card-bg);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 20px;
+    border: 1px solid var(--glass-border);
+    box-shadow: 0 4px 24px var(--glass-shadow), 0 1px 2px rgba(45, 42, 38, 0.04);
+    padding: 1.5rem;
+    transition: all 0.3s ease;
+  }
+
+  .card:hover {
+    background: var(--card-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 32px var(--glass-shadow), 0 2px 4px rgba(45, 42, 38, 0.06);
+  }
+
+  /* Stat card with colored accent */
+  .stat-card {
+    background: var(--card-bg);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 20px;
+    border: 1px solid var(--glass-border);
+    box-shadow: 0 4px 24px var(--glass-shadow);
+    padding: 1.5rem;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease;
+  }
+
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: var(--accent-color, var(--color-primary));
+    border-radius: 20px 20px 0 0;
+  }
+
+  .stat-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 40px var(--glass-shadow);
+  }
+
+  .stat-card.primary { --accent-color: var(--color-primary); }
+  .stat-card.secondary { --accent-color: var(--color-secondary); }
+  .stat-card.accent { --accent-color: var(--color-accent); }
+  .stat-card.success { --accent-color: var(--color-success); }
+
+  /* Primary button */
+  .btn-primary {
+    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
+    color: white;
+    font-weight: 600;
+    padding: 0.75rem 1.5rem;
+    border-radius: 12px;
+    border: none;
+    box-shadow: 0 4px 14px color-mix(in srgb, var(--color-primary) 40%, transparent);
+    transition: all 0.2s ease;
+    cursor: pointer;
+  }
+
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px color-mix(in srgb, var(--color-primary) 50%, transparent);
+  }
+
+  .btn-primary:active {
+    transform: translateY(0);
+  }
+
+  /* Secondary button */
+  .btn-secondary {
+    background: var(--card-bg);
+    backdrop-filter: blur(10px);
+    color: var(--color-text-primary);
+    font-weight: 500;
+    padding: 0.75rem 1.5rem;
+    border-radius: 12px;
+    border: 1px solid var(--glass-border);
+    box-shadow: 0 2px 8px var(--glass-shadow);
+    transition: all 0.2s ease;
+    cursor: pointer;
+  }
+
+  .btn-secondary:hover {
+    background: var(--card-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px var(--glass-shadow);
+  }
+
+  /* Ghost button */
+  .btn-ghost {
+    background: transparent;
+    color: var(--color-text-secondary);
+    font-weight: 500;
+    padding: 0.75rem 1.5rem;
+    border-radius: 12px;
+    border: none;
+    transition: all 0.2s ease;
+    cursor: pointer;
+  }
+
+  .btn-ghost:hover {
+    background: color-mix(in srgb, var(--color-text-primary) 5%, transparent);
+    color: var(--color-text-primary);
+  }
+
+  /* Modern input */
+  .input {
+    width: 100%;
+    padding: 0.875rem 1rem;
+    background: var(--card-bg);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    color: var(--color-text-primary);
+    font-size: 0.9375rem;
+    transition: all 0.2s ease;
+  }
+
+  .input:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 15%, transparent);
+  }
+
+  .input::placeholder {
+    color: var(--color-text-muted);
+  }
+
+  /* Glass surface */
+  .glass {
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--glass-border);
+  }
+
+  .glass-card {
+    background: var(--card-bg);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    box-shadow: 0 4px 24px var(--glass-shadow);
+  }
+
+  /* Hide scrollbar while keeping functionality */
+  .scrollbar-hidden {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .scrollbar-hidden::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Badge styles */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.75rem;
+    border-radius: 100px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+  }
+
+  .badge-primary {
+    background: color-mix(in srgb, var(--color-primary) 15%, transparent);
+    color: var(--color-primary-dark);
+  }
+
+  .badge-secondary {
+    background: color-mix(in srgb, var(--color-secondary) 15%, transparent);
+    color: var(--color-secondary-dark);
+  }
+
+  .badge-success {
+    background: color-mix(in srgb, var(--color-success) 15%, transparent);
+    color: color-mix(in srgb, var(--color-success) 70%, black);
+  }
+
+  .badge-warning {
+    background: color-mix(in srgb, var(--color-warning) 15%, transparent);
+    color: color-mix(in srgb, var(--color-warning) 70%, black);
+  }
+
+  .badge-danger {
+    background: color-mix(in srgb, var(--color-danger) 15%, transparent);
+    color: color-mix(in srgb, var(--color-danger) 70%, black);
+  }
+
+  /* Icon button */
+  .icon-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    background: var(--card-bg);
+    border: 1px solid var(--glass-border);
+    color: var(--color-text-secondary);
+    transition: all 0.2s ease;
+    cursor: pointer;
+  }
+
+  .icon-btn:hover {
+    background: var(--card-hover);
+    color: var(--color-text-primary);
+    transform: translateY(-1px);
+  }
+
+  /* Avatar */
+  .avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, var(--color-primary-light) 0%, var(--color-primary) 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 600;
+    font-size: 0.875rem;
+  }
+
+  .avatar-lg {
+    width: 56px;
+    height: 56px;
+    border-radius: 16px;
+    font-size: 1.125rem;
+  }
+
+  /* Divider */
+  .divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent 0%, var(--glass-border) 50%, transparent 100%);
+    margin: 1.5rem 0;
+  }
+
+  /* Modern table */
+  .table-modern {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0 0.5rem;
+  }
+
+  .table-modern th {
+    text-align: left;
+    padding: 0.75rem 1rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-text-muted);
+  }
+
+  .table-modern td {
+    padding: 1rem;
+    background: var(--card-bg);
+    backdrop-filter: blur(10px);
+  }
+
+  .table-modern tr td:first-child {
+    border-radius: 12px 0 0 12px;
+  }
+
+  .table-modern tr td:last-child {
+    border-radius: 0 12px 12px 0;
+  }
+
+  .table-modern tbody tr {
+    transition: all 0.2s ease;
+  }
+
+  .table-modern tbody tr:hover td {
+    background: var(--card-hover);
+  }
+}
+
+/* FullCalendar Modern Styling - Usa variabili dinamiche */
+.fc {
+  --fc-border-color: var(--glass-border);
+  --fc-page-bg-color: transparent;
+  --fc-neutral-bg-color: var(--bg-secondary);
+  --fc-today-bg-color: color-mix(in srgb, var(--color-primary) 8%, transparent);
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+.fc .fc-toolbar {
+  background: var(--card-bg);
+  backdrop-filter: blur(20px);
+  border-radius: 16px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1rem !important;
+  border: 1px solid var(--glass-border);
+}
+
+.fc .fc-toolbar-title {
+  font-size: 1.125rem !important;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.fc .fc-button {
+  background: var(--card-bg) !important;
+  border: 1px solid var(--glass-border) !important;
+  color: var(--color-text-secondary) !important;
+  font-weight: 500 !important;
+  padding: 0.5rem 1rem !important;
+  border-radius: 10px !important;
+  transition: all 0.2s ease !important;
+}
+
+.fc .fc-button:hover {
+  background: var(--card-hover) !important;
+  color: var(--color-text-primary) !important;
+}
+
+.fc .fc-button-primary:not(:disabled).fc-button-active,
+.fc .fc-button-primary:not(:disabled):active {
+  background: var(--color-primary) !important;
+  border-color: var(--color-primary) !important;
+  color: white !important;
+}
+
+/* Calendar grid */
+.fc .fc-scrollgrid {
+  background: var(--card-bg);
+  backdrop-filter: blur(20px);
+  border-radius: 16px;
+  border: 1px solid var(--glass-border) !important;
+  overflow: hidden;
+}
+
+.fc .fc-scrollgrid-section > td {
+  border: none;
+}
+
+/* Resource column separators */
+.fc .fc-col-header-cell,
+.fc .fc-timegrid-col {
+  border-right: 2px solid var(--glass-border) !important;
+}
+
+.fc .fc-col-header-cell:last-child,
+.fc .fc-timegrid-col:last-child {
+  border-right: none !important;
+}
+
+/* Resource header styling */
+.fc .fc-col-header-cell {
+  padding: 0 !important;
+  background: var(--bg-secondary);
+  font-weight: 600;
+  font-size: 0.8125rem;
+  color: var(--color-text-primary);
+}
+
+.fc .fc-col-header-cell-cushion {
+  color: var(--color-text-primary);
+  padding: 1rem 0.75rem !important;
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--bg-secondary);
+}
+
+/* Header row background uniform */
+.fc .fc-scrollgrid thead tr:first-child > th {
+  background: var(--bg-secondary) !important;
+}
+
+/* Minimum column width */
+.fc .fc-timegrid-col {
+  min-width: 180px !important;
+}
+
+/* Resource area */
+.fc .fc-resource-area {
+  width: 160px !important;
+}
+
+/* Resource area header (Operatori title) */
+.fc .fc-datagrid-header {
+  background: var(--bg-secondary) !important;
+}
+
+.fc .fc-datagrid-header .fc-datagrid-cell-frame {
+  padding: 1rem !important;
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
+}
+
+.fc .fc-datagrid-header .fc-datagrid-cell-main {
+  font-weight: 700;
+  font-size: 0.875rem;
+  color: white;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Small time axis header cell - blend with background */
+.fc .fc-timegrid-axis-frame {
+  background: var(--bg-secondary) !important;
+}
+
+.fc .fc-datagrid-cell-frame {
+  padding: 0.75rem 1rem !important;
+}
+
+.fc .fc-datagrid-cell-main {
+  font-weight: 500;
+  font-size: 0.8125rem;
+  color: var(--color-text-primary);
+}
+
+/* Time column */
+.fc .fc-timegrid-slot-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+
+/* Time slot rows - Hour lines visibility */
+.fc .fc-timegrid-slot {
+  height: 1.5em !important;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-text-muted) 15%, transparent) !important;
+}
+
+/* Hour lines (major) - more visible */
+.fc .fc-timegrid-slot-label-frame {
+  border-bottom: 1px solid color-mix(in srgb, var(--color-text-muted) 30%, transparent) !important;
+}
+
+.fc .fc-timegrid-slot-lane {
+  border-bottom: 1px solid color-mix(in srgb, var(--color-text-muted) 15%, transparent) !important;
+}
+
+/* Major hour rows - stronger border every hour */
+.fc tr.fc-timegrid-slot-label:has(.fc-timegrid-slot-label-cushion:not(:empty)) {
+  border-top: 2px solid color-mix(in srgb, var(--color-text-secondary) 40%, transparent) !important;
+}
+
+/* Horizontal lane lines between slots */
+.fc .fc-timegrid-divider {
+  border-top: 1px solid var(--glass-border) !important;
+  padding: 0 !important;
+}
+
+/* Alternating column backgrounds */
+.fc .fc-timegrid-col:nth-child(odd) .fc-timegrid-col-frame {
+  background: color-mix(in srgb, var(--bg-secondary) 30%, transparent);
+}
+
+.fc .fc-timegrid-col:nth-child(even) .fc-timegrid-col-frame {
+  background: color-mix(in srgb, var(--card-bg) 50%, transparent);
+}
+
+/* Event styling */
+.fc .fc-event {
+  border-radius: 10px !important;
+  border: none !important;
+  padding: 6px 10px !important;
+  font-size: 0.75rem !important;
+  font-weight: 500 !important;
+  box-shadow: 0 2px 8px var(--glass-shadow) !important;
+  margin: 2px 4px !important;
+  transition: all 0.2s ease !important;
+}
+
+.fc .fc-event-main {
+  padding: 2px 0;
+}
+
+.fc .fc-event-time {
+  font-weight: 600;
+  font-size: 0.6875rem;
+  opacity: 0.9;
+}
+
+.fc .fc-event-title {
+  font-weight: 500;
+  white-space: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fc .fc-event:hover {
+  box-shadow: 0 6px 20px var(--glass-shadow) !important;
+  transform: translateY(-2px) scale(1.02);
+}
+
+/* Current time indicator */
+.fc .fc-timegrid-now-indicator-line {
+  border-color: var(--color-primary) !important;
+  border-width: 2px !important;
+}
+
+.fc .fc-timegrid-now-indicator-arrow {
+  border-color: var(--color-primary) !important;
+}
+
+/* Selection styling */
+.fc .fc-highlight {
+  background: color-mix(in srgb, var(--color-primary) 15%, transparent) !important;
+  border: 2px dashed var(--color-primary) !important;
+  border-radius: 10px;
+}
+
+/* Day grid specific */
+.fc .fc-daygrid-day {
+  background: transparent;
+}
+
+.fc .fc-daygrid-day:hover {
+  background: color-mix(in srgb, var(--color-primary) 5%, transparent);
+}
+
+.fc .fc-daygrid-day-number {
+  color: var(--color-text-primary);
+  font-weight: 500;
+}
+
+.fc .fc-day-today .fc-daygrid-day-number {
+  background: var(--color-primary);
+  color: white;
+  border-radius: 8px;
+  padding: 4px 8px;
+}
+
+/* Month view specific styles */
+.fc .fc-daygrid-body {
+  background: transparent;
+}
+
+.fc .fc-daygrid-day-frame {
+  min-height: 100px;
+  padding: 4px;
+}
+
+.fc .fc-daygrid-day-top {
+  display: flex;
+  justify-content: flex-end;
+  padding: 4px;
+}
+
+.fc .fc-daygrid-event {
+  border-radius: 6px !important;
+  padding: 2px 6px !important;
+  font-size: 0.75rem !important;
+  margin: 1px 2px !important;
+  border: none !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.fc .fc-daygrid-event:hover {
+  opacity: 0.9;
+  transform: scale(1.02);
+  cursor: pointer;
+}
+
+.fc .fc-daygrid-more-link {
+  color: var(--color-primary) !important;
+  font-weight: 600;
+  font-size: 0.75rem;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+.fc .fc-daygrid-more-link:hover {
+  background: color-mix(in srgb, var(--color-primary) 15%, transparent);
+}
+
+.fc .fc-popover {
+  background: var(--card-bg) !important;
+  border: 1px solid var(--glass-border) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15) !important;
+  backdrop-filter: blur(20px);
+}
+
+.fc .fc-popover-header {
+  background: var(--card-hover) !important;
+  border-bottom: 1px solid var(--glass-border) !important;
+  padding: 8px 12px !important;
+  border-radius: 12px 12px 0 0 !important;
+  color: var(--color-text-primary) !important;
+}
+
+.fc .fc-popover-body {
+  padding: 8px !important;
+}
+
+.fc .fc-daygrid-day.fc-day-other {
+  opacity: 0.5;
+}
+
+.fc .fc-daygrid-day.fc-day-other .fc-daygrid-day-number {
+  color: var(--color-text-muted);
+}
+
+/* Weekday header for month view */
+.fc .fc-col-header-cell {
+  padding: 12px 0 !important;
+  background: transparent !important;
+}
+
+.fc .fc-col-header-cell-cushion {
+  color: var(--color-text-secondary) !important;
+  font-weight: 600 !important;
+  font-size: 0.85rem !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em;
+}
+
+@layer utilities {
+  .animate-in {
+    animation: animate-in 0.3s ease-out;
+  }
+
+  .fade-in {
+    animation: fade-in 0.3s ease-out;
+  }
+
+  .slide-in-from-bottom {
+    animation: slide-in-from-bottom 0.3s ease-out;
+  }
+
+  .slide-in-up {
+    animation: slide-in-up 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .scale-in {
+    animation: scale-in 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .float {
+    animation: float 3s ease-in-out infinite;
+  }
+
+  @keyframes animate-in {
+    from {
+      opacity: 0;
+      transform: scale(0.96);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes slide-in-from-bottom {
+    from {
+      opacity: 0;
+      transform: translateY(16px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes slide-in-up {
+    from {
+      opacity: 0;
+      transform: translateY(24px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes scale-in {
+    from {
+      opacity: 0;
+      transform: scale(0.92);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+  }
+
+  /* Gradient text effect */
+  .gradient-text {
+    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Soft shadow */
+  .shadow-soft {
+    box-shadow: 0 4px 24px var(--glass-shadow);
+  }
+
+  .shadow-soft-lg {
+    box-shadow: 0 8px 40px var(--glass-shadow);
+  }
+}
