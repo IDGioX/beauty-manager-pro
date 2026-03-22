@@ -1,4 +1,5 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useCallback } from 'react';
+import ReactDOM from 'react-dom';
 import { X } from 'lucide-react';
 
 interface ModalProps {
@@ -16,21 +17,23 @@ export const Modal: React.FC<ModalProps> = ({
   children,
   size = 'md',
 }) => {
-  useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
+  const handleEscape = useCallback(
+    (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
-    };
+    },
+    [onClose]
+  );
 
+  useEffect(() => {
     if (isOpen) {
       document.addEventListener('keydown', handleEscape);
       document.body.style.overflow = 'hidden';
     }
-
     return () => {
       document.removeEventListener('keydown', handleEscape);
-      document.body.style.overflow = 'unset';
+      document.body.style.overflow = '';
     };
-  }, [isOpen, onClose]);
+  }, [isOpen, handleEscape]);
 
   if (!isOpen) return null;
 
@@ -41,41 +44,46 @@ export const Modal: React.FC<ModalProps> = ({
     xl: 'max-w-4xl',
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+  return ReactDOM.createPortal(
+    <>
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm"
+        className="fixed inset-0 z-[100]"
+        style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
         onClick={onClose}
       />
 
-      {/* Modal */}
-      <div
-        className={`
-          relative w-full ${sizes[size]}
-          bg-white dark:bg-gray-800 rounded-2xl shadow-2xl
-          transform transition-all
-          animate-in fade-in slide-in-from-bottom-4 duration-200
-        `}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-5 bg-gray-900">
-          <h2 className="text-lg font-semibold text-white">
-            {title}
-          </h2>
-          <button
-            onClick={onClose}
-            className="p-1.5 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+      {/* Scroll wrapper */}
+      <div className="fixed inset-0 z-[101] overflow-y-auto pointer-events-none">
+        <div className="min-h-full flex items-start justify-center p-4 pt-[6vh] pb-8">
+          {/* Modal card */}
+          <div
+            className={`pointer-events-auto relative w-full ${sizes[size]} rounded-2xl shadow-2xl`}
+            style={{ background: 'var(--card-bg, #fff)', border: '1px solid var(--glass-border, rgba(0,0,0,0.1))' }}
+            onClick={(e) => e.stopPropagation()}
           >
-            <X size={18} />
-          </button>
-        </div>
+            {/* Header */}
+            <div
+              className="flex items-center justify-between px-6 py-4 rounded-t-2xl"
+              style={{ background: 'var(--sidebar-bg, #111827)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}
+            >
+              <h2 className="text-[15px] font-semibold text-white tracking-tight">{title}</h2>
+              <button
+                onClick={onClose}
+                className="p-1.5 text-white/50 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+              >
+                <X size={16} />
+              </button>
+            </div>
 
-        {/* Content */}
-        <div className="p-6 max-h-[70vh] overflow-y-auto scrollbar-hidden">
-          {children}
+            {/* Content */}
+            <div className="p-6 max-h-[72vh] overflow-y-auto scrollbar-hidden">
+              {children}
+            </div>
+          </div>
         </div>
       </div>
-    </div>
+    </>,
+    document.body
   );
 };

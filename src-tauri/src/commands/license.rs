@@ -1,31 +1,27 @@
 use crate::error::AppResult;
 use crate::licensing::LicenseManager;
-use crate::models::{License, LicenseFile, LicenseInfo};
+use crate::models::{GeneratedKey, License, LicenseInfo};
 use crate::AppState;
 use std::sync::Arc;
-use tokio::sync::Mutex;
 use tauri::State;
+use tokio::sync::Mutex;
 
-/// Importa un file licenza dal file system
+/// Attiva una licenza tramite chiave alfanumerica
 #[tauri::command]
-pub async fn import_license(
-    license_file_content: String,
+pub async fn activate_license(
+    key: String,
+    customer_name: Option<String>,
     db: State<'_, Arc<Mutex<AppState>>>,
 ) -> AppResult<License> {
-    // Parse JSON del file licenza
-    let license_file: LicenseFile = serde_json::from_str(&license_file_content)
-        .map_err(|e| crate::error::AppError::InvalidInput(format!("Invalid license file: {}", e)))?;
-
-    // Ottieni il database pool
     let pool = {
         let app_state = db.lock().await;
         app_state.db.pool.clone()
-    }; // MutexGuard dropped here
+    };
 
     let license_manager = LicenseManager::new(pool);
-
-    // Importa la licenza
-    license_manager.import_license(license_file).await
+    license_manager
+        .activate_license(&key, customer_name.as_deref())
+        .await
 }
 
 /// Valida la licenza corrente
@@ -64,8 +60,21 @@ pub async fn remove_license(db: State<'_, Arc<Mutex<AppState>>>) -> AppResult<()
     license_manager.remove_license().await
 }
 
-/// Ottieni l'hardware ID del dispositivo corrente
+/// Genera una nuova chiave di licenza (admin)
 #[tauri::command]
-pub fn get_hardware_id() -> AppResult<String> {
-    LicenseManager::get_hardware_id()
+pub fn generate_license_key(
+    license_type: String,
+    durata_mesi: Option<i32>,
+) -> AppResult<GeneratedKey> {
+    let key = LicenseManager::generate_key(&license_type, durata_mesi)?;
+
+    // Parsa per ottenere la data di scadenza
+    let (_, scadenza) = LicenseManager::parse_and_validate_key(&key)?;
+    let expires_at = scadenza.map(|d| format!("{}T23:59:59Z", d));
+
+    Ok(GeneratedKey {
+        key,
+        license_type,
+        expires_at,
+    })
 }

@@ -1,13 +1,12 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
-  Search, User, Phone, Mail, Settings, LogOut, ChevronDown,
+  Search, Phone, Mail, Settings,
   LayoutDashboard, Calendar, Users, Scissors, Package, MessageSquare,
-  BarChart3, TrendingUp, TrendingDown, History, ClipboardList, UserPlus,
+  BarChart3, TrendingUp, TrendingDown, History, UserPlus,
   CalendarPlus, FileText, Database, Palette, Bell, Command
 } from 'lucide-react';
 import { clientiService } from '../../services/clienti';
 import { Cliente } from '../../types/cliente';
-import { useAuthStore } from '../../stores/authStore';
 
 interface HeaderProps {
   title: string;
@@ -33,11 +32,6 @@ export const Header: React.FC<HeaderProps> = ({ title, onNavigate }) => {
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const searchRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-
-  const [showUserMenu, setShowUserMenu] = useState(false);
-  const userMenuRef = useRef<HTMLDivElement>(null);
-
-  const { user, logout } = useAuthStore();
 
   // Definizione comandi di ricerca globale
   const searchCommands: SearchCommand[] = useMemo(() => [
@@ -90,8 +84,8 @@ export const Header: React.FC<HeaderProps> = ({ title, onNavigate }) => {
     {
       id: 'nav-magazzino',
       label: 'Magazzino',
-      description: 'Gestione inventario prodotti',
-      keywords: ['magazzino', 'inventario', 'prodotti', 'stock', 'giacenze'],
+      description: 'Gestione prodotti e scorte',
+      keywords: ['magazzino', 'prodotti', 'stock', 'giacenze', 'scorte'],
       icon: <Package size={18} />,
       type: 'page',
       page: 'magazzino'
@@ -99,8 +93,8 @@ export const Header: React.FC<HeaderProps> = ({ title, onNavigate }) => {
     {
       id: 'nav-comunicazioni',
       label: 'Comunicazioni',
-      description: 'SMS, Email e campagne marketing',
-      keywords: ['comunicazioni', 'sms', 'email', 'messaggi', 'marketing', 'campagne', 'newsletter'],
+      description: 'WhatsApp, Email e auguri clienti',
+      keywords: ['comunicazioni', 'whatsapp', 'email', 'messaggi', 'template', 'auguri', 'compleanni'],
       icon: <MessageSquare size={18} />,
       type: 'page',
       page: 'comunicazioni'
@@ -161,19 +155,6 @@ export const Header: React.FC<HeaderProps> = ({ title, onNavigate }) => {
       action: () => {
         sessionStorage.setItem('magazzinoTab', 'movimenti');
         window.dispatchEvent(new CustomEvent('magazzinoTabChange', { detail: 'movimenti' }));
-      }
-    },
-    {
-      id: 'action-inventario',
-      label: 'Inventario',
-      description: 'Gestione inventario fisico',
-      keywords: ['inventario', 'conta', 'verifica', 'giacenze', 'controllo'],
-      icon: <ClipboardList size={18} />,
-      type: 'action',
-      page: 'magazzino',
-      action: () => {
-        sessionStorage.setItem('magazzinoTab', 'inventario');
-        window.dispatchEvent(new CustomEvent('magazzinoTabChange', { detail: 'inventario' }));
       }
     },
     // Azioni rapide - Clienti
@@ -244,8 +225,8 @@ export const Header: React.FC<HeaderProps> = ({ title, onNavigate }) => {
     {
       id: 'action-template',
       label: 'Template Messaggi',
-      description: 'Gestisci template SMS/Email',
-      keywords: ['template', 'modelli', 'messaggi', 'sms', 'email'],
+      description: 'Gestisci testi WhatsApp/Email',
+      keywords: ['template', 'modelli', 'messaggi', 'whatsapp', 'email', 'testi'],
       icon: <FileText size={18} />,
       type: 'action',
       page: 'comunicazioni',
@@ -297,9 +278,6 @@ export const Header: React.FC<HeaderProps> = ({ title, onNavigate }) => {
     const handleClickOutside = (event: MouseEvent) => {
       if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
         setShowResults(false);
-      }
-      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
-        setShowUserMenu(false);
       }
     };
 
@@ -360,10 +338,6 @@ export const Header: React.FC<HeaderProps> = ({ title, onNavigate }) => {
         handleClienteClick(searchResults[clienteIndex]);
       }
     }
-  };
-
-  const handleLogout = async () => {
-    await logout();
   };
 
   // Ricerca clienti (con debounce)
@@ -670,77 +644,6 @@ export const Header: React.FC<HeaderProps> = ({ title, onNavigate }) => {
               </div>
             )}
           </div>
-
-          {/* User Menu */}
-          {user && (
-            <div className="relative" ref={userMenuRef}>
-              <button
-                onClick={() => setShowUserMenu(!showUserMenu)}
-                className="flex items-center gap-2 px-3 py-2 rounded-xl transition-all duration-200 hover:scale-105"
-                style={{
-                  background: 'var(--card-bg)',
-                  border: '1px solid var(--glass-border)',
-                }}
-              >
-                <div
-                  className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-semibold"
-                  style={{
-                    background: 'linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%)',
-                  }}
-                >
-                  {user.avatar_url ? (
-                    <img src={user.avatar_url} alt={user.nome} className="w-full h-full rounded-lg object-cover" />
-                  ) : (
-                    user.nome?.charAt(0).toUpperCase() || <User size={16} />
-                  )}
-                </div>
-                <ChevronDown size={16} style={{ color: 'var(--color-text-secondary)' }} />
-              </button>
-
-              {/* User Menu Dropdown */}
-              {showUserMenu && (
-                <div
-                  className="absolute right-0 top-full mt-2 w-56 rounded-2xl z-50 py-2"
-                  style={{
-                    background: 'var(--card-hover)',
-                    backdropFilter: 'blur(20px)',
-                    border: '1px solid var(--glass-border)',
-                    boxShadow: '0 8px 32px var(--glass-shadow)',
-                  }}
-                >
-                  <div className="px-4 py-3" style={{ borderBottom: '1px solid var(--glass-border)' }}>
-                    <p className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>
-                      {user.nome} {user.cognome}
-                    </p>
-                    <p className="text-xs capitalize" style={{ color: 'var(--color-text-muted)' }}>
-                      {user.role}
-                    </p>
-                  </div>
-
-                  <button
-                    onClick={() => {
-                      setShowUserMenu(false);
-                      onNavigate('settings');
-                    }}
-                    className="w-full px-4 py-2.5 text-left text-sm flex items-center gap-2 transition-colors hover:bg-[color-mix(in_srgb,var(--color-text-primary)_4%,transparent)]"
-                    style={{ color: 'var(--color-text-secondary)' }}
-                  >
-                    <Settings size={16} />
-                    Impostazioni
-                  </button>
-
-                  <button
-                    onClick={handleLogout}
-                    className="w-full px-4 py-2.5 text-left text-sm flex items-center gap-2 transition-colors hover:bg-[color-mix(in_srgb,var(--color-danger)_8%,transparent)]"
-                    style={{ color: 'var(--color-danger)' }}
-                  >
-                    <LogOut size={16} />
-                    Esci
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
         </div>
       </div>
     </header>

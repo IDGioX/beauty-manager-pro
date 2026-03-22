@@ -1,14 +1,18 @@
 use crate::error::{AppError, AppResult};
-use crate::models::{License, LicenseFile, LicenseInfo};
-use chrono::{DateTime, Utc};
-use ed25519_dalek::{VerifyingKey, Signature, Verifier};
-use serde_json;
-use sha2::{Digest, Sha256};
+use crate::models::{License, LicenseInfo};
+use chrono::{Datelike, NaiveDate, Utc};
+use hmac::{Hmac, Mac};
+use rand::Rng;
+use sha2::Sha256;
 use sqlx::SqlitePool;
 
-/// Public key per validazione firme (generata con la private key del sistema di generazione licenze)
-/// NOTA: Questa chiave pubblica deve corrispondere alla private key usata per generare le licenze
-const PUBLIC_KEY_HEX: &str = "2e3ccf609af27a6c0c2027961a32fff077cab622338a767861a483684a10483d";
+type HmacSha256 = Hmac<Sha256>;
+
+/// Segreto per HMAC — cambiare prima della distribuzione
+const HMAC_SECRET: &[u8] = b"bm_pro_2026_s3cret_k3y_h7x9q2w4";
+
+/// Caratteri usati per la parte random della chiave (no 0/O/1/I per evitare confusione)
+const CHARSET: &[u8] = b"ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
 pub struct LicenseManager {
     db: SqlitePool,
@@ -19,160 +23,222 @@ impl LicenseManager {
         Self { db }
     }
 
-    /// Genera hardware fingerprint univoco per il dispositivo corrente
-    pub fn get_hardware_id() -> AppResult<String> {
-        let mut hasher = Sha256::new();
-
-        // CPU info
-        #[cfg(target_os = "macos")]
-        {
-            use std::process::Command;
-            if let Ok(output) = Command::new("sysctl")
-                .arg("-n")
-                .arg("machdep.cpu.brand_string")
-                .output()
-            {
-                hasher.update(&output.stdout);
-            }
-        }
-
-        #[cfg(target_os = "windows")]
-        {
-            use std::process::Command;
-            if let Ok(output) = Command::new("wmic")
-                .args(&["cpu", "get", "processorid"])
-                .output()
-            {
-                hasher.update(&output.stdout);
-            }
-        }
-
-        #[cfg(target_os = "linux")]
-        {
-            if let Ok(contents) = std::fs::read_to_string("/proc/cpuinfo") {
-                hasher.update(contents.as_bytes());
-            }
-        }
-
-        // Hostname
-        if let Ok(hostname) = hostname::get() {
-            hasher.update(hostname.as_encoded_bytes());
-        }
-
-        Ok(format!("{:x}", hasher.finalize()))
+    /// Calcola checksum HMAC-SHA256 del payload, ritorna 4 chars hex uppercase
+    fn compute_checksum(payload: &str) -> String {
+        let mut mac =
+            HmacSha256::new_from_slice(HMAC_SECRET).expect("HMAC can take key of any size");
+        mac.update(payload.as_bytes());
+        let result = mac.finalize();
+        let hex_full = hex::encode_upper(result.into_bytes());
+        hex_full[..4].to_string()
     }
 
-    /// Verifica la firma digitale del file licenza
-    fn verify_signature(&self, license_file: &LicenseFile) -> AppResult<bool> {
-        // Decodifica la chiave pubblica
-        let public_key_bytes = hex::decode(PUBLIC_KEY_HEX).map_err(|e| {
-            AppError::InvalidInput(format!("Invalid public key: {}", e))
-        })?;
+    /// Genera una chiave di licenza nel formato BM-TTMM-YYYY-RRRR-CCCC
+    pub fn generate_key(license_type: &str, durata_mesi: Option<i32>) -> AppResult<String> {
+        let (tt, mm, yyyy) = match license_type {
+            "trial" => {
+                let mesi = durata_mesi.unwrap_or(1);
+                let scadenza =
+                    Utc::now().naive_utc().date() + chrono::Months::new(mesi as u32);
+                (
+                    "TR",
+                    format!("{:02}", scadenza.month()),
+                    format!("{:04}", scadenza.year()),
+                )
+            }
+            "monthly" => {
+                let mesi = durata_mesi.unwrap_or(1);
+                let scadenza =
+                    Utc::now().naive_utc().date() + chrono::Months::new(mesi as u32);
+                (
+                    "MO",
+                    format!("{:02}", scadenza.month()),
+                    format!("{:04}", scadenza.year()),
+                )
+            }
+            "annual" => {
+                let mesi = durata_mesi.unwrap_or(12);
+                let scadenza =
+                    Utc::now().naive_utc().date() + chrono::Months::new(mesi as u32);
+                (
+                    "AN",
+                    format!("{:02}", scadenza.month()),
+                    format!("{:04}", scadenza.year()),
+                )
+            }
+            "lifetime" => ("LT", "00".to_string(), "0000".to_string()),
+            _ => {
+                return Err(AppError::InvalidInput(format!(
+                    "Tipo licenza non valido: {}",
+                    license_type
+                )))
+            }
+        };
 
-        // Converti in array [u8; 32] per VerifyingKey
-        let key_array: &[u8; 32] = public_key_bytes.as_slice().try_into().map_err(|_| {
-            AppError::InvalidInput("Invalid public key length".to_string())
-        })?;
+        // Genera 4 chars random
+        let mut rng = rand::thread_rng();
+        let random_part: String = (0..4)
+            .map(|_| {
+                let idx = rng.gen_range(0..CHARSET.len());
+                CHARSET[idx] as char
+            })
+            .collect();
 
-        let public_key = VerifyingKey::from_bytes(key_array).map_err(|e| {
-            AppError::InvalidInput(format!("Invalid public key format: {}", e))
-        })?;
+        // Payload per checksum: tutto tranne il checksum stesso
+        let payload = format!("BM-{}{}-{}-{}", tt, mm, yyyy, random_part);
+        let checksum = Self::compute_checksum(&payload);
 
-        // Decodifica la firma
-        let signature_bytes = hex::decode(&license_file.signature).map_err(|e| {
-            AppError::InvalidInput(format!("Invalid signature format: {}", e))
-        })?;
-
-        // Converti in array [u8; 64] per Signature
-        let sig_array: &[u8; 64] = signature_bytes.as_slice().try_into().map_err(|_| {
-            AppError::InvalidInput("Invalid signature length".to_string())
-        })?;
-
-        let signature = Signature::from_bytes(sig_array);
-
-        // Genera il payload da verificare
-        let payload = license_file.get_signing_payload();
-
-        // Verifica la firma
-        public_key
-            .verify(payload.as_bytes(), &signature)
-            .map_err(|_| AppError::InvalidInput("Signature verification failed".to_string()))?;
-
-        Ok(true)
+        Ok(format!("{}-{}", payload, checksum))
     }
 
-    /// Importa un file licenza
-    pub async fn import_license(&self, license_file: LicenseFile) -> AppResult<License> {
-        // 1. Verifica firma digitale
-        if !self.verify_signature(&license_file)? {
+    /// Parsa e valida una chiave di licenza.
+    /// Ritorna (license_type_db, Option<scadenza>)
+    pub fn parse_and_validate_key(key: &str) -> AppResult<(String, Option<NaiveDate>)> {
+        let key = key.trim().to_uppercase();
+
+        // Formato atteso: BM-TTMM-YYYY-RRRR-CCCC (5 segmenti separati da -)
+        let parts: Vec<&str> = key.split('-').collect();
+        if parts.len() != 5 {
             return Err(AppError::InvalidInput(
-                "Invalid license signature".to_string(),
+                "Formato chiave non valido. Usa: BM-XXXX-XXXX-XXXX-XXXX".to_string(),
             ));
         }
 
-        // 2. Verifica scadenza
-        if license_file.is_expired() {
+        if parts[0] != "BM" {
             return Err(AppError::InvalidInput(
-                "License has expired".to_string(),
+                "Chiave non valida: deve iniziare con BM".to_string(),
             ));
         }
 
-        // 3. Verifica hardware binding (se specificato)
-        if let Some(bound_hardware_id) = &license_file.hardware_id {
-            let current_hardware_id = Self::get_hardware_id()?;
-            if bound_hardware_id != &current_hardware_id {
+        // Verifica lunghezze
+        if parts[1].len() != 4 || parts[2].len() != 4 || parts[3].len() != 4 || parts[4].len() != 4
+        {
+            return Err(AppError::InvalidInput(
+                "Formato chiave non valido: ogni segmento deve avere 4 caratteri".to_string(),
+            ));
+        }
+
+        // Verifica checksum
+        let payload = format!("{}-{}-{}-{}", parts[0], parts[1], parts[2], parts[3]);
+        let expected_checksum = Self::compute_checksum(&payload);
+        if parts[4] != expected_checksum {
+            return Err(AppError::InvalidInput(
+                "Chiave di licenza non valida".to_string(),
+            ));
+        }
+
+        // Parsa tipo
+        let tt = &parts[1][..2];
+        let license_type = match tt {
+            "TR" => "trial",
+            "MO" => "monthly",
+            "AN" => "annual",
+            "LT" => "lifetime",
+            _ => {
                 return Err(AppError::InvalidInput(
-                    "License is bound to a different device".to_string(),
+                    "Tipo licenza non riconosciuto nella chiave".to_string(),
+                ))
+            }
+        };
+
+        // Parsa scadenza
+        let mm_str = &parts[1][2..4];
+        let yyyy_str = parts[2];
+
+        let scadenza = if license_type == "lifetime" {
+            None
+        } else {
+            let mese: u32 = mm_str.parse().map_err(|_| {
+                AppError::InvalidInput("Mese non valido nella chiave".to_string())
+            })?;
+            let anno: i32 = yyyy_str.parse().map_err(|_| {
+                AppError::InvalidInput("Anno non valido nella chiave".to_string())
+            })?;
+
+            if !(1..=12).contains(&mese) {
+                return Err(AppError::InvalidInput(
+                    "Mese non valido nella chiave".to_string(),
+                ));
+            }
+
+            // Scadenza = ultimo giorno del mese indicato
+            let next_month = if mese == 12 {
+                NaiveDate::from_ymd_opt(anno + 1, 1, 1)
+            } else {
+                NaiveDate::from_ymd_opt(anno, mese + 1, 1)
+            };
+
+            let ultimo_giorno = next_month
+                .ok_or_else(|| AppError::InvalidInput("Data scadenza non valida".to_string()))?
+                .pred_opt()
+                .ok_or_else(|| AppError::InvalidInput("Data scadenza non valida".to_string()))?;
+
+            Some(ultimo_giorno)
+        };
+
+        Ok((license_type.to_string(), scadenza))
+    }
+
+    /// Attiva una licenza con la chiave fornita
+    pub async fn activate_license(
+        &self,
+        key: &str,
+        customer_name: Option<&str>,
+    ) -> AppResult<License> {
+        // 1. Valida chiave
+        let (license_type, scadenza) = Self::parse_and_validate_key(key)?;
+
+        // 2. Controlla scadenza
+        if let Some(scad) = scadenza {
+            let oggi = Utc::now().naive_utc().date();
+            if scad < oggi {
+                return Err(AppError::InvalidInput(
+                    "La chiave di licenza è scaduta".to_string(),
                 ));
             }
         }
 
-        // 4. Rimuovi eventuali licenze esistenti
+        // 3. Rimuovi licenze esistenti
         sqlx::query("DELETE FROM license")
             .execute(&self.db)
-            .await
-            ?;
+            .await?;
 
-        // 5. Inserisci nuova licenza
-        let features_json = serde_json::to_string(&license_file.features)
-            .unwrap_or_else(|_| "[]".to_string());
+        // 4. Inserisci nuova licenza
+        let key_normalized = key.trim().to_uppercase();
+        let expires_at = scadenza.map(|d| format!("{}T23:59:59Z", d));
+        let issued_at = Utc::now().to_rfc3339();
 
         let license = sqlx::query_as::<_, License>(
             r#"
             INSERT INTO license (
-                license_key, customer_name, customer_email, license_type,
-                status, issued_at, expires_at, hardware_id, features, notes, signature
-            ) VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?)
-            RETURNING *
+                license_key, customer_name, license_type,
+                status, issued_at, expires_at
+            ) VALUES (?1, ?2, ?3, 'active', ?4, ?5)
+            RETURNING id, license_key, customer_name, license_type, status,
+                      issued_at, activated_at, expires_at, created_at, updated_at
             "#,
         )
-        .bind(&license_file.license_key)
-        .bind(&license_file.customer_name)
-        .bind(&license_file.customer_email)
-        .bind(&license_file.license_type)
-        .bind(&license_file.issued_at)
-        .bind(&license_file.expires_at)
-        .bind(&license_file.hardware_id)
-        .bind(features_json)
-        .bind(&license_file.notes)
-        .bind(&license_file.signature)
+        .bind(&key_normalized)
+        .bind(customer_name)
+        .bind(&license_type)
+        .bind(&issued_at)
+        .bind(&expires_at)
         .fetch_one(&self.db)
-        .await
-        ?;
+        .await?;
 
-        // 6. Log validazione
+        // 5. Log
         self.log_validation(Some(&license.id), true, None).await?;
 
         Ok(license)
     }
 
-    /// Valida la licenza corrente
+    /// Valida la licenza corrente nel DB
     pub async fn validate_license(&self) -> AppResult<bool> {
-        // Ottieni licenza dal database
-        let license_opt = sqlx::query_as::<_, License>("SELECT * FROM license LIMIT 1")
-            .fetch_optional(&self.db)
-            .await
-            ?;
+        let license_opt = sqlx::query_as::<_, License>(
+            "SELECT id, license_key, customer_name, license_type, status, issued_at, activated_at, expires_at, created_at, updated_at FROM license LIMIT 1",
+        )
+        .fetch_optional(&self.db)
+        .await?;
 
         let license = match license_opt {
             Some(l) => l,
@@ -196,62 +262,43 @@ impl LicenseManager {
 
         // Verifica scadenza
         if let Some(expires_at) = &license.expires_at {
-            if let Ok(expiry) = DateTime::parse_from_rfc3339(expires_at) {
+            if let Ok(expiry) = chrono::DateTime::parse_from_rfc3339(expires_at) {
                 if expiry.with_timezone(&Utc) < Utc::now() {
-                    // Aggiorna stato a expired
                     sqlx::query("UPDATE license SET status = 'expired' WHERE id = ?")
                         .bind(&license.id)
                         .execute(&self.db)
                         .await
                         .ok();
 
-                    self.log_validation(
-                        Some(&license.id),
-                        false,
-                        Some("License expired"),
-                    )
-                    .await?;
+                    self.log_validation(Some(&license.id), false, Some("License expired"))
+                        .await?;
                     return Ok(false);
                 }
             }
         }
 
-        // Verifica hardware binding (se presente)
-        if let Some(bound_hardware_id) = &license.hardware_id {
-            let current_hardware_id = Self::get_hardware_id()?;
-            if bound_hardware_id != &current_hardware_id {
-                self.log_validation(
-                    Some(&license.id),
-                    false,
-                    Some("Hardware mismatch"),
-                )
-                .await?;
-                return Ok(false);
-            }
-        }
-
-        // Licenza valida
         self.log_validation(Some(&license.id), true, None).await?;
         Ok(true)
     }
 
     /// Ottieni informazioni sulla licenza corrente
     pub async fn get_license_info(&self) -> AppResult<LicenseInfo> {
-        let license_opt = sqlx::query_as::<_, License>("SELECT * FROM license LIMIT 1")
-            .fetch_optional(&self.db)
-            .await
-            ?;
+        let license_opt = sqlx::query_as::<_, License>(
+            "SELECT id, license_key, customer_name, license_type, status, issued_at, activated_at, expires_at, created_at, updated_at FROM license LIMIT 1",
+        )
+        .fetch_optional(&self.db)
+        .await?;
 
         match license_opt {
             Some(license) => {
                 let days_remaining = if let Some(expires_at) = &license.expires_at {
-                    if let Ok(expiry) = DateTime::parse_from_rfc3339(expires_at) {
+                    if let Ok(expiry) = chrono::DateTime::parse_from_rfc3339(expires_at) {
                         Some((expiry.with_timezone(&Utc) - Utc::now()).num_days())
                     } else {
                         None
                     }
                 } else {
-                    None // Lifetime license
+                    None // Lifetime
                 };
 
                 Ok(LicenseInfo {
@@ -276,27 +323,15 @@ impl LicenseManager {
         }
     }
 
-    /// Revoca la licenza corrente
-    pub async fn revoke_license(&self) -> AppResult<()> {
-        sqlx::query("UPDATE license SET status = 'revoked' WHERE status = 'active'")
-            .execute(&self.db)
-            .await
-            ?;
-
-        Ok(())
-    }
-
-    /// Rimuovi completamente la licenza
+    /// Rimuovi la licenza
     pub async fn remove_license(&self) -> AppResult<()> {
         sqlx::query("DELETE FROM license")
             .execute(&self.db)
-            .await
-            ?;
-
+            .await?;
         Ok(())
     }
 
-    /// Log una validazione (per audit)
+    /// Log validazione
     async fn log_validation(
         &self,
         license_id: Option<&str>,
@@ -316,8 +351,7 @@ impl LicenseManager {
         .bind(error_message)
         .bind(app_version)
         .execute(&self.db)
-        .await
-        ?;
+        .await?;
 
         Ok(())
     }

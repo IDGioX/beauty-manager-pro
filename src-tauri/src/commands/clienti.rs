@@ -16,16 +16,15 @@ pub async fn get_clienti(
     let state = db.lock().await;
     let limit = limit.unwrap_or(50);
     let offset = offset.unwrap_or(0);
-    let show_inactive_only = include_inactive.unwrap_or(false);
+    let include_all = include_inactive.unwrap_or(false);
 
     let query = if let Some(search_term) = search {
         let search_pattern = format!("%{}%", search_term);
-        if show_inactive_only {
+        if include_all {
             sqlx::query_as::<_, Cliente>(
                 r#"
                 SELECT * FROM clienti
                 WHERE (nome LIKE ?1 OR cognome LIKE ?1 OR cellulare LIKE ?1 OR email LIKE ?1)
-                AND attivo = 0
                 ORDER BY cognome, nome
                 LIMIT ?2 OFFSET ?3
                 "#,
@@ -52,11 +51,10 @@ pub async fn get_clienti(
             .await?
         }
     } else {
-        if show_inactive_only {
+        if include_all {
             sqlx::query_as::<_, Cliente>(
                 r#"
                 SELECT * FROM clienti
-                WHERE attivo = 0
                 ORDER BY cognome, nome
                 LIMIT ?1 OFFSET ?2
                 "#,
@@ -176,6 +174,11 @@ pub async fn update_cliente(
     consenso_sms: Option<bool>,
     consenso_whatsapp: Option<bool>,
     consenso_email: Option<bool>,
+    tipo_pelle: Option<String>,
+    allergie: Option<String>,
+    patologie: Option<String>,
+    note_estetiche: Option<String>,
+    fonte_acquisizione: Option<String>,
 ) -> AppResult<Cliente> {
     let state = db.lock().await;
 
@@ -286,6 +289,46 @@ pub async fn update_cliente(
             .await?;
     }
 
+    if let Some(ref tp) = tipo_pelle {
+        sqlx::query("UPDATE clienti SET tipo_pelle = ?1 WHERE id = ?2")
+            .bind(tp)
+            .bind(&id)
+            .execute(&state.db.pool)
+            .await?;
+    }
+
+    if let Some(ref al) = allergie {
+        sqlx::query("UPDATE clienti SET allergie = ?1 WHERE id = ?2")
+            .bind(al)
+            .bind(&id)
+            .execute(&state.db.pool)
+            .await?;
+    }
+
+    if let Some(ref pa) = patologie {
+        sqlx::query("UPDATE clienti SET patologie = ?1 WHERE id = ?2")
+            .bind(pa)
+            .bind(&id)
+            .execute(&state.db.pool)
+            .await?;
+    }
+
+    if let Some(ref ne) = note_estetiche {
+        sqlx::query("UPDATE clienti SET note_estetiche = ?1 WHERE id = ?2")
+            .bind(ne)
+            .bind(&id)
+            .execute(&state.db.pool)
+            .await?;
+    }
+
+    if let Some(ref fa) = fonte_acquisizione {
+        sqlx::query("UPDATE clienti SET fonte_acquisizione = ?1 WHERE id = ?2")
+            .bind(fa)
+            .bind(&id)
+            .execute(&state.db.pool)
+            .await?;
+    }
+
     // Recupera il cliente aggiornato
     let cliente = sqlx::query_as::<_, Cliente>("SELECT * FROM clienti WHERE id = ?1")
         .bind(&id)
@@ -347,6 +390,20 @@ pub async fn delete_cliente(
     id: String,
 ) -> AppResult<()> {
     let state = db.lock().await;
+
+    // Verifica che non ci siano appuntamenti associati
+    let count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM appuntamenti WHERE cliente_id = ?"
+    )
+    .bind(&id)
+    .fetch_one(&state.db.pool)
+    .await?;
+
+    if count > 0 {
+        return Err(crate::error::AppError::InvalidInput(
+            format!("Impossibile eliminare il cliente: ci sono {} appuntamenti associati. Disattivalo invece di eliminarlo.", count)
+        ));
+    }
 
     // Hard delete - rimuove definitivamente il cliente
     let result = sqlx::query("DELETE FROM clienti WHERE id = ?1")

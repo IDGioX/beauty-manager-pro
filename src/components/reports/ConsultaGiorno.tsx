@@ -120,7 +120,7 @@ export const ConsultaGiorno: React.FC = () => {
               <input
                 type="date"
                 value={format(dataInizio, 'yyyy-MM-dd')}
-                onChange={(e) => setDataInizio(new Date(e.target.value + 'T12:00:00'))}
+                onChange={(e) => { const d = new Date(e.target.value); d.setHours(0, 0, 0, 0); setDataInizio(d); }}
                 className="px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white focus:outline-none focus:ring-2 focus:ring-white/30"
               />
             </div>
@@ -129,7 +129,7 @@ export const ConsultaGiorno: React.FC = () => {
               <input
                 type="date"
                 value={format(dataFine, 'yyyy-MM-dd')}
-                onChange={(e) => setDataFine(new Date(e.target.value + 'T12:00:00'))}
+                onChange={(e) => { const d = new Date(e.target.value); d.setHours(23, 59, 59, 999); setDataFine(d); }}
                 className="px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white focus:outline-none focus:ring-2 focus:ring-white/30"
               />
             </div>
@@ -266,7 +266,7 @@ export const ConsultaGiorno: React.FC = () => {
                       <div className="flex items-center gap-2">
                         <User size={16} className="text-gray-400 flex-shrink-0" />
                         <p className="font-semibold text-gray-900 dark:text-gray-100">
-                          {app.cliente_nome} {app.cliente_cognome}
+                          {app.cliente_nome} {app.cliente_cognome || ''}
                         </p>
                       </div>
                       <span className={`px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${getStatoColor(app.stato)}`}>
@@ -282,7 +282,7 @@ export const ConsultaGiorno: React.FC = () => {
                       </div>
                       <div className="flex items-center gap-2">
                         <User size={14} className="flex-shrink-0" />
-                        <span>Operatore: {app.operatrice_nome} {app.operatrice_cognome}</span>
+                        <span>Operatore: {app.operatrice_nome} {app.operatrice_cognome || ''}</span>
                       </div>
                       {app.cliente_cellulare && (
                         <div className="flex items-center gap-2">

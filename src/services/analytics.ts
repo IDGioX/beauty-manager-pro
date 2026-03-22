@@ -51,6 +51,7 @@ export interface PeriodAnalytics {
   totale_appuntamenti: number;
   appuntamenti_completati: number;
   appuntamenti_annullati: number;
+  appuntamenti_no_show: number;
   tasso_completamento: number;
   ricavo_totale: number;
   ricavo_medio: number;
@@ -109,6 +110,58 @@ export interface ClienteCompleteProfile {
 }
 
 // ============================================
+// FILTERED REPORT TYPES
+// ============================================
+
+export interface ReportFiltrato {
+  data_inizio: string;
+  data_fine: string;
+  cliente_ids?: string[];
+  trattamento_ids?: string[];
+}
+
+export interface OperatriceProduttivita {
+  operatrice_id: string;
+  operatrice_nome: string;
+  operatrice_cognome: string;
+  totale_appuntamenti: number;
+  appuntamenti_completati: number;
+  ricavo_totale: number;
+  ricavo_medio: number;
+  ore_lavorate: number;
+}
+
+export interface RicavoCategoria {
+  categoria_nome: string;
+  totale_appuntamenti: number;
+  ricavo_totale: number;
+  percentuale: number;
+}
+
+export interface ReportAppuntamentoRow {
+  data: string;
+  cliente_nome: string;
+  cliente_cognome: string;
+  trattamento_nome: string;
+  categoria_trattamento: string;
+  operatrice_nome: string;
+  operatrice_cognome: string;
+  durata_minuti: number;
+  stato: string;
+  prezzo: number;
+  note: string;
+}
+
+export interface ReportFiltratoResult {
+  kpi: PeriodAnalytics;
+  top_trattamenti: TrattamentoStats[];
+  top_clienti: ClienteTopRicavo[];
+  produttivita_operatrici: OperatriceProduttivita[];
+  ricavi_per_categoria: RicavoCategoria[];
+  dettaglio_appuntamenti: ReportAppuntamentoRow[];
+}
+
+// ============================================
 // SERVICE
 // ============================================
 
@@ -152,6 +205,13 @@ export const analyticsService = {
    */
   async getPeriodAnalytics(filter: DateRangeFilter): Promise<PeriodAnalytics> {
     return await invoke('get_period_analytics', { filter });
+  },
+
+  /**
+   * Get filtered report with custom date range and optional client/treatment filters
+   */
+  async getReportFiltrato(filtro: ReportFiltrato): Promise<ReportFiltratoResult> {
+    return await invoke('get_report_filtrato', { filtro });
   },
 
   // ============================================

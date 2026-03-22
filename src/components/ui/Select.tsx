@@ -18,53 +18,49 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
     return (
       <div className="w-full">
         {label && (
-          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2.5">
+          <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--color-text-secondary)' }}>
             {label}
           </label>
         )}
-        <div className="relative group">
+        <div className="relative">
           {icon && (
-            <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none group-focus-within:text-primary-500 transition-colors">
+            <div className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--color-text-muted)' }}>
               {icon}
             </div>
           )}
-          {/* Dropdown arrow icon */}
-          <div className="absolute right-4 top-1/2 transform -translate-y-1/2 pointer-events-none">
-            <svg className="w-5 h-5 text-gray-400 dark:text-gray-500 group-focus-within:text-primary-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--color-text-muted)' }}>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
             </svg>
           </div>
           <select
             ref={ref}
-            className={`
-              w-full ${icon ? 'pl-10' : 'pl-4'} pr-10 py-3
-              bg-white dark:bg-gray-800 border-2 rounded-xl
-              text-base font-normal text-gray-900 dark:text-gray-100
-              font-sans
-              transition-all duration-200
-              appearance-none cursor-pointer
-              focus:outline-none focus:ring-4 focus:ring-offset-0
-              hover:border-gray-300 dark:hover:border-gray-500
-              disabled:bg-gray-50 dark:disabled:bg-gray-900 disabled:text-gray-400 dark:disabled:text-gray-600 disabled:cursor-not-allowed disabled:opacity-60
-              ${error
-                ? 'border-red-300 dark:border-red-700 focus:border-red-500 focus:ring-red-100 dark:focus:ring-red-900/50'
-                : 'border-gray-200 dark:border-gray-600 focus:border-primary-500 focus:ring-primary-100 dark:focus:ring-primary-900/50'
-              }
-              ${className}
-            `}
+            className={`w-full ${icon ? 'pl-10' : 'pl-3.5'} pr-10 py-2.5 rounded-xl text-sm appearance-none cursor-pointer transition-all duration-150 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
             style={{
-              WebkitFontSmoothing: 'antialiased',
-              MozOsxFontSmoothing: 'grayscale'
+              background: 'var(--input-bg, var(--card-bg))',
+              border: `1.5px solid ${error ? 'var(--color-danger)' : 'var(--glass-border)'}`,
+              color: 'var(--color-text-primary)',
+              boxShadow: error ? '0 0 0 2px color-mix(in srgb, var(--color-danger) 15%, transparent)' : 'none',
+            }}
+            onFocus={e => {
+              if (!error) {
+                e.currentTarget.style.borderColor = 'var(--color-primary)';
+                e.currentTarget.style.boxShadow = '0 0 0 2px color-mix(in srgb, var(--color-primary) 15%, transparent)';
+              }
+            }}
+            onBlur={e => {
+              if (!error) {
+                e.currentTarget.style.borderColor = 'var(--glass-border)';
+                e.currentTarget.style.boxShadow = 'none';
+              }
             }}
             {...props}
           >
             {options ? (
               <>
-                <option value="" style={{ fontFamily: 'inherit' }}>Seleziona un'opzione...</option>
+                <option value="">Seleziona...</option>
                 {options.map((opt) => (
-                  <option key={opt.value} value={opt.value} style={{ fontFamily: 'inherit', padding: '8px' }}>
-                    {opt.label}
-                  </option>
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
               </>
             ) : (
@@ -73,15 +69,10 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
           </select>
         </div>
         {error && (
-          <p className="mt-2 text-sm font-medium text-red-600 dark:text-red-400 flex items-center gap-1.5">
-            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-            </svg>
-            {error}
-          </p>
+          <p className="mt-1 text-xs font-medium" style={{ color: 'var(--color-danger)' }}>{error}</p>
         )}
         {helperText && !error && (
-          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">{helperText}</p>
+          <p className="mt-1 text-xs" style={{ color: 'var(--color-text-muted)' }}>{helperText}</p>
         )}
       </div>
     );

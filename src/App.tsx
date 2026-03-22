@@ -1,17 +1,20 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback, lazy, Suspense } from "react";
 import { MainLayout } from "./components/layout/MainLayout";
-import { Dashboard } from "./pages/Dashboard";
-import { Clienti } from "./pages/Clienti";
-import { Agenda } from "./pages/Agenda";
-import { Operatrici } from "./pages/Operatrici";
-import { Trattamenti } from "./pages/Trattamenti";
-import { Magazzino } from "./pages/Magazzino";
-import { Comunicazioni } from "./pages/Comunicazioni";
-import { Settings } from "./pages/Settings";
-import { Report } from "./pages/Report";
 import { ThemeProvider } from "./components/theme/ThemeProvider";
 import { AuthGuard } from "./components/auth/AuthGuard";
 import { LicenseGuard } from "./components/license/LicenseGuard";
+import { ToastContainer } from "./components/ui/Toast";
+
+// Lazy load all pages — each becomes a separate chunk
+const Dashboard = lazy(() => import("./pages/Dashboard").then(m => ({ default: m.Dashboard })));
+const Clienti = lazy(() => import("./pages/Clienti").then(m => ({ default: m.Clienti })));
+const Agenda = lazy(() => import("./pages/Agenda").then(m => ({ default: m.Agenda })));
+const Operatrici = lazy(() => import("./pages/Operatrici").then(m => ({ default: m.Operatrici })));
+const Trattamenti = lazy(() => import("./pages/Trattamenti").then(m => ({ default: m.Trattamenti })));
+const Magazzino = lazy(() => import("./pages/Magazzino").then(m => ({ default: m.Magazzino })));
+const Comunicazioni = lazy(() => import("./pages/Comunicazioni").then(m => ({ default: m.Comunicazioni })));
+const Settings = lazy(() => import("./pages/Settings").then(m => ({ default: m.Settings })));
+const Report = lazy(() => import("./pages/Report").then(m => ({ default: m.Report })));
 
 type PageType = 'dashboard' | 'agenda' | 'clienti' | 'operatrici' | 'trattamenti' | 'magazzino' | 'comunicazioni' | 'report' | 'settings';
 
@@ -27,9 +30,20 @@ const pageTitles: Record<PageType, string> = {
   settings: 'Impostazioni',
 };
 
+// Minimal loading fallback
+function PageLoader() {
+  return (
+    <div className="flex items-center justify-center h-full">
+      <div className="w-6 h-6 border-2 rounded-full animate-spin" style={{ borderColor: 'var(--glass-border)', borderTopColor: 'var(--color-primary)' }} />
+    </div>
+  );
+}
+
 function App() {
   const [currentPage, setCurrentPage] = useState<PageType>('dashboard');
   const [pendingAppuntamentoId, setPendingAppuntamentoId] = useState<string | null>(null);
+  const [pendingClienteId, setPendingClienteId] = useState<string | null>(null);
+  const [backToAppuntamentoId, setBackToAppuntamentoId] = useState<string | null>(null);
 
   // Handler per navigare all'Agenda con un appuntamento specifico
   const navigateToAgendaWithAppuntamento = (appuntamentoId: string) => {
@@ -37,18 +51,64 @@ function App() {
     setCurrentPage('agenda');
   };
 
+  // Handler per navigare ai Clienti con un cliente specifico
+  const navigateToClientiWithCliente = useCallback((clienteId: string) => {
+    setPendingClienteId(clienteId);
+    setCurrentPage('clienti');
+  }, []);
+
+  // Callback per tornare all'appuntamento di provenienza
+  const handleGoBackToAppuntamento = useCallback(() => {
+    if (backToAppuntamentoId) {
+      setPendingAppuntamentoId(backToAppuntamentoId);
+      setBackToAppuntamentoId(null);
+      setCurrentPage('agenda');
+    }
+  }, [backToAppuntamentoId]);
+
+  // Global navigation event listener (used by modals that don't have direct access to navigation)
+  useEffect(() => {
+    const handleNavigateToPage = (event: Event) => {
+      const { page, clienteId, appuntamentoId, fromAppuntamentoId } = (event as CustomEvent).detail;
+
+      // Se la navigazione proviene da un appuntamento, salva il contesto per il "torna indietro"
+      if (fromAppuntamentoId) {
+        setBackToAppuntamentoId(fromAppuntamentoId);
+      }
+
+      if (clienteId) {
+        setPendingClienteId(clienteId);
+        setCurrentPage('clienti');
+      } else if (appuntamentoId) {
+        setPendingAppuntamentoId(appuntamentoId);
+        setBackToAppuntamentoId(null);
+        setCurrentPage('agenda');
+      } else if (page) {
+        setCurrentPage(page as PageType);
+      }
+    };
+    window.addEventListener('navigateToPage', handleNavigateToPage);
+    return () => window.removeEventListener('navigateToPage', handleNavigateToPage);
+  }, []);
+
   const renderPage = () => {
     switch (currentPage) {
       case 'dashboard':
-        return <Dashboard />;
+        return (
+          <Dashboard
+            onNavigate={(page) => setCurrentPage(page as PageType)}
+            onOpenAppuntamento={navigateToAgendaWithAppuntamento}
+            onOpenCliente={navigateToClientiWithCliente}
+          />
+        );
       case 'agenda':
         return <Agenda openAppuntamentoId={pendingAppuntamentoId} onAppuntamentoOpened={() => setPendingAppuntamentoId(null)} />;
       case 'clienti':
-        return <Clienti />;
+        return <Clienti openClienteId={pendingClienteId} onClienteOpened={() => setPendingClienteId(null)} onGoBack={backToAppuntamentoId ? handleGoBackToAppuntamento : undefined} />;
       case 'operatrici':
-        return <Operatrici />;
+        return <Operatrici onGoBack={backToAppuntamentoId ? handleGoBackToAppuntamento : undefined} />;
       case 'trattamenti':
-        return <Trattamenti />;
+        return <Trattamenti onGoBack={backToAppuntamentoId ? handleGoBackToAppuntamento : undefined} />;
       case 'magazzino':
         return <Magazzino onNavigateToAgenda={navigateToAgendaWithAppuntamento} />;
       case 'comunicazioni':
@@ -69,10 +129,13 @@ function App() {
           <MainLayout
             currentPage={currentPage}
             pageTitle={pageTitles[currentPage]}
-            onNavigate={(page) => setCurrentPage(page as PageType)}
+            onNavigate={(page) => { setBackToAppuntamentoId(null); setCurrentPage(page as PageType); }}
           >
-            {renderPage()}
+            <Suspense fallback={<PageLoader />}>
+              {renderPage()}
+            </Suspense>
           </MainLayout>
+          <ToastContainer />
         </AuthGuard>
       </ThemeProvider>
     </LicenseGuard>

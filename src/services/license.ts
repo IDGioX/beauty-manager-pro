@@ -1,102 +1,51 @@
 import { invoke } from '@tauri-apps/api/core';
-import { open } from '@tauri-apps/plugin-dialog';
-import { readTextFile } from '@tauri-apps/plugin-fs';
-import type { License, LicenseInfo } from '../types/license';
+import type { License, LicenseInfo, GeneratedKey } from '../types/license';
+
+function extractError(error: unknown, fallback: string): Error {
+  if (typeof error === 'string') return new Error(error);
+  if (error && typeof error === 'object' && 'message' in error) return new Error(String((error as any).message));
+  return new Error(fallback);
+}
 
 export const licenseService = {
-  /**
-   * Importa un file licenza dal file system
-   */
-  async importLicenseFile(): Promise<License> {
+  async activateLicense(key: string, customerName?: string): Promise<License> {
     try {
-      // Apri dialog per selezionare file
-      const selected = await open({
-        multiple: false,
-        filters: [
-          {
-            name: 'Beauty Manager License',
-            extensions: ['bmlic', 'json'],
-          },
-        ],
-      });
-
-      if (!selected || typeof selected !== 'string') {
-        throw new Error('Nessun file selezionato');
-      }
-
-      // Leggi contenuto file
-      const fileContent = await readTextFile(selected);
-
-      // Importa licenza tramite backend
-      const license = await invoke<License>('import_license', {
-        licenseFileContent: fileContent,
-      });
-
-      return license;
-    } catch (error: any) {
-      throw new Error(error || 'Errore durante l\'importazione della licenza');
+      return await invoke<License>('activate_license', { key, customerName });
+    } catch (error) {
+      throw extractError(error, 'Errore durante l\'attivazione della licenza');
     }
   },
 
-  /**
-   * Importa licenza da stringa JSON (per paste da clipboard)
-   */
-  async importLicenseFromString(licenseJson: string): Promise<License> {
-    try {
-      const license = await invoke<License>('import_license', {
-        licenseFileContent: licenseJson,
-      });
-      return license;
-    } catch (error: any) {
-      throw new Error(error || 'Errore durante l\'importazione della licenza');
-    }
-  },
-
-  /**
-   * Valida la licenza corrente
-   */
   async validateLicense(): Promise<boolean> {
     try {
-      const isValid = await invoke<boolean>('validate_license');
-      return isValid;
+      return await invoke<boolean>('validate_license');
     } catch (error) {
       console.error('License validation failed:', error);
       return false;
     }
   },
 
-  /**
-   * Ottieni informazioni sulla licenza corrente
-   */
   async getLicenseInfo(): Promise<LicenseInfo> {
     try {
-      const info = await invoke<LicenseInfo>('get_license_info');
-      return info;
-    } catch (error: any) {
-      throw new Error(error || 'Errore durante il recupero delle informazioni sulla licenza');
+      return await invoke<LicenseInfo>('get_license_info');
+    } catch (error) {
+      throw extractError(error, 'Errore durante il recupero delle informazioni sulla licenza');
     }
   },
 
-  /**
-   * Rimuovi la licenza corrente
-   */
   async removeLicense(): Promise<void> {
     try {
       await invoke('remove_license');
-    } catch (error: any) {
-      throw new Error(error || 'Errore durante la rimozione della licenza');
+    } catch (error) {
+      throw extractError(error, 'Errore durante la rimozione della licenza');
     }
   },
 
-  /**
-   * Ottieni l'hardware ID del dispositivo corrente
-   */
-  async getHardwareId(): Promise<string> {
+  async generateLicenseKey(licenseType: string, durataMesi?: number): Promise<GeneratedKey> {
     try {
-      const hardwareId = await invoke<string>('get_hardware_id');
-      return hardwareId;
-    } catch (error: any) {
-      throw new Error(error || 'Errore durante il recupero dell\'hardware ID');
+      return await invoke<GeneratedKey>('generate_license_key', { licenseType, durataMesi });
+    } catch (error) {
+      throw extractError(error, 'Errore durante la generazione della chiave');
     }
   },
 };

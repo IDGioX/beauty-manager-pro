@@ -66,6 +66,14 @@ pub struct CreateUserInput {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct UpdateUserInput {
+    pub nome: Option<String>,
+    pub cognome: Option<String>,
+    pub email: Option<String>,
+    pub role: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct UpdateUserSettingsInput {
     pub theme_mode: Option<String>,
     pub primary_color: Option<String>,

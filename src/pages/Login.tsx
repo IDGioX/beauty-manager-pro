@@ -94,7 +94,7 @@ export const Login: React.FC = () => {
       const users = await invoke<any[]>('get_all_users');
       if (users.length > 0) {
         const adminUser = users.find(u => u.role === 'admin') || users[0];
-        await invoke('change_password', { userId: adminUser.id, newPassword });
+        await invoke('change_password', { userId: adminUser.id, oldPassword: password, newPassword });
         localStorage.setItem('bmp_user_password', newPassword);
 
         // Update saved password if remember me was enabled

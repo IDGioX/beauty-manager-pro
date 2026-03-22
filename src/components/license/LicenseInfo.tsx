@@ -1,19 +1,45 @@
 import React, { useEffect, useState } from 'react';
-import { Key, Calendar, CheckCircle, XCircle, AlertTriangle, Trash2, RefreshCw, Upload, FileText, X } from 'lucide-react';
+import {
+  Key,
+  Calendar,
+  CheckCircle,
+  XCircle,
+  AlertTriangle,
+  RefreshCw,
+  Clock,
+  CalendarDays,
+  Crown,
+  Infinity,
+} from 'lucide-react';
 import { licenseService } from '../../services/license';
 import type { LicenseInfo as LicenseInfoType } from '../../types/license';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 
+type LicensePlan = {
+  id: string;
+  label: string;
+  description: string;
+  icon: React.ReactNode;
+  durataMesi?: number;
+};
+
+const plans: LicensePlan[] = [
+  { id: 'trial', label: 'Prova', description: '1 mese', icon: <Clock size={20} />, durataMesi: 1 },
+  { id: 'monthly', label: 'Mensile', description: '1 mese', icon: <CalendarDays size={20} />, durataMesi: 1 },
+  { id: 'annual', label: 'Annuale', description: '12 mesi', icon: <Crown size={20} />, durataMesi: 12 },
+  { id: 'lifetime', label: 'A vita', description: 'Nessuna scadenza', icon: <Infinity size={20} /> },
+];
+
 export const LicenseInfo: React.FC = () => {
   const [licenseInfo, setLicenseInfo] = useState<LicenseInfoType | null>(null);
   const [loading, setLoading] = useState(true);
-  const [removing, setRemoving] = useState(false);
-  const [showUpdateForm, setShowUpdateForm] = useState(false);
-  const [updating, setUpdating] = useState(false);
-  const [updateError, setUpdateError] = useState<string | null>(null);
-  const [updateTab, setUpdateTab] = useState<'file' | 'paste'>('file');
-  const [licenseJson, setLicenseJson] = useState('');
+
+  // Rinnovo
+  const [showRenew, setShowRenew] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState('annual');
+  const [renewing, setRenewing] = useState(false);
+  const [renewError, setRenewError] = useState<string | null>(null);
 
   useEffect(() => {
     loadLicenseInfo();
@@ -30,55 +56,21 @@ export const LicenseInfo: React.FC = () => {
     }
   };
 
-  const handleRemoveLicense = async () => {
-    if (!confirm('Sei sicuro di voler rimuovere la licenza? Dovrai attivarla nuovamente.')) {
-      return;
-    }
-
-    setRemoving(true);
-    try {
-      await licenseService.removeLicense();
-      // Reload app
-      window.location.reload();
-    } catch (error: any) {
-      alert(error.message || 'Errore durante la rimozione della licenza');
-      setRemoving(false);
-    }
-  };
-
-  const handleFileUpdate = async () => {
-    setUpdateError(null);
-    setUpdating(true);
+  const handleRenew = async () => {
+    setRenewError(null);
+    setRenewing(true);
 
     try {
-      await licenseService.importLicenseFile();
-      window.location.reload();
+      const plan = plans.find(p => p.id === selectedPlan)!;
+      const generated = await licenseService.generateLicenseKey(plan.id, plan.durataMesi);
+      await licenseService.activateLicense(generated.key);
+      await loadLicenseInfo();
+      setShowRenew(false);
     } catch (err: any) {
-      setUpdateError(err.message || 'Errore durante l\'aggiornamento della licenza');
+      setRenewError(err.message || 'Errore durante il rinnovo');
     } finally {
-      setUpdating(false);
+      setRenewing(false);
     }
-  };
-
-  const handlePasteUpdate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setUpdateError(null);
-    setUpdating(true);
-
-    try {
-      await licenseService.importLicenseFromString(licenseJson);
-      window.location.reload();
-    } catch (err: any) {
-      setUpdateError(err.message || 'Errore durante l\'aggiornamento della licenza');
-    } finally {
-      setUpdating(false);
-    }
-  };
-
-  const closeUpdateForm = () => {
-    setShowUpdateForm(false);
-    setUpdateError(null);
-    setLicenseJson('');
   };
 
   if (loading) {
@@ -104,12 +96,22 @@ export const LicenseInfo: React.FC = () => {
               Nessuna Licenza Attiva
             </h3>
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-              Non è stata trovata alcuna licenza valida. L'applicazione potrebbe non funzionare
-              correttamente.
+              Attiva una licenza per continuare ad utilizzare l'applicazione.
             </p>
-            <Button variant="primary" size="sm" onClick={() => window.location.reload()}>
+            <Button variant="primary" size="sm" onClick={() => setShowRenew(true)}>
               Attiva Licenza
             </Button>
+
+            {showRenew && (
+              <RenewPanel
+                selectedPlan={selectedPlan}
+                onSelectPlan={setSelectedPlan}
+                onConfirm={handleRenew}
+                onCancel={() => { setShowRenew(false); setRenewError(null); }}
+                loading={renewing}
+                error={renewError}
+              />
+            )}
           </div>
         </div>
       </Card>
@@ -121,42 +123,31 @@ export const LicenseInfo: React.FC = () => {
       return <CheckCircle className="text-green-600 dark:text-green-400" size={24} />;
     } else if (licenseInfo.status === 'expired') {
       return <XCircle className="text-red-600 dark:text-red-400" size={24} />;
-    } else {
-      return <AlertTriangle className="text-yellow-600 dark:text-yellow-400" size={24} />;
     }
+    return <AlertTriangle className="text-yellow-600 dark:text-yellow-400" size={24} />;
   };
 
-  const getStatusColor = () => {
-    if (licenseInfo.status === 'active') return 'green';
-    if (licenseInfo.status === 'expired') return 'red';
-    return 'yellow';
+  const getStatusBg = () => {
+    if (licenseInfo.status === 'active') return 'bg-green-100 dark:bg-green-900/20';
+    if (licenseInfo.status === 'expired') return 'bg-red-100 dark:bg-red-900/20';
+    return 'bg-yellow-100 dark:bg-yellow-900/20';
   };
 
   const getLicenseTypeLabel = (type?: string) => {
     switch (type) {
-      case 'trial':
-        return 'Trial';
-      case 'monthly':
-        return 'Mensile';
-      case 'annual':
-        return 'Annuale';
-      case 'lifetime':
-        return 'Lifetime';
-      case 'custom':
-        return 'Custom';
-      default:
-        return type || 'Sconosciuto';
+      case 'trial': return 'Prova';
+      case 'monthly': return 'Mensile';
+      case 'annual': return 'Annuale';
+      case 'lifetime': return 'A vita';
+      default: return type || 'Sconosciuto';
     }
   };
 
-  const statusColor = getStatusColor();
-
   return (
     <Card className="p-6">
+      {/* Header */}
       <div className="flex items-start gap-4 mb-6">
-        <div
-          className={`flex-shrink-0 w-12 h-12 bg-${statusColor}-100 dark:bg-${statusColor}-900/20 rounded-full flex items-center justify-center`}
-        >
+        <div className={`flex-shrink-0 w-12 h-12 ${getStatusBg()} rounded-full flex items-center justify-center`}>
           {getStatusIcon()}
         </div>
         <div className="flex-1">
@@ -179,7 +170,7 @@ export const LicenseInfo: React.FC = () => {
             <span>Stato</span>
           </div>
           <p className="font-medium text-gray-900 dark:text-white capitalize">
-            {licenseInfo.status}
+            {licenseInfo.status === 'active' ? 'Attiva' : licenseInfo.status === 'expired' ? 'Scaduta' : licenseInfo.status}
           </p>
         </div>
 
@@ -204,7 +195,7 @@ export const LicenseInfo: React.FC = () => {
               <Calendar size={16} />
               <span>Durata</span>
             </div>
-            <p className="font-medium text-green-600 dark:text-green-400">Lifetime</p>
+            <p className="font-medium text-green-600 dark:text-green-400">A vita</p>
           </div>
         )}
       </div>
@@ -220,99 +211,24 @@ export const LicenseInfo: React.FC = () => {
               </p>
               <p className="text-sm text-yellow-700 dark:text-yellow-400">
                 {licenseInfo.days_remaining > 0
-                  ? `La tua licenza trial scadrà tra ${licenseInfo.days_remaining} giorni.`
-                  : 'La tua licenza trial è scaduta.'}
+                  ? `La tua licenza scadrà tra ${licenseInfo.days_remaining} giorni.`
+                  : 'La tua licenza è scaduta.'}
               </p>
             </div>
           </div>
         </div>
       )}
 
-      {/* Update License Form */}
-      {showUpdateForm && (
-        <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-xl">
-          <div className="flex items-center justify-between mb-4">
-            <h4 className="font-semibold text-gray-900 dark:text-white">Aggiorna Licenza</h4>
-            <button
-              onClick={closeUpdateForm}
-              className="p-1 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
-            >
-              <X size={20} />
-            </button>
-          </div>
-
-          {/* Tabs */}
-          <div className="flex gap-2 mb-4 border-b border-gray-200 dark:border-gray-600">
-            <button
-              onClick={() => setUpdateTab('file')}
-              className={`flex items-center gap-2 px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
-                updateTab === 'file'
-                  ? 'border-primary-500 text-primary-600 dark:text-primary-400'
-                  : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
-              }`}
-            >
-              <Upload size={16} />
-              Carica File
-            </button>
-            <button
-              onClick={() => setUpdateTab('paste')}
-              className={`flex items-center gap-2 px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
-                updateTab === 'paste'
-                  ? 'border-primary-500 text-primary-600 dark:text-primary-400'
-                  : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
-              }`}
-            >
-              <FileText size={16} />
-              Incolla Codice
-            </button>
-          </div>
-
-          {/* Tab Content */}
-          {updateTab === 'file' ? (
-            <div className="text-center py-4">
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                Seleziona il file .bmlic con la nuova licenza
-              </p>
-              <Button
-                onClick={handleFileUpdate}
-                variant="primary"
-                size="sm"
-                disabled={updating}
-              >
-                {updating ? 'Importazione...' : 'Seleziona File'}
-              </Button>
-            </div>
-          ) : (
-            <form onSubmit={handlePasteUpdate} className="space-y-4">
-              <textarea
-                value={licenseJson}
-                onChange={(e) => setLicenseJson(e.target.value)}
-                placeholder={'{\n  "license_key": "...",\n  ...\n}'}
-                rows={6}
-                required
-                disabled={updating}
-                className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg text-sm font-mono text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
-              />
-              <Button
-                type="submit"
-                variant="primary"
-                size="sm"
-                disabled={updating || !licenseJson.trim()}
-                className="w-full"
-              >
-                {updating ? 'Attivazione...' : 'Attiva Nuova Licenza'}
-              </Button>
-            </form>
-          )}
-
-          {/* Error */}
-          {updateError && (
-            <div className="mt-4 flex items-start gap-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-              <AlertTriangle size={16} className="text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-red-600 dark:text-red-400">{updateError}</p>
-            </div>
-          )}
-        </div>
+      {/* Renew Panel */}
+      {showRenew && (
+        <RenewPanel
+          selectedPlan={selectedPlan}
+          onSelectPlan={setSelectedPlan}
+          onConfirm={handleRenew}
+          onCancel={() => { setShowRenew(false); setRenewError(null); }}
+          loading={renewing}
+          error={renewError}
+        />
       )}
 
       {/* Actions */}
@@ -320,24 +236,82 @@ export const LicenseInfo: React.FC = () => {
         <Button
           variant="primary"
           size="sm"
-          onClick={() => setShowUpdateForm(!showUpdateForm)}
-          disabled={removing || updating}
+          onClick={() => setShowRenew(!showRenew)}
+          disabled={renewing}
           className="flex items-center gap-2"
         >
           <RefreshCw size={16} />
-          Aggiorna Licenza
-        </Button>
-        <Button
-          variant="danger"
-          size="sm"
-          onClick={handleRemoveLicense}
-          disabled={removing || updating}
-          className="flex items-center gap-2"
-        >
-          <Trash2 size={16} />
-          {removing ? 'Rimozione...' : 'Rimuovi Licenza'}
+          {licenseInfo.status === 'expired' || licenseInfo.is_trial ? 'Rinnova Licenza' : 'Modifica Licenza'}
         </Button>
       </div>
     </Card>
   );
 };
+
+/* Pannello scelta durata per rinnovo/attivazione */
+const RenewPanel: React.FC<{
+  selectedPlan: string;
+  onSelectPlan: (id: string) => void;
+  onConfirm: () => void;
+  onCancel: () => void;
+  loading: boolean;
+  error: string | null;
+}> = ({ selectedPlan, onSelectPlan, onConfirm, onCancel, loading, error }) => (
+  <div className="my-4 p-4 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-xl">
+    <div className="flex items-center justify-between mb-3">
+      <h4 className="font-semibold text-gray-900 dark:text-white text-sm">Scegli la durata</h4>
+      <button onClick={onCancel} className="text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
+        Annulla
+      </button>
+    </div>
+
+    <div className="grid grid-cols-2 gap-2 mb-3">
+      {plans.map((plan) => (
+        <button
+          key={plan.id}
+          type="button"
+          onClick={() => onSelectPlan(plan.id)}
+          disabled={loading}
+          className={`
+            p-3 rounded-lg border-2 transition-all text-left text-sm
+            ${selectedPlan === plan.id
+              ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
+              : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
+            }
+            ${loading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+          `}
+        >
+          <div className="flex items-center gap-2">
+            <span className={selectedPlan === plan.id ? 'text-primary-600 dark:text-primary-400' : 'text-gray-400'}>
+              {plan.icon}
+            </span>
+            <div>
+              <p className={`font-medium ${selectedPlan === plan.id ? 'text-primary-700 dark:text-primary-300' : 'text-gray-900 dark:text-white'}`}>
+                {plan.label}
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">{plan.description}</p>
+            </div>
+          </div>
+        </button>
+      ))}
+    </div>
+
+    <Button
+      type="button"
+      variant="primary"
+      size="sm"
+      className="w-full"
+      onClick={onConfirm}
+      disabled={loading}
+    >
+      {loading ? 'Attivazione...' : 'Conferma'}
+    </Button>
+
+    {error && (
+      <div className="mt-2 flex items-start gap-2 p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+        <AlertTriangle size={14} className="text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+        <p className="text-xs text-red-600 dark:text-red-400">{error}</p>
+      </div>
+    )}
+  </div>
+);

@@ -15,8 +15,8 @@ export const trattamentiService = {
 
   async getTrattamenti(categoriaId?: string, attivoOnly?: boolean): Promise<Trattamento[]> {
     return await invoke('get_trattamenti', {
-      categoria_id: categoriaId,
-      attivo_only: attivoOnly
+      categoriaId,
+      attivoOnly
     });
   },
 

@@ -8,26 +8,15 @@ CREATE TABLE IF NOT EXISTS license (
     -- Dati licenza
     license_key TEXT NOT NULL UNIQUE,
     customer_name TEXT,
-    customer_email TEXT,
 
     -- Tipo e stato
-    license_type TEXT NOT NULL CHECK(license_type IN ('trial', 'monthly', 'annual', 'lifetime', 'custom')),
+    license_type TEXT NOT NULL CHECK(license_type IN ('trial', 'monthly', 'annual', 'lifetime')),
     status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'expired', 'revoked')),
 
     -- Date
     issued_at TEXT NOT NULL,
     activated_at TEXT NOT NULL DEFAULT (datetime('now')),
     expires_at TEXT, -- NULL per lifetime
-
-    -- Hardware binding (optional - can be NULL for transferable licenses)
-    hardware_id TEXT,
-
-    -- Metadata
-    features TEXT, -- JSON array of enabled features
-    notes TEXT,
-
-    -- Signature validation
-    signature TEXT NOT NULL, -- Digital signature of license data
 
     -- Audit
     created_at TEXT NOT NULL DEFAULT (datetime('now')),

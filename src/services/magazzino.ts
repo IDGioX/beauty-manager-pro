@@ -63,10 +63,10 @@ export const magazzinoService = {
   }): Promise<Prodotto[]> {
     return await invoke('get_prodotti', {
       search: params?.search || null,
-      categoria_id: params?.categoriaId || null,
-      attivo_only: params?.attivoOnly ?? true,
-      solo_sotto_scorta: params?.soloSottoScorta || false,
-      solo_in_scadenza: params?.soloInScadenza || false,
+      categoriaId: params?.categoriaId || null,
+      attivoOnly: params?.attivoOnly ?? true,
+      soloSottoScorta: params?.soloSottoScorta || false,
+      soloInScadenza: params?.soloInScadenza || false,
       limit: params?.limit || null,
       offset: params?.offset || null,
     });
@@ -168,10 +168,10 @@ export const magazzinoService = {
     tipo?: 'consumo' | 'vendita';
   }): Promise<ReportConsumiResult[]> {
     return await invoke('get_report_consumi', {
-      data_da: params.dataDa,
-      data_a: params.dataA,
-      categoria_id: params.categoriaId || null,
-      operatrice_id: params.operatriceId || null,
+      dataDa: params.dataDa,
+      dataA: params.dataA,
+      categoriaId: params.categoriaId || null,
+      operatriceId: params.operatriceId || null,
       tipo: params.tipo || null,
     });
   },
@@ -197,7 +197,7 @@ export const magazzinoService = {
   },
 
   async getRigheInventario(inventarioId: string): Promise<RigaInventarioWithProdotto[]> {
-    return await invoke('get_righe_inventario', { inventario_id: inventarioId });
+    return await invoke('get_righe_inventario', { inventarioId });
   },
 
   async aggiungiRigaInventario(input: CreateRigaInventarioInput): Promise<RigaInventarioWithProdotto> {
@@ -213,19 +213,19 @@ export const magazzinoService = {
   },
 
   async cercaProdottoPerInventario(inventarioId: string, search: string): Promise<ProdottoPerInventario[]> {
-    return await invoke('cerca_prodotto_per_inventario', { inventario_id: inventarioId, search });
+    return await invoke('cerca_prodotto_per_inventario', { inventarioId, search });
   },
 
   async confermaInventario(id: string): Promise<InventarioRiepilogo> {
-    return await invoke('conferma_inventario', { id });
+    return await invoke('conferma_inventario', { inventarioId: id });
   },
 
   async annullaInventario(id: string): Promise<void> {
-    return await invoke('annulla_inventario', { id });
+    return await invoke('annulla_inventario', { inventarioId: id });
   },
 
   async eliminaInventario(id: string): Promise<void> {
-    return await invoke('elimina_inventario', { id });
+    return await invoke('elimina_inventario', { inventarioId: id });
   },
 
   // ============================================================================

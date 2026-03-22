@@ -99,7 +99,7 @@ export function ProdottiUsatiSection({
 
   useEffect(() => {
     onProdottiChange(prodottiUsati);
-  }, [prodottiUsati]);
+  }, [prodottiUsati, onProdottiChange]);
 
   const handleAddProdotto = (prodotto: Prodotto) => {
     // Verifica se il prodotto è già stato aggiunto
@@ -207,11 +207,12 @@ export function ProdottiUsatiSection({
 
       {/* Ricerca prodotti */}
       {showSearch && !disabled && (
-        <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-3 border border-gray-200 dark:border-gray-700 space-y-2">
+        <div className="rounded-xl p-3 space-y-2" style={{ background: 'var(--glass-border)', border: '1px solid var(--glass-border)' }}>
           <div className="relative">
             <Search
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 z-10"
+              className="absolute left-3 top-1/2 -translate-y-1/2 z-10"
               size={16}
+              style={{ color: 'var(--color-text-muted)' }}
             />
             <Input
               placeholder="Cerca prodotto o scansiona barcode..."
@@ -224,7 +225,7 @@ export function ProdottiUsatiSection({
 
             {/* Dropdown overlay - posizionato sopra il contenuto */}
             {prodottiDisponibili.length > 0 && (
-              <div className="absolute left-0 right-0 top-full mt-1 z-50 max-h-48 overflow-y-auto bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg">
+              <div className="absolute left-0 right-0 top-full mt-1 z-50 max-h-48 overflow-y-auto rounded-xl shadow-lg" style={{ background: 'var(--card-bg)', border: '1px solid var(--glass-border)' }}>
                 {prodottiDisponibili.slice(0, 15).map((prodotto) => {
                   const isAlreadyAdded = prodottiUsati.some(
                     (p) => p.prodotto_id === prodotto.id
@@ -236,19 +237,25 @@ export function ProdottiUsatiSection({
                       type="button"
                       onClick={() => handleAddProdotto(prodotto)}
                       disabled={isEsaurito}
-                      className={`w-full text-left p-2 text-sm border-b border-gray-100 dark:border-gray-800 last:border-b-0 ${
-                        isEsaurito
-                          ? 'opacity-50 cursor-not-allowed bg-gray-100 dark:bg-gray-800'
-                          : isAlreadyAdded
-                          ? 'bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30'
-                          : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+                      className={`w-full text-left p-2 text-sm transition-colors last:border-b-0 ${
+                        isEsaurito ? 'opacity-50 cursor-not-allowed' : ''
                       }`}
+                      style={{
+                        borderBottom: '1px solid var(--glass-border)',
+                        background: isEsaurito
+                          ? 'var(--glass-border)'
+                          : isAlreadyAdded
+                          ? 'color-mix(in srgb, var(--color-success) 8%, transparent)'
+                          : undefined,
+                      }}
+                      onMouseEnter={e => { if (!isEsaurito) e.currentTarget.style.background = isAlreadyAdded ? 'color-mix(in srgb, var(--color-success) 15%, transparent)' : 'var(--glass-border)'; }}
+                      onMouseLeave={e => { if (!isEsaurito) e.currentTarget.style.background = isAlreadyAdded ? 'color-mix(in srgb, var(--color-success) 8%, transparent)' : ''; }}
                     >
-                      <p className={`font-medium ${isAlreadyAdded ? 'text-green-700 dark:text-green-300' : 'text-gray-900 dark:text-white'}`}>
+                      <p className="font-medium" style={{ color: isAlreadyAdded ? 'var(--color-success)' : 'var(--color-text-primary)' }}>
                         {prodotto.nome}
                         {isAlreadyAdded && <span className="ml-1 text-xs">(clicca per +1)</span>}
                       </p>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
                         {prodotto.codice} • Disp: {prodotto.giacenza} {prodotto.unita_misura}
                         {isEsaurito && ' • Esaurito'}
                       </p>

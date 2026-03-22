@@ -8,7 +8,7 @@ export interface TemplateMesaggio {
   id: string;
   codice: string;
   nome: string;
-  tipo: 'reminder' | 'birthday' | 'marketing' | 'custom';
+  tipo: 'reminder_appuntamento' | 'conferma_appuntamento' | 'auguri_compleanno' | 'promozione' | 'recall_periodico' | 'recall_churn' | 'manuale';
   canale: 'whatsapp' | 'email';
   oggetto: string | null;
   corpo: string;
@@ -238,14 +238,14 @@ export const CANALI = [
 ] as const;
 
 export const TIPI_TEMPLATE = [
-  { value: 'reminder', label: 'Promemoria Appuntamento' },
-  { value: 'birthday', label: 'Auguri Compleanno' },
-  { value: 'marketing', label: 'Marketing' },
-  { value: 'custom', label: 'Personalizzato' },
+  { value: 'reminder_appuntamento', label: 'Promemoria Appuntamento' },
+  { value: 'auguri_compleanno', label: 'Auguri Compleanno' },
+  { value: 'promozione', label: 'Promozione' },
+  { value: 'manuale', label: 'Libero' },
 ] as const;
 
 export const STATI_COMUNICAZIONE = [
-  { value: 'pending', label: 'In attesa', color: 'yellow' },
+  { value: 'in_coda', label: 'In attesa', color: 'yellow' },
   { value: 'inviato', label: 'Inviato', color: 'blue' },
   { value: 'consegnato', label: 'Consegnato', color: 'green' },
   { value: 'errore', label: 'Errore', color: 'red' },

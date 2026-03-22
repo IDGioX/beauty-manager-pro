@@ -153,7 +153,7 @@ export function CategorieModal({ isOpen, onClose, onSave }: CategorieModalProps)
 
           {/* Add/Edit Form */}
           {(isAdding || editingId) && (
-            <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl space-y-3">
+            <div className="p-4 rounded-xl space-y-3" style={{ background: 'var(--input-bg, var(--card-bg))', border: '1px solid var(--glass-border)' }}>
               <div className="grid grid-cols-2 gap-3">
                 <Input
                   label="Nome Categoria *"
@@ -209,30 +209,30 @@ export function CategorieModal({ isOpen, onClose, onSave }: CategorieModalProps)
           {/* Categories List */}
           <div className="space-y-2">
             {loading && categorie.length === 0 ? (
-              <p className="text-center text-gray-500 py-4">Caricamento...</p>
+              <p className="text-center py-4" style={{ color: 'var(--color-text-muted)' }}>Caricamento...</p>
             ) : categorie.length === 0 ? (
-              <p className="text-center text-gray-500 py-4">
+              <p className="text-center py-4" style={{ color: 'var(--color-text-muted)' }}>
                 Nessuna categoria presente
               </p>
             ) : (
               categorie.map((categoria) => (
                 <div
                   key={categoria.id}
-                  className={`flex items-center justify-between p-3 rounded-lg border ${
-                    editingId === categoria.id
-                      ? 'border-gray-400 dark:border-gray-500 bg-gray-50 dark:bg-gray-800'
-                      : 'border-gray-200 dark:border-gray-700'
-                  }`}
+                  className="flex items-center justify-between p-3 rounded-lg"
+                  style={{
+                    border: editingId === categoria.id ? '1px solid var(--color-primary)' : '1px solid var(--glass-border)',
+                    background: editingId === categoria.id ? 'var(--input-bg, var(--card-bg))' : 'transparent',
+                  }}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-                      <Tag size={16} className="text-gray-500" />
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--glass-border)' }}>
+                      <Tag size={16} style={{ color: 'var(--color-text-muted)' }} />
                     </div>
                     <div>
-                      <p className="font-medium text-gray-900 dark:text-white">
+                      <p className="font-medium" style={{ color: 'var(--color-text-primary)' }}>
                         {categoria.nome}
                       </p>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
                         {categoria.codice} • {getTipoLabel(categoria.tipo)}
                       </p>
                     </div>
@@ -241,14 +241,20 @@ export function CategorieModal({ isOpen, onClose, onSave }: CategorieModalProps)
                   <div className="flex items-center gap-1">
                     <button
                       onClick={() => handleStartEdit(categoria)}
-                      className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                      className="p-2 rounded-lg transition-colors"
+                      style={{ color: 'var(--color-text-muted)' }}
+                      onMouseEnter={e => { e.currentTarget.style.color = 'var(--color-text-primary)'; e.currentTarget.style.background = 'var(--glass-border)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.color = 'var(--color-text-muted)'; e.currentTarget.style.background = 'transparent'; }}
                       title="Modifica"
                     >
                       <Edit2 size={16} />
                     </button>
                     <button
                       onClick={() => handleDelete(categoria)}
-                      className="p-2 text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                      className="p-2 rounded-lg transition-colors"
+                      style={{ color: 'var(--color-text-muted)' }}
+                      onMouseEnter={e => { e.currentTarget.style.color = 'rgb(239, 68, 68)'; e.currentTarget.style.background = 'color-mix(in srgb, rgb(239, 68, 68) 10%, transparent)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.color = 'var(--color-text-muted)'; e.currentTarget.style.background = 'transparent'; }}
                       title="Elimina"
                     >
                       <Trash2 size={16} />
@@ -260,7 +266,7 @@ export function CategorieModal({ isOpen, onClose, onSave }: CategorieModalProps)
           </div>
 
           {/* Close Button */}
-          <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+          <div className="pt-4" style={{ borderTop: '1px solid var(--glass-border)' }}>
             <Button variant="secondary" onClick={onClose} className="w-full">
               Chiudi
             </Button>

@@ -10,15 +10,16 @@ import { updaterService, UpdateInfo, UpdateProgress, UpdateStatus } from '../ser
 import type { ConfigSmtp, SaveSmtpConfigInput } from '../types/comunicazione';
 import { useAuthStore } from '../stores/authStore';
 import { useThemeStore } from '../stores/themeStore';
-import { Database, Download, Upload, Trash2, Calendar, HardDrive, FolderOpen, Info, Building2, Key, UserCircle, Eye, EyeOff, Save, Mail, CheckCircle, AlertCircle, Loader2, Palette, Check, Sun, Moon, Monitor, RefreshCw, Rocket } from 'lucide-react';
+import { Database, Download, Upload, Trash2, Calendar, HardDrive, FolderOpen, Info, Building2, Key, UserCircle, Eye, EyeOff, Save, Mail, CheckCircle, AlertCircle, Loader2, Palette, Check, Sun, Moon, Monitor, RefreshCw, Rocket, Users } from 'lucide-react';
 import { LicenseInfo } from '../components/license/LicenseInfo';
+import { UserManagement } from '../components/settings/UserManagement';
 
 interface ToastState {
   message: string;
   type: 'success' | 'error';
 }
 
-type SettingsTab = 'account' | 'aspetto' | 'backup' | 'azienda' | 'license' | 'smtp' | 'updates';
+type SettingsTab = 'account' | 'aspetto' | 'backup' | 'azienda' | 'license' | 'smtp' | 'updates' | 'users';
 
 export function Settings() {
   const [activeTab, setActiveTab] = useState<SettingsTab>('azienda');
@@ -312,7 +313,7 @@ export function Settings() {
     if (!user) return;
 
     try {
-      await invoke('change_password', { userId: user.id, newPassword });
+      await invoke('change_password', { userId: user.id, oldPassword: accountPassword, newPassword });
       localStorage.setItem('bmp_user_password', newPassword);
       setAccountPassword(newPassword);
       setNewPassword('');
@@ -343,6 +344,7 @@ export function Settings() {
     { id: 'azienda' as SettingsTab, label: 'Dati Azienda', icon: Building2 },
     { id: 'smtp' as SettingsTab, label: 'Email SMTP', icon: Mail },
     { id: 'license' as SettingsTab, label: 'Licenza', icon: Key },
+    { id: 'users' as SettingsTab, label: 'Gestione Utenti', icon: Users },
     { id: 'backup' as SettingsTab, label: 'Backup & Ripristino', icon: Database },
     { id: 'updates' as SettingsTab, label: 'Aggiornamenti', icon: RefreshCw },
   ];
@@ -404,13 +406,13 @@ export function Settings() {
 
       <div className="space-y-6">
         {/* Header */}
-        <div>
+        <div className="animate-fade-in-up">
           <h1 className="text-3xl font-bold mb-2" style={{ color: 'var(--color-text-primary)' }}>Impostazioni</h1>
           <p style={{ color: 'var(--color-text-secondary)' }}>Gestisci backup, ripristini e configurazioni dell'applicazione</p>
         </div>
 
         {/* Tabs Navigation */}
-        <div style={{ borderBottom: '1px solid var(--glass-border)' }}>
+        <div className="animate-fade-in-up" style={{ borderBottom: '1px solid var(--glass-border)', animationDelay: '100ms' }}>
           <nav className="-mb-px flex space-x-6 overflow-x-auto pb-px">
             {tabs.map((tab) => {
               const Icon = tab.icon;
@@ -437,11 +439,11 @@ export function Settings() {
         </div>
 
         {/* Tab Content */}
-        <div className="mt-6">
+        <div className="mt-6 animate-fade-in-up" style={{ animationDelay: '200ms' }}>
           {activeTab === 'account' && (
             <div className="space-y-6">
               <div
-                className="rounded-2xl p-6"
+                className="rounded-2xl p-6 card-hover-lift"
                 style={{
                   background: 'var(--card-bg)',
                   border: '1px solid var(--glass-border)',
@@ -608,7 +610,7 @@ export function Settings() {
             <div className="space-y-6">
               {/* Palette Colori */}
               <div
-                className="rounded-2xl p-6"
+                className="rounded-2xl p-6 card-hover-lift"
                 style={{
                   background: 'var(--card-bg)',
                   border: '1px solid var(--glass-border)',
@@ -713,7 +715,7 @@ export function Settings() {
 
               {/* Modalita Tema */}
               <div
-                className="rounded-2xl p-6"
+                className="rounded-2xl p-6 card-hover-lift"
                 style={{
                   background: 'var(--card-bg)',
                   border: '1px solid var(--glass-border)',
@@ -782,7 +784,7 @@ export function Settings() {
 
               {/* Anteprima Colori Attuali */}
               <div
-                className="rounded-2xl p-6"
+                className="rounded-2xl p-6 card-hover-lift"
                 style={{
                   background: 'var(--card-bg)',
                   border: '1px solid var(--glass-border)',
@@ -831,7 +833,7 @@ export function Settings() {
           {activeTab === 'azienda' && (
             <div className="space-y-6">
               <div
-                className="rounded-2xl p-6"
+                className="rounded-2xl p-6 card-hover-lift"
                 style={{
                   background: 'var(--card-bg)',
                   border: '1px solid var(--glass-border)',
@@ -938,7 +940,7 @@ export function Settings() {
           {activeTab === 'license' && (
             <div className="space-y-6">
               <div
-                className="rounded-2xl p-6"
+                className="rounded-2xl p-6 card-hover-lift"
                 style={{
                   background: 'var(--card-bg)',
                   border: '1px solid var(--glass-border)',
@@ -964,10 +966,39 @@ export function Settings() {
             </div>
           )}
 
+          {activeTab === 'users' && (
+            <div className="space-y-6">
+              <div
+                className="rounded-2xl p-6 card-hover-lift"
+                style={{
+                  background: 'var(--card-bg)',
+                  border: '1px solid var(--glass-border)',
+                }}
+              >
+                <div className="flex items-center gap-3 mb-6">
+                  <div
+                    className="p-2 rounded-xl"
+                    style={{
+                      background: 'color-mix(in srgb, var(--color-primary) 15%, transparent)',
+                    }}
+                  >
+                    <Users className="w-6 h-6" style={{ color: 'var(--color-primary)' }} />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-semibold" style={{ color: 'var(--color-text-primary)' }}>Gestione Utenti</h2>
+                    <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>Crea e gestisci gli utenti del sistema</p>
+                  </div>
+                </div>
+
+                <UserManagement />
+              </div>
+            </div>
+          )}
+
           {activeTab === 'smtp' && (
             <div className="space-y-6">
               <div
-                className="rounded-2xl p-6"
+                className="rounded-2xl p-6 card-hover-lift"
                 style={{
                   background: 'var(--card-bg)',
                   border: '1px solid var(--glass-border)',
@@ -1167,7 +1198,7 @@ export function Settings() {
             <div className="space-y-6">
               {/* Sezione Backup & Ripristino */}
               <div
-                className="rounded-2xl p-6"
+                className="rounded-2xl p-6 card-hover-lift"
                 style={{
                   background: 'var(--card-bg)',
                   border: '1px solid var(--glass-border)',
@@ -1335,7 +1366,7 @@ export function Settings() {
           {activeTab === 'updates' && (
             <div className="space-y-6">
               <div
-                className="rounded-2xl p-6"
+                className="rounded-2xl p-6 card-hover-lift"
                 style={{
                   background: 'var(--card-bg)',
                   border: '1px solid var(--glass-border)',

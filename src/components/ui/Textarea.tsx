@@ -11,33 +11,38 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
     return (
       <div className="w-full">
         {label && (
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--color-text-secondary)' }}>
             {label}
           </label>
         )}
         <textarea
           ref={ref}
-          className={`
-            w-full px-4 py-2.5
-            bg-white dark:bg-gray-800 border-2 rounded-xl
-            text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500
-            transition-all duration-200
-            focus:outline-none focus:ring-2 focus:ring-offset-1 dark:focus:ring-offset-gray-900
-            disabled:bg-gray-50 dark:disabled:bg-gray-900 disabled:text-gray-500 disabled:cursor-not-allowed
-            resize-none
-            ${error
-              ? 'border-red-300 dark:border-red-700 focus:border-red-500 focus:ring-red-200 dark:focus:ring-red-900'
-              : 'border-gray-200 dark:border-gray-600 focus:border-primary-500 focus:ring-primary-100 dark:focus:ring-primary-900'
+          className={`w-full px-3.5 py-2.5 rounded-xl text-sm resize-none transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-offset-0 disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
+          style={{
+            background: 'var(--input-bg, var(--card-bg))',
+            border: `1.5px solid ${error ? 'var(--color-danger)' : 'var(--glass-border)'}`,
+            color: 'var(--color-text-primary)',
+            boxShadow: error ? '0 0 0 2px color-mix(in srgb, var(--color-danger) 15%, transparent)' : 'none',
+          }}
+          onFocus={e => {
+            if (!error) {
+              e.currentTarget.style.borderColor = 'var(--color-primary)';
+              e.currentTarget.style.boxShadow = '0 0 0 2px color-mix(in srgb, var(--color-primary) 15%, transparent)';
             }
-            ${className}
-          `}
+          }}
+          onBlur={e => {
+            if (!error) {
+              e.currentTarget.style.borderColor = 'var(--glass-border)';
+              e.currentTarget.style.boxShadow = 'none';
+            }
+          }}
           {...props}
         />
         {error && (
-          <p className="mt-1.5 text-sm text-red-600 dark:text-red-400">{error}</p>
+          <p className="mt-1 text-xs font-medium" style={{ color: 'var(--color-danger)' }}>{error}</p>
         )}
         {helperText && !error && (
-          <p className="mt-1.5 text-sm text-gray-500 dark:text-gray-400">{helperText}</p>
+          <p className="mt-1 text-xs" style={{ color: 'var(--color-text-muted)' }}>{helperText}</p>
         )}
       </div>
     );

@@ -58,8 +58,9 @@ export const useAgendaStore = create<AgendaState>((set, get) => ({
 
   loadOperatrici: async () => {
     try {
+      // Carica anche operatrici inattive per mostrare i loro appuntamenti esistenti
       const operatrici = await invoke<Operatrice[]>('get_operatrici', {
-        includeInactive: false,
+        includeInactive: true,
       });
       set({ operatrici });
     } catch (error: any) {
@@ -88,13 +89,23 @@ export const useAgendaStore = create<AgendaState>((set, get) => ({
       const [iniziati, completati] = await invoke<[number, number]>('aggiorna_stati_automatici');
       if (iniziati > 0 || completati > 0) {
         console.log(`Stati aggiornati: ${iniziati} iniziati, ${completati} completati`);
-        // Ricarica appuntamenti per mostrare i cambiamenti
-        const { selectedDate, loadAppuntamenti } = get();
-        const startOfDay = new Date(selectedDate);
-        startOfDay.setHours(0, 0, 0, 0);
-        const endOfDay = new Date(selectedDate);
-        endOfDay.setHours(23, 59, 59, 999);
-        await loadAppuntamenti(startOfDay, endOfDay);
+        // Ricarica appuntamenti per mostrare i cambiamenti, rispettando la vista corrente
+        const { selectedDate, viewMode, loadAppuntamenti } = get();
+
+        if (viewMode === 'day') {
+          const startOfDay = new Date(selectedDate);
+          startOfDay.setHours(0, 0, 0, 0);
+          const endOfDay = new Date(selectedDate);
+          endOfDay.setHours(23, 59, 59, 999);
+          await loadAppuntamenti(startOfDay, endOfDay);
+        } else {
+          // Vista settimana/mese: carica l'intero mese
+          const startOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+          startOfMonth.setHours(0, 0, 0, 0);
+          const endOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
+          endOfMonth.setHours(23, 59, 59, 999);
+          await loadAppuntamenti(startOfMonth, endOfMonth);
+        }
       }
     } catch (error: any) {
       console.error('Errore aggiornamento stati automatici:', error);
@@ -106,14 +117,24 @@ export const useAgendaStore = create<AgendaState>((set, get) => ({
     try {
       await invoke('create_appuntamento', { input });
 
-      // Ricarica gli appuntamenti dopo la creazione
-      const { selectedDate, loadAppuntamenti } = get();
-      const startOfDay = new Date(selectedDate);
-      startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(selectedDate);
-      endOfDay.setHours(23, 59, 59, 999);
+      // Ricarica gli appuntamenti dopo la creazione, rispettando la vista corrente
+      const { selectedDate, viewMode, loadAppuntamenti } = get();
 
-      await loadAppuntamenti(startOfDay, endOfDay);
+      if (viewMode === 'day') {
+        const startOfDay = new Date(selectedDate);
+        startOfDay.setHours(0, 0, 0, 0);
+        const endOfDay = new Date(selectedDate);
+        endOfDay.setHours(23, 59, 59, 999);
+        await loadAppuntamenti(startOfDay, endOfDay);
+      } else {
+        // Vista settimana/mese: carica l'intero mese
+        const startOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+        startOfMonth.setHours(0, 0, 0, 0);
+        const endOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
+        endOfMonth.setHours(23, 59, 59, 999);
+        await loadAppuntamenti(startOfMonth, endOfMonth);
+      }
+
       set({ isLoading: false, isModalOpen: false, modalMode: null, modalInitialTime: null });
     } catch (error: any) {
       const errorMessage = error?.message || 'Errore nella creazione dell\'appuntamento';
@@ -127,14 +148,24 @@ export const useAgendaStore = create<AgendaState>((set, get) => ({
     try {
       await invoke('update_appuntamento', { id, input });
 
-      // Ricarica gli appuntamenti dopo l'aggiornamento
-      const { selectedDate, loadAppuntamenti } = get();
-      const startOfDay = new Date(selectedDate);
-      startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(selectedDate);
-      endOfDay.setHours(23, 59, 59, 999);
+      // Ricarica gli appuntamenti dopo l'aggiornamento, rispettando la vista corrente
+      const { selectedDate, viewMode, loadAppuntamenti } = get();
 
-      await loadAppuntamenti(startOfDay, endOfDay);
+      if (viewMode === 'day') {
+        const startOfDay = new Date(selectedDate);
+        startOfDay.setHours(0, 0, 0, 0);
+        const endOfDay = new Date(selectedDate);
+        endOfDay.setHours(23, 59, 59, 999);
+        await loadAppuntamenti(startOfDay, endOfDay);
+      } else {
+        // Vista settimana/mese: carica l'intero mese
+        const startOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+        startOfMonth.setHours(0, 0, 0, 0);
+        const endOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
+        endOfMonth.setHours(23, 59, 59, 999);
+        await loadAppuntamenti(startOfMonth, endOfMonth);
+      }
+
       set({
         isLoading: false,
         isModalOpen: false,
@@ -153,14 +184,24 @@ export const useAgendaStore = create<AgendaState>((set, get) => ({
     try {
       await invoke('delete_appuntamento', { id });
 
-      // Ricarica gli appuntamenti dopo l'eliminazione
-      const { selectedDate, loadAppuntamenti } = get();
-      const startOfDay = new Date(selectedDate);
-      startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(selectedDate);
-      endOfDay.setHours(23, 59, 59, 999);
+      // Ricarica gli appuntamenti dopo l'eliminazione, rispettando la vista corrente
+      const { selectedDate, viewMode, loadAppuntamenti } = get();
 
-      await loadAppuntamenti(startOfDay, endOfDay);
+      if (viewMode === 'day') {
+        const startOfDay = new Date(selectedDate);
+        startOfDay.setHours(0, 0, 0, 0);
+        const endOfDay = new Date(selectedDate);
+        endOfDay.setHours(23, 59, 59, 999);
+        await loadAppuntamenti(startOfDay, endOfDay);
+      } else {
+        // Vista settimana/mese: carica l'intero mese
+        const startOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+        startOfMonth.setHours(0, 0, 0, 0);
+        const endOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
+        endOfMonth.setHours(23, 59, 59, 999);
+        await loadAppuntamenti(startOfMonth, endOfMonth);
+      }
+
       set({
         isLoading: false,
         isModalOpen: false,
@@ -176,14 +217,8 @@ export const useAgendaStore = create<AgendaState>((set, get) => ({
 
   setSelectedDate: (date: Date) => {
     set({ selectedDate: date });
-
-    // Carica automaticamente gli appuntamenti per la nuova data
-    const startOfDay = new Date(date);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(date);
-    endOfDay.setHours(23, 59, 59, 999);
-
-    get().loadAppuntamenti(startOfDay, endOfDay);
+    // Il caricamento degli appuntamenti è gestito dall'useEffect in Agenda.tsx
+    // che risponde ai cambiamenti di selectedDate e viewMode
   },
 
   setSelectedOperatrici: (ids: string[]) => {

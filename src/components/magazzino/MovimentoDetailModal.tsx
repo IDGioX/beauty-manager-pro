@@ -67,14 +67,14 @@ export function MovimentoDetailModal({
   const isPositive = ['carico', 'reso'].includes(movimento.tipo) ||
     (movimento.tipo === 'inventario' && movimento.quantita > 0);
 
-  const getTipoColor = () => {
+  const getTipoStyle = (): React.CSSProperties => {
     if (['carico', 'reso'].includes(movimento.tipo)) {
-      return 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800';
+      return { background: 'color-mix(in srgb, rgb(16, 185, 129) 10%, transparent)', color: 'rgb(16, 185, 129)', border: '1px solid color-mix(in srgb, rgb(16, 185, 129) 20%, transparent)' };
     }
     if (['scarico_uso', 'scarico_vendita', 'scarto'].includes(movimento.tipo)) {
-      return 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800';
+      return { background: 'color-mix(in srgb, rgb(239, 68, 68) 10%, transparent)', color: 'rgb(239, 68, 68)', border: '1px solid color-mix(in srgb, rgb(239, 68, 68) 20%, transparent)' };
     }
-    return 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800';
+    return { background: 'color-mix(in srgb, rgb(59, 130, 246) 10%, transparent)', color: 'rgb(59, 130, 246)', border: '1px solid color-mix(in srgb, rgb(59, 130, 246) 20%, transparent)' };
   };
 
   const handleOpenAppuntamento = () => {
@@ -136,7 +136,7 @@ export function MovimentoDetailModal({
       >
         <div className="space-y-6">
           {/* Header con tipo e quantità */}
-          <div className={`p-4 rounded-xl border ${getTipoColor()}`}>
+          <div className="p-4 rounded-xl" style={getTipoStyle()}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 {getMovimentoIcon(movimento.tipo)}
@@ -151,7 +151,7 @@ export function MovimentoDetailModal({
               </div>
               <div className="text-right">
                 <p className={`text-2xl font-bold ${isPositive ? 'text-emerald-600' : 'text-red-600'}`}>
-                  {isPositive ? '+' : ''}{movimento.quantita}
+                  {isPositive ? '+' : '-'}{movimento.quantita}
                 </p>
                 <p className="text-sm opacity-75">
                   Giacenza: {movimento.giacenza_risultante}
@@ -162,16 +162,16 @@ export function MovimentoDetailModal({
 
           {/* Prodotto */}
           <div className="space-y-3">
-            <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+            <h3 className="text-sm font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
               Prodotto
             </h3>
-            <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-              <Package className="text-gray-400" size={20} />
+            <div className="flex items-center gap-3 p-3 rounded-lg" style={{ background: 'var(--input-bg, var(--card-bg))', border: '1px solid var(--glass-border)' }}>
+              <Package size={20} style={{ color: 'var(--color-text-muted)' }} />
               <div>
-                <p className="font-medium text-gray-900 dark:text-white">
+                <p className="font-medium" style={{ color: 'var(--color-text-primary)' }}>
                   {movimento.prodotto_nome}
                 </p>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
                   Codice: {movimento.prodotto_codice}
                 </p>
               </div>
@@ -180,16 +180,16 @@ export function MovimentoDetailModal({
 
           {/* Dettagli */}
           <div className="space-y-3">
-            <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+            <h3 className="text-sm font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
               Dettagli
             </h3>
             <div className="grid grid-cols-2 gap-3">
               {movimento.cliente_nome && (
-                <div className="flex items-center gap-2 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                  <User className="text-gray-400" size={16} />
+                <div className="flex items-center gap-2 p-3 rounded-lg" style={{ background: 'var(--input-bg, var(--card-bg))', border: '1px solid var(--glass-border)' }}>
+                  <User size={16} style={{ color: 'var(--color-text-muted)' }} />
                   <div>
-                    <p className="text-xs text-gray-500">Cliente</p>
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">
+                    <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Cliente</p>
+                    <p className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
                       {movimento.cliente_nome}
                     </p>
                   </div>
@@ -197,11 +197,11 @@ export function MovimentoDetailModal({
               )}
 
               {movimento.operatrice_nome && (
-                <div className="flex items-center gap-2 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                  <User className="text-gray-400" size={16} />
+                <div className="flex items-center gap-2 p-3 rounded-lg" style={{ background: 'var(--input-bg, var(--card-bg))', border: '1px solid var(--glass-border)' }}>
+                  <User size={16} style={{ color: 'var(--color-text-muted)' }} />
                   <div>
-                    <p className="text-xs text-gray-500">Operatore</p>
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">
+                    <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Operatore</p>
+                    <p className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
                       {movimento.operatrice_nome}
                     </p>
                   </div>
@@ -209,11 +209,11 @@ export function MovimentoDetailModal({
               )}
 
               {movimento.fornitore && (
-                <div className="flex items-center gap-2 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                  <Truck className="text-gray-400" size={16} />
+                <div className="flex items-center gap-2 p-3 rounded-lg" style={{ background: 'var(--input-bg, var(--card-bg))', border: '1px solid var(--glass-border)' }}>
+                  <Truck size={16} style={{ color: 'var(--color-text-muted)' }} />
                   <div>
-                    <p className="text-xs text-gray-500">Fornitore</p>
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">
+                    <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Fornitore</p>
+                    <p className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
                       {movimento.fornitore}
                     </p>
                   </div>
@@ -221,11 +221,11 @@ export function MovimentoDetailModal({
               )}
 
               {movimento.documento_riferimento && (
-                <div className="flex items-center gap-2 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                  <FileText className="text-gray-400" size={16} />
+                <div className="flex items-center gap-2 p-3 rounded-lg" style={{ background: 'var(--input-bg, var(--card-bg))', border: '1px solid var(--glass-border)' }}>
+                  <FileText size={16} style={{ color: 'var(--color-text-muted)' }} />
                   <div>
-                    <p className="text-xs text-gray-500">Documento</p>
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">
+                    <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Documento</p>
+                    <p className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
                       {movimento.documento_riferimento}
                     </p>
                   </div>
@@ -233,11 +233,11 @@ export function MovimentoDetailModal({
               )}
 
               {movimento.lotto && (
-                <div className="flex items-center gap-2 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                  <Hash className="text-gray-400" size={16} />
+                <div className="flex items-center gap-2 p-3 rounded-lg" style={{ background: 'var(--input-bg, var(--card-bg))', border: '1px solid var(--glass-border)' }}>
+                  <Hash size={16} style={{ color: 'var(--color-text-muted)' }} />
                   <div>
-                    <p className="text-xs text-gray-500">Lotto</p>
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">
+                    <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Lotto</p>
+                    <p className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
                       {movimento.lotto}
                     </p>
                   </div>
@@ -245,11 +245,11 @@ export function MovimentoDetailModal({
               )}
 
               {movimento.prezzo_unitario !== null && movimento.prezzo_unitario !== undefined && (
-                <div className="flex items-center gap-2 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                  <span className="text-gray-400 text-sm font-bold">€</span>
+                <div className="flex items-center gap-2 p-3 rounded-lg" style={{ background: 'var(--input-bg, var(--card-bg))', border: '1px solid var(--glass-border)' }}>
+                  <span className="text-sm font-bold" style={{ color: 'var(--color-text-muted)' }}>€</span>
                   <div>
-                    <p className="text-xs text-gray-500">Prezzo Unitario</p>
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">
+                    <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Prezzo Unitario</p>
+                    <p className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
                       € {movimento.prezzo_unitario.toFixed(2)}
                     </p>
                   </div>
@@ -261,10 +261,10 @@ export function MovimentoDetailModal({
           {/* Note */}
           {movimento.note && (
             <div className="space-y-3">
-              <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              <h3 className="text-sm font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
                 Note
               </h3>
-              <p className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg text-sm text-gray-700 dark:text-gray-300">
+              <p className="p-3 rounded-lg text-sm" style={{ background: 'var(--input-bg, var(--card-bg))', border: '1px solid var(--glass-border)', color: 'var(--color-text-secondary)' }}>
                 {movimento.note}
               </p>
             </div>
@@ -273,7 +273,7 @@ export function MovimentoDetailModal({
           {/* Azione di navigazione */}
           {navigationAction && navigationAction.available && (
             <div className="space-y-3">
-              <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              <h3 className="text-sm font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
                 {movimento.appuntamento_id ? 'Appuntamento Collegato' : 'Origine Movimento'}
               </h3>
               <Button
@@ -289,7 +289,7 @@ export function MovimentoDetailModal({
           )}
 
           {/* Azioni */}
-          <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+          <div className="flex justify-end gap-3 pt-4" style={{ borderTop: '1px solid var(--glass-border)' }}>
             <Button variant="ghost" onClick={onClose}>
               Chiudi
             </Button>

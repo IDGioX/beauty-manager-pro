@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import { Cliente, CreateClienteInput } from '../types/cliente';
+import { Cliente, CreateClienteInput, UpdateClienteInput } from '../types/cliente';
 
 export const clientiService = {
   async getClienti(search?: string, limit?: number, offset?: number, includeInactive?: boolean): Promise<Cliente[]> {
@@ -14,24 +14,7 @@ export const clientiService = {
     return await invoke('create_cliente', { input });
   },
 
-  async updateCliente(
-    id: string,
-    updates: {
-      nome?: string;
-      cognome?: string;
-      data_nascita?: string;
-      cellulare?: string;
-      email?: string;
-      indirizzo?: string;
-      citta?: string;
-      note?: string;
-      consenso_marketing?: boolean;
-      consenso_whatsapp?: boolean;
-      consenso_email?: boolean;
-    }
-  ): Promise<Cliente> {
-    // Tauri expects camelCase parameter names from JavaScript
-    // that get converted to snake_case in Rust
+  async updateCliente(id: string, updates: UpdateClienteInput): Promise<Cliente> {
     return await invoke('update_cliente', {
       id,
       nome: updates.nome,
@@ -43,8 +26,14 @@ export const clientiService = {
       citta: updates.citta,
       note: updates.note,
       consensoMarketing: updates.consenso_marketing,
+      consensoSms: updates.consenso_sms,
       consensoWhatsapp: updates.consenso_whatsapp,
       consensoEmail: updates.consenso_email,
+      tipoPelle: updates.tipo_pelle,
+      allergie: updates.allergie,
+      patologie: updates.patologie,
+      noteEstetiche: updates.note_estetiche,
+      fonteAcquisizione: updates.fonte_acquisizione,
     });
   },
 

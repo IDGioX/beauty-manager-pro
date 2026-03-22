@@ -81,4 +81,10 @@ pub struct UpdateClienteInput {
     pub indirizzo: Option<String>,
     pub citta: Option<String>,
     pub note: Option<String>,
+    // Info estetiche
+    pub tipo_pelle: Option<String>,
+    pub allergie: Option<String>,
+    pub patologie: Option<String>,
+    pub note_estetiche: Option<String>,
+    pub fonte_acquisizione: Option<String>,
 }

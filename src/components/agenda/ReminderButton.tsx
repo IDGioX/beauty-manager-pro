@@ -165,14 +165,14 @@ export const ReminderButton: React.FC<ReminderButtonProps> = ({
       {isOpen && !loading && createPortal(
         <>
           {/* Overlay per chiudere al click fuori */}
-          <div className="fixed inset-0 z-[100]" onClick={() => setIsOpen(false)} />
+          <div className="fixed inset-0 z-[50]" onClick={() => setIsOpen(false)} />
 
           {/* Dropdown menu - renderizzato tramite Portal per evitare problemi con overflow del modal */}
           <div
-            className="fixed w-44 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-1 z-[101]"
-            style={{ top: dropdownPosition.top, left: dropdownPosition.left }}
+            className="fixed w-44 rounded-xl shadow-xl py-1 z-[51]"
+            style={{ background: 'var(--card-bg)', border: '1px solid var(--glass-border)', top: dropdownPosition.top, left: dropdownPosition.left }}
           >
-            <div className="px-3 py-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide border-b border-gray-100 dark:border-gray-700">
+            <div className="px-3 py-1.5 text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--color-text-muted)', borderBottom: '1px solid var(--glass-border)' }}>
               Invia tramite
             </div>
             {channels.map((channel) => (
@@ -180,22 +180,23 @@ export const ReminderButton: React.FC<ReminderButtonProps> = ({
                 key={channel.id}
                 onClick={() => channel.available && handleSendReminder(channel.id)}
                 disabled={!channel.available}
-                className={`w-full flex items-center gap-2 px-3 py-2 text-sm ${
-                  channel.available
-                    ? `text-gray-700 dark:text-gray-200 ${channel.bgColor} dark:hover:bg-gray-700 cursor-pointer`
-                    : 'text-gray-400 dark:text-gray-500 cursor-not-allowed'
+                className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors ${
+                  channel.available ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'
                 }`}
+                style={{ color: channel.available ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}
+                onMouseEnter={e => { if (channel.available) e.currentTarget.style.background = 'var(--glass-border)'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = ''; }}
               >
-                <channel.icon size={16} className={channel.available ? channel.color : 'text-gray-400'} />
+                <channel.icon size={16} className={channel.available ? channel.color : ''} style={!channel.available ? { color: 'var(--color-text-muted)' } : undefined} />
                 <span>{channel.label}</span>
                 {!channel.available && (
-                  <span className="text-xs text-gray-400 ml-auto">Non disponibile</span>
+                  <span className="text-xs ml-auto" style={{ color: 'var(--color-text-muted)' }}>Non disponibile</span>
                 )}
               </button>
             ))}
 
             {/* Info */}
-            <div className="px-3 py-2 text-xs text-gray-400 dark:text-gray-500 border-t border-gray-100 dark:border-gray-700">
+            <div className="px-3 py-2 text-xs" style={{ color: 'var(--color-text-muted)', borderTop: '1px solid var(--glass-border)' }}>
               Si aprirà l'app per confermare
             </div>
           </div>

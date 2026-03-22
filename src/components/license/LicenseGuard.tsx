@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import { licenseService } from '../../services/license';
 import { LicenseActivation } from '../../pages/LicenseActivation';
 import { Key } from 'lucide-react';
@@ -17,6 +18,15 @@ export const LicenseGuard: React.FC<LicenseGuardProps> = ({ children }) => {
 
   const checkLicense = async () => {
     try {
+      // Prima installazione: se non esistono utenti, bypassa il controllo licenza
+      // per permettere la creazione del primo admin
+      const usersExist = await invoke<boolean>('check_users_exist');
+      if (!usersExist) {
+        setIsValid(true);
+        setLoading(false);
+        return;
+      }
+
       const valid = await licenseService.validateLicense();
       setIsValid(valid);
     } catch (error) {

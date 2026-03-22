@@ -62,11 +62,11 @@ export function ProdottoModal({
         marca: prodotto.marca || '',
         linea: prodotto.linea || '',
         unita_misura: prodotto.unita_misura,
-        capacita: prodotto.capacita || undefined,
+        capacita: prodotto.capacita ?? undefined,
         giacenza: prodotto.giacenza,
         scorta_minima: prodotto.scorta_minima,
         scorta_riordino: prodotto.scorta_riordino,
-        prezzo_vendita: prodotto.prezzo_vendita || undefined,
+        prezzo_vendita: prodotto.prezzo_vendita ?? undefined,
         uso: (prodotto.uso as 'interno' | 'vendita' | 'entrambi') || 'interno',
         data_scadenza: prodotto.data_scadenza || '',
         note: prodotto.note || '',
@@ -128,14 +128,14 @@ export function ProdottoModal({
     >
       <form onSubmit={handleSubmit} className="space-y-6">
         {error && (
-          <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-600 dark:text-red-400 text-sm">
+          <div className="p-3 rounded-lg text-sm" style={{ background: 'color-mix(in srgb, rgb(239, 68, 68) 10%, transparent)', color: 'rgb(220, 38, 38)', border: '1px solid color-mix(in srgb, rgb(239, 68, 68) 20%, transparent)' }}>
             {error}
           </div>
         )}
 
         {/* Informazioni Base */}
         <div className="space-y-4">
-          <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+          <div className="flex items-center gap-2" style={{ color: 'var(--color-text-muted)' }}>
             <Package size={16} />
             <span className="text-xs font-medium uppercase tracking-wide">
               Informazioni Prodotto
@@ -223,8 +223,8 @@ export function ProdottoModal({
         </div>
 
         {/* Unità e Quantità */}
-        <div className="border-t border-gray-200 dark:border-gray-700 pt-6 space-y-4">
-          <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+        <div className="pt-6 space-y-4" style={{ borderTop: '1px solid var(--glass-border)' }}>
+          <div className="flex items-center gap-2" style={{ color: 'var(--color-text-muted)' }}>
             <Box size={16} />
             <span className="text-xs font-medium uppercase tracking-wide">
               Unità e Quantità
@@ -289,8 +289,8 @@ export function ProdottoModal({
         </div>
 
         {/* Prezzo Vendita */}
-        <div className="border-t border-gray-200 dark:border-gray-700 pt-6 space-y-4">
-          <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+        <div className="pt-6 space-y-4" style={{ borderTop: '1px solid var(--glass-border)' }}>
+          <div className="flex items-center gap-2" style={{ color: 'var(--color-text-muted)' }}>
             <Euro size={16} />
             <span className="text-xs font-medium uppercase tracking-wide">
               Prezzo
@@ -317,8 +317,8 @@ export function ProdottoModal({
         </div>
 
         {/* Scadenza e Note */}
-        <div className="border-t border-gray-200 dark:border-gray-700 pt-6 space-y-4">
-          <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+        <div className="pt-6 space-y-4" style={{ borderTop: '1px solid var(--glass-border)' }}>
+          <div className="flex items-center gap-2" style={{ color: 'var(--color-text-muted)' }}>
             <Calendar size={16} />
             <span className="text-xs font-medium uppercase tracking-wide">
               Scadenza e Note
@@ -347,7 +347,7 @@ export function ProdottoModal({
         </div>
 
         {/* Actions */}
-        <div className="flex gap-3 justify-end pt-4 border-t border-gray-200 dark:border-gray-700">
+        <div className="flex gap-3 justify-end pt-4" style={{ borderTop: '1px solid var(--glass-border)' }}>
           <Button variant="secondary" onClick={onClose} type="button">
             Annulla
           </Button>

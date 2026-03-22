@@ -231,8 +231,9 @@ export function CaricoTab({ onRefresh }: CaricoTabProps) {
               <div ref={dropdownRef}>
                 <div className="relative">
                   <Search
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 z-10"
+                    className="absolute left-3 top-1/2 -translate-y-1/2 z-10"
                     size={18}
+                    style={{ color: 'var(--color-text-muted)' }}
                   />
                   <Input
                     ref={barcodeInputRef}
@@ -246,18 +247,21 @@ export function CaricoTab({ onRefresh }: CaricoTabProps) {
 
                   {/* Dropdown overlay - posizionato sopra il contenuto */}
                   {showDropdown && prodotti.length > 0 && (
-                    <div className="absolute left-0 right-0 top-full mt-1 z-50 max-h-64 overflow-y-auto bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg">
+                    <div className="absolute left-0 right-0 top-full mt-1 z-50 max-h-64 overflow-y-auto rounded-xl shadow-lg" style={{ background: 'var(--card-bg)', border: '1px solid var(--glass-border)' }}>
                       {prodotti.slice(0, 20).map((prodotto) => (
                         <button
                           key={prodotto.id}
                           type="button"
                           onClick={() => handleSelectProdotto(prodotto)}
-                          className="w-full text-left p-3 hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-700 last:border-b-0"
+                          className="w-full text-left p-3 transition-colors last:border-b-0"
+                          style={{ borderBottom: '1px solid var(--glass-border)' }}
+                          onMouseEnter={e => { e.currentTarget.style.background = 'var(--glass-border)'; }}
+                          onMouseLeave={e => { e.currentTarget.style.background = ''; }}
                         >
-                          <p className="font-medium text-gray-900 dark:text-white">
+                          <p className="font-medium" style={{ color: 'var(--color-text-primary)' }}>
                             {prodotto.nome}
                           </p>
-                          <p className="text-sm text-gray-500">
+                          <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
                             {prodotto.codice} • Giacenza: {prodotto.giacenza}{' '}
                             {prodotto.unita_misura}
                           </p>

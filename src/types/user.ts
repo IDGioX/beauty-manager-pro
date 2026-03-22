@@ -44,6 +44,13 @@ export interface CreateUserInput {
   avatar_url?: string;
 }
 
+export interface UpdateUserInput {
+  nome?: string;
+  cognome?: string;
+  email?: string;
+  role?: 'admin' | 'operatrice' | 'reception';
+}
+
 export interface UpdateUserSettingsInput {
   theme_mode?: 'light' | 'dark' | 'auto';
   primary_color?: string;

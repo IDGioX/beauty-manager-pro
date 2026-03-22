@@ -2,7 +2,7 @@
 
 use crate::error::AppResult;
 use crate::models::AppuntamentoWithDetails;
-use chrono::{DateTime, Utc, Datelike};
+use chrono::{DateTime, Utc, Local, Datelike};
 use rust_xlsxwriter::{Workbook, Format, FormatAlign, Color as XlsxColor};
 use printpdf::{PdfDocument, Mm, BuiltinFont};
 use std::path::Path;
@@ -72,16 +72,18 @@ pub fn generate_excel_agenda(
     for (i, app) in sorted_apps.iter().enumerate() {
         let row = (i + 1) as u32; // +1 perché row 0 è header
 
-        // Data
-        let data_str = app.data_ora_inizio.format("%d/%m/%Y").to_string();
+        // Data (converti in ora locale)
+        let local_inizio = app.data_ora_inizio.with_timezone(&Local);
+        let local_fine = app.data_ora_fine.with_timezone(&Local);
+        let data_str = local_inizio.format("%d/%m/%Y").to_string();
         worksheet.write_string(row, 0, &data_str)?;
 
         // Ora inizio
-        let ora_inizio_str = app.data_ora_inizio.format("%H:%M").to_string();
+        let ora_inizio_str = local_inizio.format("%H:%M").to_string();
         worksheet.write_string(row, 1, &ora_inizio_str)?;
 
         // Ora fine
-        let ora_fine_str = app.data_ora_fine.format("%H:%M").to_string();
+        let ora_fine_str = local_fine.format("%H:%M").to_string();
         worksheet.write_string(row, 2, &ora_fine_str)?;
 
         // Operatrice
@@ -155,20 +157,23 @@ pub fn generate_pdf_agenda(
 
     let mut y_pos = 280.0; // Partenza dall'alto (A4 height = 297mm)
 
-    // Titolo
+    // Titolo (converti in ora locale)
+    let local_inizio = data_inizio.with_timezone(&Local);
+    let local_fine = data_fine.with_timezone(&Local);
     let title = format!(
         "AGENDA {} - {}",
-        data_inizio.format("%d/%m/%Y"),
-        data_fine.format("%d/%m/%Y")
+        local_inizio.format("%d/%m/%Y"),
+        local_fine.format("%d/%m/%Y")
     );
     current_layer.use_text(title, 14.0, Mm(20.0), Mm(y_pos), &font_bold);
     y_pos -= 10.0;
 
-    // Raggruppa per giorno
+    // Raggruppa per giorno (in ora locale)
     use std::collections::HashMap;
     let mut by_day: HashMap<String, Vec<&AppuntamentoWithDetails>> = HashMap::new();
     for app in &sorted_apps {
-        let day_key = app.data_ora_inizio.format("%Y-%m-%d").to_string();
+        let local_dt = app.data_ora_inizio.with_timezone(&Local);
+        let day_key = local_dt.format("%Y-%m-%d").to_string();
         by_day.entry(day_key).or_insert_with(Vec::new).push(app);
     }
 
@@ -182,13 +187,14 @@ pub fn generate_pdf_agenda(
             continue;
         }
 
-        // Header giorno
+        // Header giorno (in ora locale)
         let first_app = apps[0];
-        let weekday = get_italian_weekday(first_app.data_ora_inizio.weekday().num_days_from_monday());
+        let first_local = first_app.data_ora_inizio.with_timezone(&Local);
+        let weekday = get_italian_weekday(first_local.weekday().num_days_from_monday());
         let day_header = format!(
             "{} {}",
             weekday.to_uppercase(),
-            first_app.data_ora_inizio.format("%d/%m/%Y")
+            first_local.format("%d/%m/%Y")
         );
 
         current_layer.use_text(day_header, 12.0, Mm(20.0), Mm(y_pos), &font_bold);
@@ -196,10 +202,12 @@ pub fn generate_pdf_agenda(
 
         // Appuntamenti del giorno
         for app in apps {
+            let app_local_inizio = app.data_ora_inizio.with_timezone(&Local);
+            let app_local_fine = app.data_ora_fine.with_timezone(&Local);
             let time_range = format!(
                 "{} - {}",
-                app.data_ora_inizio.format("%H:%M"),
-                app.data_ora_fine.format("%H:%M")
+                app_local_inizio.format("%H:%M"),
+                app_local_fine.format("%H:%M")
             );
             let operatrice = format!("{} {}", app.operatrice_cognome, app.operatrice_nome);
             let cliente = format!("{} {}", app.cliente_cognome, app.cliente_nome);

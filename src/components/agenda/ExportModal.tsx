@@ -82,7 +82,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
       // Chiama backend in base al formato
       const exportData = {
         data_inizio: new Date(dataInizio).toISOString(),
-        data_fine: new Date(dataFine + 'T23:59:59').toISOString(),
+        data_fine: (() => { const d = new Date(dataFine); d.setHours(23, 59, 59, 999); return d.toISOString(); })(),
         operatrici_ids: selectedOps,
         file_path: filePath,
       };
@@ -109,28 +109,32 @@ export const ExportModal: React.FC<ExportModalProps> = ({
       <div className="space-y-6">
         {/* Errore */}
         {error && (
-          <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-700 dark:text-red-400 text-sm">
+          <div className="p-3 rounded-lg text-sm" style={{ background: 'color-mix(in srgb, rgb(239, 68, 68) 10%, transparent)', color: 'rgb(220, 38, 38)', border: '1px solid color-mix(in srgb, rgb(239, 68, 68) 20%, transparent)' }}>
             {error}
           </div>
         )}
 
         {/* Selezione Formato */}
         <div>
-          <h3 className="font-semibold mb-3 text-gray-900 dark:text-gray-100">Formato</h3>
+          <h3 className="font-semibold mb-3" style={{ color: 'var(--color-text-primary)' }}>Formato</h3>
           <div className="grid grid-cols-2 gap-4">
             <button
               onClick={() => setFormato('excel')}
               className={`p-4 border-2 rounded-lg transition-all ${
                 formato === 'excel'
-                  ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
-                  : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                  ? 'border-green-500'
+                  : ''
               }`}
+              style={formato === 'excel'
+                ? { background: 'color-mix(in srgb, rgb(34, 197, 94) 10%, transparent)' }
+                : { borderColor: 'var(--glass-border)', background: 'transparent' }
+              }
             >
               <div className="flex items-center justify-center gap-3 mb-2">
-                <FileSpreadsheet className={`w-6 h-6 ${formato === 'excel' ? 'text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-gray-400'}`} />
-                <div className={`font-semibold ${formato === 'excel' ? 'text-green-900 dark:text-green-100' : 'text-gray-900 dark:text-gray-100'}`}>Excel</div>
+                <FileSpreadsheet className="w-6 h-6" style={{ color: formato === 'excel' ? 'rgb(34, 197, 94)' : 'var(--color-text-muted)' }} />
+                <div className="font-semibold" style={{ color: formato === 'excel' ? 'rgb(34, 197, 94)' : 'var(--color-text-primary)' }}>Excel</div>
               </div>
-              <div className={`text-sm ${formato === 'excel' ? 'text-green-700 dark:text-green-300' : 'text-gray-600 dark:text-gray-400'}`}>
+              <div className="text-sm" style={{ color: formato === 'excel' ? 'rgb(34, 197, 94)' : 'var(--color-text-muted)' }}>
                 Lista completa con filtri
               </div>
             </button>
@@ -139,15 +143,19 @@ export const ExportModal: React.FC<ExportModalProps> = ({
               onClick={() => setFormato('pdf')}
               className={`p-4 border-2 rounded-lg transition-all ${
                 formato === 'pdf'
-                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                  : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                  ? 'border-blue-500'
+                  : ''
               }`}
+              style={formato === 'pdf'
+                ? { background: 'color-mix(in srgb, rgb(59, 130, 246) 10%, transparent)' }
+                : { borderColor: 'var(--glass-border)', background: 'transparent' }
+              }
             >
               <div className="flex items-center justify-center gap-3 mb-2">
-                <FileText className={`w-6 h-6 ${formato === 'pdf' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'}`} />
-                <div className={`font-semibold ${formato === 'pdf' ? 'text-blue-900 dark:text-blue-100' : 'text-gray-900 dark:text-gray-100'}`}>PDF</div>
+                <FileText className="w-6 h-6" style={{ color: formato === 'pdf' ? 'rgb(59, 130, 246)' : 'var(--color-text-muted)' }} />
+                <div className="font-semibold" style={{ color: formato === 'pdf' ? 'rgb(59, 130, 246)' : 'var(--color-text-primary)' }}>PDF</div>
               </div>
-              <div className={`text-sm ${formato === 'pdf' ? 'text-blue-700 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400'}`}>
+              <div className="text-sm" style={{ color: formato === 'pdf' ? 'rgb(59, 130, 246)' : 'var(--color-text-muted)' }}>
                 Stampa organizzata per giorno
               </div>
             </button>
@@ -156,7 +164,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
 
         {/* Selezione Periodo */}
         <div>
-          <h3 className="font-semibold mb-3 text-gray-900 dark:text-gray-100">Periodo</h3>
+          <h3 className="font-semibold mb-3" style={{ color: 'var(--color-text-primary)' }}>Periodo</h3>
           <div className="grid grid-cols-2 gap-4">
             <Input
               label="Data Inizio"
@@ -175,18 +183,18 @@ export const ExportModal: React.FC<ExportModalProps> = ({
 
         {/* Selezione Operatori */}
         <div>
-          <h3 className="font-semibold mb-3 text-gray-900 dark:text-gray-100">
+          <h3 className="font-semibold mb-3" style={{ color: 'var(--color-text-primary)' }}>
             Operatori
           </h3>
-          <div className="max-h-48 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-lg p-3 space-y-2 bg-white dark:bg-gray-800">
+          <div className="max-h-48 overflow-y-auto rounded-lg p-3 space-y-2" style={{ border: '1px solid var(--glass-border)', background: 'var(--card-bg)' }}>
             <button
               onClick={() => setSelectedOps(selectedOps.length === operatrici.length ? [] : operatrici.map(o => o.id))}
-              className="text-sm text-primary-600 dark:text-primary-400 hover:underline"
+              className="text-sm hover:underline" style={{ color: 'var(--color-primary)' }}
             >
               {selectedOps.length === operatrici.length ? 'Deseleziona tutte' : 'Seleziona tutte'}
             </button>
             {operatrici.map((op) => (
-              <label key={op.id} className="flex items-center gap-3 p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded cursor-pointer">
+              <label key={op.id} className="flex items-center gap-3 p-2 rounded cursor-pointer" onMouseEnter={e => (e.currentTarget.style.background = 'var(--glass-border)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                 <input
                   type="checkbox"
                   checked={selectedOps.includes(op.id)}
@@ -203,17 +211,17 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                   className="w-3 h-3 rounded"
                   style={{ backgroundColor: op.colore_agenda }}
                 />
-                <span className="text-gray-900 dark:text-gray-100">{op.cognome} {op.nome}</span>
+                <span style={{ color: 'var(--color-text-primary)' }}>{op.cognome} {op.nome}</span>
               </label>
             ))}
           </div>
-          <div className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+          <div className="text-sm mt-2" style={{ color: 'var(--color-text-muted)' }}>
             {selectedOps.length} operator{selectedOps.length === 1 ? 'e' : 'i'} selezionat{selectedOps.length === 1 ? 'o' : 'i'}
           </div>
         </div>
 
         {/* Azioni */}
-        <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+        <div className="flex justify-end gap-3 pt-4" style={{ borderTop: '1px solid var(--glass-border)' }}>
           <Button variant="secondary" onClick={onClose} disabled={isExporting}>
             Annulla
           </Button>

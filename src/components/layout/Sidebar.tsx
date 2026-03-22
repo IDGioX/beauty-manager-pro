@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   LayoutDashboard,
   Calendar,
@@ -10,8 +10,12 @@ import {
   Settings,
   Sparkles,
   ChevronRight,
+  LogOut,
+  ChevronUp,
+  User,
 } from 'lucide-react';
 import { useThemeStore } from '../../stores/themeStore';
+import { useAuthStore } from '../../stores/authStore';
 
 interface SidebarProps {
   currentPage: string;
@@ -31,6 +35,24 @@ const menuItems = [
 
 export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate }) => {
   const { config } = useThemeStore();
+  const { user, logout } = useAuthStore();
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+
+  // Click outside to close
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setShowUserMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleLogout = async () => {
+    await logout();
+  };
 
   return (
     <div
@@ -134,48 +156,96 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate }) => 
         })}
       </nav>
 
-      {/* Bottom Section */}
+      {/* Bottom Section - User Menu */}
       <div className="p-4 relative z-10">
         <div className="mx-2 mb-4 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
 
-        <button
-          onClick={() => onNavigate('settings')}
-          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-left group relative"
-          style={{
-            background: currentPage === 'settings'
-              ? `linear-gradient(135deg, var(--color-secondary) 0%, var(--color-secondary-dark) 100%)`
-              : 'transparent',
-            boxShadow: currentPage === 'settings' ? `0 4px 16px color-mix(in srgb, var(--color-secondary) 30%, transparent)` : 'none',
-          }}
-        >
-          {currentPage !== 'settings' && (
-            <div
-              className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-              style={{ background: 'var(--sidebar-hover)' }}
-            />
-          )}
+        {user && (
+          <div className="relative" ref={userMenuRef}>
+            <button
+              onClick={() => setShowUserMenu(!showUserMenu)}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-left group relative"
+              style={{ background: showUserMenu ? 'var(--sidebar-hover)' : 'transparent' }}
+            >
+              {!showUserMenu && (
+                <div
+                  className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                  style={{ background: 'var(--sidebar-hover)' }}
+                />
+              )}
 
-          <div
-            className="w-9 h-9 rounded-lg flex items-center justify-center relative z-10"
-            style={{
-              background: currentPage === 'settings'
-                ? 'rgba(255, 255, 255, 0.2)'
-                : 'rgba(255, 255, 255, 0.05)',
-            }}
-          >
-            <Settings
-              size={18}
-              style={{ color: currentPage === 'settings' ? 'white' : 'var(--sidebar-text)' }}
-            />
+              <div
+                className="w-9 h-9 rounded-lg flex items-center justify-center relative z-10 text-white text-sm font-semibold"
+                style={{
+                  background: `linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%)`,
+                }}
+              >
+                {user.avatar_url ? (
+                  <img src={user.avatar_url} alt={user.nome} className="w-full h-full rounded-lg object-cover" />
+                ) : (
+                  user.nome?.charAt(0).toUpperCase() || <User size={16} />
+                )}
+              </div>
+
+              <div className="flex-1 min-w-0 relative z-10">
+                <span
+                  className="block font-medium text-sm truncate"
+                  style={{ color: 'var(--sidebar-text-active)' }}
+                >
+                  {user.nome} {user.cognome}
+                </span>
+                <span
+                  className="block text-xs capitalize truncate"
+                  style={{ color: 'var(--sidebar-text)' }}
+                >
+                  {user.role}
+                </span>
+              </div>
+
+              <ChevronUp
+                size={16}
+                className="relative z-10 transition-transform duration-200"
+                style={{
+                  color: 'var(--sidebar-text)',
+                  transform: showUserMenu ? 'rotate(180deg)' : 'rotate(0deg)',
+                }}
+              />
+            </button>
+
+            {/* Dropdown Menu */}
+            {showUserMenu && (
+              <div
+                className="absolute bottom-full left-0 right-0 mb-2 rounded-xl overflow-hidden"
+                style={{
+                  background: 'var(--card-bg)',
+                  border: '1px solid var(--glass-border)',
+                  boxShadow: '0 8px 32px var(--glass-shadow)',
+                }}
+              >
+                <button
+                  onClick={() => {
+                    onNavigate('settings');
+                    setShowUserMenu(false);
+                  }}
+                  className="w-full px-4 py-3 text-left text-sm flex items-center gap-3 transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
+                  style={{ color: 'var(--color-text-primary)' }}
+                >
+                  <Settings size={16} />
+                  Impostazioni
+                </button>
+                <div style={{ borderTop: '1px solid var(--glass-border)' }} />
+                <button
+                  onClick={handleLogout}
+                  className="w-full px-4 py-3 text-left text-sm flex items-center gap-3 transition-colors hover:bg-red-50 dark:hover:bg-red-900/20"
+                  style={{ color: 'var(--color-danger)' }}
+                >
+                  <LogOut size={16} />
+                  Esci
+                </button>
+              </div>
+            )}
           </div>
-
-          <span
-            className="flex-1 font-medium text-sm relative z-10"
-            style={{ color: currentPage === 'settings' ? 'var(--sidebar-text-active)' : 'var(--sidebar-text)' }}
-          >
-            Impostazioni
-          </span>
-        </button>
+        )}
       </div>
     </div>
   );

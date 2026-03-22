@@ -29,4 +29,33 @@ export default defineConfig(async () => ({
       ignored: ["**/src-tauri/**"],
     },
   },
+
+  // Build optimizations
+  build: {
+    // Target modern browsers (Tauri uses latest WebView)
+    target: "es2021",
+    // Chunk size warning at 500KB
+    chunkSizeWarningLimit: 500,
+    rollupOptions: {
+      output: {
+        // Split heavy vendor libraries into separate chunks
+        manualChunks: {
+          'vendor-calendar': [
+            '@fullcalendar/core',
+            '@fullcalendar/react',
+            '@fullcalendar/daygrid',
+            '@fullcalendar/timegrid',
+            '@fullcalendar/interaction',
+            '@fullcalendar/resource-timegrid',
+          ],
+          'vendor-charts': ['recharts'],
+          'vendor-motion': ['framer-motion'],
+        },
+      },
+    },
+    // Disable sourcemaps in production for smaller output
+    sourcemap: false,
+    // Minify with esbuild (fast, default in Vite 5+)
+    minify: "esbuild",
+  },
 }));

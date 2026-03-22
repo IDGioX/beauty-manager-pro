@@ -14,6 +14,7 @@ export interface Cliente {
   cap: string | null;
   provincia: string | null;
   consenso_marketing: boolean;
+  consenso_sms: boolean;
   consenso_whatsapp: boolean;
   consenso_email: boolean;
   canale_preferito: 'whatsapp' | 'email' | 'telefono' | null;
@@ -41,6 +42,7 @@ export interface CreateClienteInput {
   indirizzo?: string;
   note?: string;
   consenso_marketing: boolean;
+  consenso_sms: boolean;
   consenso_whatsapp: boolean;
   consenso_email: boolean;
   canale_preferito?: 'whatsapp' | 'email' | 'telefono';
@@ -56,6 +58,12 @@ export interface UpdateClienteInput {
   citta?: string;
   note?: string;
   consenso_marketing?: boolean;
+  consenso_sms?: boolean;
   consenso_whatsapp?: boolean;
   consenso_email?: boolean;
+  tipo_pelle?: string;
+  allergie?: string;
+  patologie?: string;
+  note_estetiche?: string;
+  fonte_acquisizione?: string;
 }

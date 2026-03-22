@@ -2,7 +2,7 @@
 use crate::error::AppResult;
 use crate::models::{
     User, UserSettings, LoginInput, AuthResponse,
-    CreateUserInput, UpdateUserSettingsInput
+    CreateUserInput, UpdateUserInput, UpdateUserSettingsInput
 };
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -45,21 +45,13 @@ pub async fn login(
         "Credenziali non valide".to_string()
     ))?;
 
-    // Debug logging
-    println!("DEBUG: Attempting login for user: {}", credentials.username);
-    println!("DEBUG: Password length: {}", credentials.password.len());
-    println!("DEBUG: Hash from DB: {}", user.password_hash);
-
     // Verifica password con bcrypt
     let password_valid = bcrypt::verify(&credentials.password, &user.password_hash)
-        .map_err(|e| {
-            println!("DEBUG: bcrypt verify error: {:?}", e);
+        .map_err(|_| {
             crate::error::AppError::Internal(
                 "Errore durante la verifica della password".to_string()
             )
         })?;
-
-    println!("DEBUG: Password valid: {}", password_valid);
 
     if !password_valid {
         return Err(crate::error::AppError::Unauthorized(
@@ -171,6 +163,7 @@ pub async fn verify_session(
 pub async fn create_user(
     db: tauri::State<'_, Arc<Mutex<crate::AppState>>>,
     input: CreateUserInput,
+    caller_role: String,
 ) -> AppResult<User> {
     let state = db.lock().await;
 
@@ -184,6 +177,13 @@ pub async fn create_user(
     if !["admin", "operatrice", "reception"].contains(&input.role.as_str()) {
         return Err(crate::error::AppError::InvalidInput(
             "Ruolo non valido".to_string(),
+        ));
+    }
+
+    // Controllo permessi: solo admin può creare utenti admin
+    if input.role == "admin" && caller_role != "admin" {
+        return Err(crate::error::AppError::Unauthorized(
+            "Solo un amministratore può creare altri amministratori".to_string(),
         ));
     }
 
@@ -386,13 +386,37 @@ pub async fn check_users_exist(
 pub async fn change_password(
     db: tauri::State<'_, Arc<Mutex<crate::AppState>>>,
     user_id: String,
+    old_password: Option<String>,
     new_password: String,
 ) -> AppResult<()> {
     let state = db.lock().await;
 
+    // Verifica vecchia password se fornita (obbligatoria per cambio self-service)
+    if let Some(ref old_pwd) = old_password {
+        let current_hash: Option<String> = sqlx::query_scalar(
+            "SELECT password_hash FROM users WHERE id = ?"
+        )
+        .bind(&user_id)
+        .fetch_optional(&state.db.pool)
+        .await?;
+
+        let current_hash = current_hash.ok_or_else(|| {
+            crate::error::AppError::NotFound("Utente non trovato".to_string())
+        })?;
+
+        let old_valid = bcrypt::verify(old_pwd, &current_hash)
+            .map_err(|e| crate::error::AppError::Internal(format!("Errore verifica password: {}", e)))?;
+
+        if !old_valid {
+            return Err(crate::error::AppError::InvalidInput(
+                "La password attuale non è corretta".to_string()
+            ));
+        }
+    }
+
     if new_password.len() < 4 {
         return Err(crate::error::AppError::InvalidInput(
-            "La password deve essere di almeno 4 caratteri".to_string()
+            "La nuova password deve essere di almeno 4 caratteri".to_string()
         ));
     }
 
@@ -511,4 +535,209 @@ pub async fn register_first_user(
         settings,
         session_token,
     })
+}
+
+// Aggiorna dati di un utente (nome, cognome, email, ruolo)
+#[tauri::command]
+pub async fn update_user(
+    db: tauri::State<'_, Arc<Mutex<crate::AppState>>>,
+    user_id: String,
+    input: UpdateUserInput,
+    caller_role: String,
+) -> AppResult<User> {
+    let state = db.lock().await;
+
+    // Controllo permessi: solo admin può assegnare ruolo admin
+    if let Some(ref new_role) = input.role {
+        if !["admin", "operatrice", "reception"].contains(&new_role.as_str()) {
+            return Err(crate::error::AppError::InvalidInput(
+                "Ruolo non valido".to_string(),
+            ));
+        }
+        if new_role == "admin" && caller_role != "admin" {
+            return Err(crate::error::AppError::Unauthorized(
+                "Solo un amministratore può assegnare il ruolo admin".to_string(),
+            ));
+        }
+    }
+
+    // Costruisci update dinamico
+    let mut updates = Vec::new();
+    let mut values: Vec<String> = Vec::new();
+
+    if let Some(nome) = &input.nome {
+        updates.push("nome = ?");
+        values.push(nome.clone());
+    }
+    if let Some(cognome) = &input.cognome {
+        updates.push("cognome = ?");
+        values.push(cognome.clone());
+    }
+    if let Some(email) = &input.email {
+        updates.push("email = ?");
+        values.push(email.clone());
+    }
+    if let Some(role) = &input.role {
+        updates.push("role = ?");
+        values.push(role.clone());
+    }
+
+    if updates.is_empty() {
+        let user = sqlx::query_as::<_, User>("SELECT * FROM users WHERE id = ?1")
+            .bind(&user_id)
+            .fetch_one(&state.db.pool)
+            .await?;
+        return Ok(user);
+    }
+
+    updates.push("updated_at = datetime('now')");
+
+    let query_str = format!(
+        "UPDATE users SET {} WHERE id = ?",
+        updates.join(", ")
+    );
+
+    let mut query = sqlx::query(&query_str);
+    for value in &values {
+        query = query.bind(value);
+    }
+    query = query.bind(&user_id);
+    query.execute(&state.db.pool).await?;
+
+    let user = sqlx::query_as::<_, User>("SELECT * FROM users WHERE id = ?1")
+        .bind(&user_id)
+        .fetch_one(&state.db.pool)
+        .await?;
+
+    Ok(user)
+}
+
+// Attiva/disattiva un utente
+#[tauri::command]
+pub async fn toggle_user_active(
+    db: tauri::State<'_, Arc<Mutex<crate::AppState>>>,
+    user_id: String,
+    attivo: bool,
+    caller_id: String,
+) -> AppResult<()> {
+    let state = db.lock().await;
+
+    // Impedisci auto-disattivazione
+    if !attivo && caller_id == user_id {
+        return Err(crate::error::AppError::InvalidInput(
+            "Non puoi disattivare il tuo stesso account".to_string(),
+        ));
+    }
+
+    // Se si sta disattivando un admin, verificare che non sia l'ultimo admin attivo
+    if !attivo {
+        let target_role: Option<String> = sqlx::query_scalar(
+            "SELECT role FROM users WHERE id = ?1"
+        )
+        .bind(&user_id)
+        .fetch_optional(&state.db.pool)
+        .await?;
+
+        if let Some(role) = target_role {
+            if role == "admin" {
+                let other_active_admins: i64 = sqlx::query_scalar(
+                    "SELECT COUNT(*) FROM users WHERE role = 'admin' AND attivo = 1 AND id != ?1"
+                )
+                .bind(&user_id)
+                .fetch_one(&state.db.pool)
+                .await?;
+
+                if other_active_admins == 0 {
+                    return Err(crate::error::AppError::InvalidInput(
+                        "Impossibile disattivare l'ultimo amministratore attivo".to_string(),
+                    ));
+                }
+            }
+        }
+    }
+
+    sqlx::query("UPDATE users SET attivo = ?1, updated_at = datetime('now') WHERE id = ?2")
+        .bind(attivo)
+        .bind(&user_id)
+        .execute(&state.db.pool)
+        .await?;
+
+    // Se disattivato, elimina tutte le sessioni dell'utente
+    if !attivo {
+        sqlx::query("DELETE FROM user_sessions WHERE user_id = ?1")
+            .bind(&user_id)
+            .execute(&state.db.pool)
+            .await?;
+    }
+
+    Ok(())
+}
+
+// Elimina definitivamente un utente
+#[tauri::command]
+pub async fn delete_user(
+    db: tauri::State<'_, Arc<Mutex<crate::AppState>>>,
+    caller_role: String,
+    user_id: String,
+) -> AppResult<()> {
+    // Solo gli admin possono eliminare utenti
+    if caller_role != "admin" {
+        return Err(crate::error::AppError::InvalidInput(
+            "Solo gli amministratori possono eliminare utenti".to_string()
+        ));
+    }
+
+    let state = db.lock().await;
+
+    // Verifica che non sia l'ultimo admin
+    let admin_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM users WHERE ruolo = 'admin' AND id != ?1"
+    )
+    .bind(&user_id)
+    .fetch_one(&state.db.pool)
+    .await?;
+
+    let user_role: Option<String> = sqlx::query_scalar(
+        "SELECT ruolo FROM users WHERE id = ?"
+    )
+    .bind(&user_id)
+    .fetch_optional(&state.db.pool)
+    .await?;
+
+    if let Some(role) = user_role {
+        if role == "admin" && admin_count == 0 {
+            return Err(crate::error::AppError::InvalidInput(
+                "Impossibile eliminare l'ultimo amministratore".to_string()
+            ));
+        }
+    }
+
+    // Usa transazione per eliminazione atomica
+    let mut tx = state.db.pool.begin().await?;
+
+    // Elimina sessioni
+    sqlx::query("DELETE FROM user_sessions WHERE user_id = ?1")
+        .bind(&user_id)
+        .execute(&mut *tx)
+        .await?;
+
+    // Elimina settings
+    sqlx::query("DELETE FROM user_settings WHERE user_id = ?1")
+        .bind(&user_id)
+        .execute(&mut *tx)
+        .await?;
+
+    // Elimina utente
+    let result = sqlx::query("DELETE FROM users WHERE id = ?1")
+        .bind(&user_id)
+        .execute(&mut *tx)
+        .await?;
+
+    if result.rows_affected() == 0 {
+        return Err(crate::error::AppError::NotFound("Utente non trovato".to_string()));
+    }
+
+    tx.commit().await?;
+
+    Ok(())
 }

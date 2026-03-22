@@ -37,11 +37,11 @@ pub use magazzino::{
 pub use azienda::{Azienda, UpdateAziendaInput};
 pub use user::{
     User, UserSettings, UserSession,
-    LoginInput, AuthResponse, CreateUserInput, UpdateUserSettingsInput
+    LoginInput, AuthResponse, CreateUserInput, UpdateUserInput, UpdateUserSettingsInput
 };
 pub use export::{ExportAgendaInput, ExportResult};
 pub use analytics::*;
-pub use license::{License, LicenseFile, LicenseInfo, ValidationLog};
+pub use license::{License, LicenseInfo, ValidationLog, GeneratedKey};
 pub use comunicazione::{
     TemplateMesaggio, CreateTemplateInput, UpdateTemplateInput,
     Comunicazione, ComunicazioneWithCliente,

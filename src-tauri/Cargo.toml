@@ -23,7 +23,7 @@ tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "sqlite", "uuid", "chrono", "migrate"] }
-tokio = { version = "1", features = ["full"] }
+tokio = { version = "1", features = ["rt", "sync", "time", "macros"] }
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1", features = ["serde", "v4"] }
 thiserror = "2"
@@ -36,12 +36,18 @@ hex = "0.4"
 bcrypt = "0.15"
 rust_xlsxwriter = "0.78"
 printpdf = "0.7"
-ed25519-dalek = "2.1"
 sha2 = "0.10"
-hostname = "0.4"
+hmac = "0.12"
 lettre = { version = "0.11", default-features = false, features = ["tokio1-native-tls", "builder", "smtp-transport"] }
 urlencoding = "2.1"
 open = "5"
 tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
+
+[profile.release]
+opt-level = "z"          # Ottimizza per dimensione binario
+lto = "thin"             # Link-Time Optimization (thin = buon compromesso velocità/dimensione)
+codegen-units = 1        # Singola unità di compilazione = migliore ottimizzazione
+strip = true             # Rimuove simboli di debug dal binario
+panic = "abort"          # Riduce dimensione binario (niente unwind tables)
 

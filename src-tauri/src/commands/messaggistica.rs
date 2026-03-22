@@ -10,7 +10,7 @@ use crate::models::{
     FiltriComunicazioni, TargetFilters,
     Cliente, Azienda, AppuntamentoWithDetails,
 };
-use chrono::{Utc, Datelike};
+use chrono::{Utc, Local, Datelike};
 use lettre::{
     Message, SmtpTransport, Transport,
     transport::smtp::authentication::Credentials,
@@ -535,8 +535,9 @@ pub async fn process_template(
         .await?
         .ok_or_else(|| AppError::NotFound("Appuntamento non trovato".to_string()))?;
 
-        let data_app = appuntamento.data_ora_inizio.format("%d/%m/%Y").to_string();
-        let ora_app = appuntamento.data_ora_inizio.format("%H:%M").to_string();
+        let local_inizio = appuntamento.data_ora_inizio.with_timezone(&Local);
+        let data_app = local_inizio.format("%d/%m/%Y").to_string();
+        let ora_app = local_inizio.format("%H:%M").to_string();
         let trattamento_nome = appuntamento.trattamento_nome.clone();
 
         corpo = corpo.replace("{data_appuntamento}", &data_app);
@@ -597,8 +598,9 @@ pub async fn send_reminder(
     .fetch_optional(&state.db.pool)
     .await?;
 
-    let data_app = appuntamento.data_ora_inizio.format("%d/%m/%Y").to_string();
-    let ora_app = appuntamento.data_ora_inizio.format("%H:%M").to_string();
+    let local_inizio = appuntamento.data_ora_inizio.with_timezone(&Local);
+    let data_app = local_inizio.format("%d/%m/%Y").to_string();
+    let ora_app = local_inizio.format("%H:%M").to_string();
     let trattamento = appuntamento.trattamento_nome.clone();
     let cliente_nome = appuntamento.cliente_nome.clone();
 
@@ -977,25 +979,30 @@ pub async fn get_target_clienti(
         query.push_str(" AND id IN (SELECT DISTINCT cliente_id FROM appuntamenti WHERE date(data_ora_inizio) >= date('now', '-90 days'))");
     }
 
+    let mut bind_values: Vec<String> = Vec::new();
+
     if let Some(min_giorni) = filters.giorni_ultima_visita_min {
-        query.push_str(&format!(
-            " AND id IN (SELECT cliente_id FROM appuntamenti GROUP BY cliente_id HAVING date(MAX(data_ora_inizio)) <= date('now', '-{} days'))",
-            min_giorni
-        ));
+        query.push_str(
+            " AND id IN (SELECT cliente_id FROM appuntamenti GROUP BY cliente_id HAVING date(MAX(data_ora_inizio)) <= date('now', ?))"
+        );
+        bind_values.push(format!("-{} days", min_giorni));
     }
 
     if let Some(max_giorni) = filters.giorni_ultima_visita_max {
-        query.push_str(&format!(
-            " AND id IN (SELECT cliente_id FROM appuntamenti GROUP BY cliente_id HAVING date(MAX(data_ora_inizio)) >= date('now', '-{} days'))",
-            max_giorni
-        ));
+        query.push_str(
+            " AND id IN (SELECT cliente_id FROM appuntamenti GROUP BY cliente_id HAVING date(MAX(data_ora_inizio)) >= date('now', ?))"
+        );
+        bind_values.push(format!("-{} days", max_giorni));
     }
 
     query.push_str(" ORDER BY cognome, nome");
 
-    let clienti = sqlx::query_as::<_, Cliente>(&query)
-        .fetch_all(&state.db.pool)
-        .await?;
+    let mut sql_query = sqlx::query_as::<_, Cliente>(&query);
+    for val in &bind_values {
+        sql_query = sql_query.bind(val);
+    }
+
+    let clienti = sql_query.fetch_all(&state.db.pool).await?;
 
     Ok(clienti)
 }
@@ -1087,25 +1094,57 @@ pub async fn get_upcoming_birthdays(
 ) -> AppResult<Vec<Cliente>> {
     let state = db.lock().await;
 
-    let clienti = sqlx::query_as::<_, Cliente>(
-        r#"SELECT * FROM clienti
-           WHERE attivo = 1
-           AND data_nascita IS NOT NULL
-           AND (
-               (CAST(strftime('%m', data_nascita) AS INTEGER) * 100 + CAST(strftime('%d', data_nascita) AS INTEGER))
-               BETWEEN
-               (CAST(strftime('%m', 'now') AS INTEGER) * 100 + CAST(strftime('%d', 'now') AS INTEGER))
-               AND
-               (CAST(strftime('%m', date('now', ? || ' days')) AS INTEGER) * 100 + CAST(strftime('%d', date('now', ? || ' days')) AS INTEGER))
-           )
-           ORDER BY
-           CAST(strftime('%m', data_nascita) AS INTEGER),
-           CAST(strftime('%d', data_nascita) AS INTEGER)"#
-    )
-    .bind(format!("+{}", days))
-    .bind(format!("+{}", days))
-    .fetch_all(&state.db.pool)
-    .await?;
+    let today = Local::now().naive_local().date();
+    let end_date = today + chrono::Duration::days(days as i64);
+    let wraps_year = end_date.year() > today.year();
+
+    let today_md = today.month() as i32 * 100 + today.day() as i32;
+    let end_md = end_date.month() as i32 * 100 + end_date.day() as i32;
+
+    let clienti = if wraps_year {
+        // Year boundary wrap: e.g. Dec 28 (1228) -> Jan 27 (127)
+        // Match birthdays >= today_md (rest of current year) OR <= end_md (start of next year)
+        sqlx::query_as::<_, Cliente>(
+            r#"SELECT * FROM clienti
+               WHERE attivo = 1
+               AND data_nascita IS NOT NULL
+               AND (
+                   (CAST(strftime('%m', data_nascita) AS INTEGER) * 100 + CAST(strftime('%d', data_nascita) AS INTEGER)) >= ?
+                   OR
+                   (CAST(strftime('%m', data_nascita) AS INTEGER) * 100 + CAST(strftime('%d', data_nascita) AS INTEGER)) <= ?
+               )
+               ORDER BY
+               CASE
+                   WHEN (CAST(strftime('%m', data_nascita) AS INTEGER) * 100 + CAST(strftime('%d', data_nascita) AS INTEGER)) >= ? THEN 0
+                   ELSE 1
+               END,
+               CAST(strftime('%m', data_nascita) AS INTEGER),
+               CAST(strftime('%d', data_nascita) AS INTEGER)"#
+        )
+        .bind(today_md)
+        .bind(end_md)
+        .bind(today_md)
+        .fetch_all(&state.db.pool)
+        .await?
+    } else {
+        // Normal case: no year boundary crossing
+        sqlx::query_as::<_, Cliente>(
+            r#"SELECT * FROM clienti
+               WHERE attivo = 1
+               AND data_nascita IS NOT NULL
+               AND (
+                   (CAST(strftime('%m', data_nascita) AS INTEGER) * 100 + CAST(strftime('%d', data_nascita) AS INTEGER))
+                   BETWEEN ? AND ?
+               )
+               ORDER BY
+               CAST(strftime('%m', data_nascita) AS INTEGER),
+               CAST(strftime('%d', data_nascita) AS INTEGER)"#
+        )
+        .bind(today_md)
+        .bind(end_md)
+        .fetch_all(&state.db.pool)
+        .await?
+    };
 
     Ok(clienti)
 }
@@ -1124,25 +1163,32 @@ pub async fn get_appuntamenti_pending_reminder(
 
     let appuntamenti = sqlx::query_as::<_, AppuntamentoWithDetails>(
         r#"SELECT
-           a.*,
+           a.id,
+           a.cliente_id,
            c.nome as cliente_nome,
            c.cognome as cliente_cognome,
-           c.telefono as cliente_telefono,
-           c.email as cliente_email,
-           c.consenso_sms as cliente_consenso_sms,
-           c.consenso_whatsapp as cliente_consenso_whatsapp,
-           c.consenso_email as cliente_consenso_email,
-           c.canale_preferito as cliente_canale_preferito,
+           c.cellulare as cliente_cellulare,
+           a.operatrice_id,
            o.nome as operatrice_nome,
-           o.colore as operatrice_colore,
+           o.cognome as operatrice_cognome,
+           o.colore_agenda as operatrice_colore,
+           a.trattamento_id,
            t.nome as trattamento_nome,
-           t.colore as trattamento_colore
+           t.durata_minuti as trattamento_durata,
+           a.data_ora_inizio,
+           a.data_ora_fine,
+           a.stato,
+           a.note_prenotazione,
+           a.note_trattamento,
+           a.prezzo_applicato,
+           a.created_at,
+           a.updated_at
            FROM appuntamenti a
            LEFT JOIN clienti c ON a.cliente_id = c.id
            LEFT JOIN operatrici o ON a.operatrice_id = o.id
            LEFT JOIN trattamenti t ON a.trattamento_id = t.id
            WHERE a.reminder_inviato = 0
-           AND a.stato NOT IN ('cancellato', 'completato')
+           AND a.stato NOT IN ('annullato', 'completato')
            AND datetime(a.data_ora_inizio) <= datetime('now', ?)
            AND datetime(a.data_ora_inizio) > datetime('now')
            ORDER BY a.data_ora_inizio"#

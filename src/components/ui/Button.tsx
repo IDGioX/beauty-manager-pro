@@ -8,6 +8,12 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   children: React.ReactNode;
 }
 
+const sizeClasses = {
+  sm: 'px-3 py-1.5 text-sm gap-1',
+  md: 'px-4 py-2 text-sm gap-1.5',
+  lg: 'px-5 py-2.5 text-base gap-2',
+};
+
 export const Button: React.FC<ButtonProps> = ({
   variant = 'primary',
   size = 'md',
@@ -15,32 +21,59 @@ export const Button: React.FC<ButtonProps> = ({
   children,
   className = '',
   disabled,
+  style,
   ...props
 }) => {
-  const baseStyles = 'inline-flex items-center justify-center font-medium rounded-lg transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed';
+  const base = `inline-flex items-center justify-center font-medium rounded-xl transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-offset-0 disabled:opacity-50 disabled:cursor-not-allowed ${sizeClasses[size]}`;
 
-  const variants = {
-    primary: 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-100 focus:ring-gray-500',
-    secondary: 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 focus:ring-gray-400',
-    success: 'bg-emerald-600 text-white hover:bg-emerald-700 focus:ring-emerald-500',
-    danger: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500',
-    ghost: 'bg-transparent text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 focus:ring-gray-400',
-    glass: 'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-800 focus:ring-gray-400',
-  };
-
-  const sizes = {
-    sm: 'px-3 py-1.5 text-sm',
-    md: 'px-4 py-2 text-sm',
-    lg: 'px-5 py-2.5 text-base',
+  const variantStyles: Record<string, React.CSSProperties> = {
+    primary: {
+      background: 'var(--color-primary)',
+      color: '#fff',
+      boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
+    },
+    secondary: {
+      background: 'var(--glass-border)',
+      color: 'var(--color-text-primary)',
+    },
+    success: {
+      background: 'var(--color-success)',
+      color: '#fff',
+    },
+    danger: {
+      background: 'var(--color-danger)',
+      color: '#fff',
+    },
+    ghost: {
+      background: 'transparent',
+      color: 'var(--color-text-secondary)',
+    },
+    glass: {
+      background: 'var(--card-bg)',
+      color: 'var(--color-text-primary)',
+      border: '1px solid var(--glass-border)',
+    },
   };
 
   return (
     <button
-      className={`${baseStyles} ${variants[variant]} ${sizes[size]} ${className}`}
+      className={`${base} ${className}`}
       disabled={disabled || loading}
+      style={{ ...variantStyles[variant], ...style }}
+      onMouseEnter={e => {
+        if (disabled || loading) return;
+        if (variant === 'primary') e.currentTarget.style.filter = 'brightness(0.9)';
+        else if (variant === 'ghost') e.currentTarget.style.background = 'var(--glass-border)';
+        else if (variant === 'glass') e.currentTarget.style.background = 'var(--card-hover, var(--card-bg))';
+        else e.currentTarget.style.filter = 'brightness(0.9)';
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.filter = '';
+        e.currentTarget.style.background = (variantStyles[variant].background as string) || '';
+      }}
       {...props}
     >
-      {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+      {loading && <Loader2 className="h-4 w-4 animate-spin" />}
       {children}
     </button>
   );

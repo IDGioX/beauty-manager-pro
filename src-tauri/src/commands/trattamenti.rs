@@ -1,5 +1,5 @@
 // Comandi per trattamenti
-use crate::error::AppResult;
+use crate::error::{AppResult, AppError};
 use crate::models::{
     Trattamento, TrattamentoWithCategoria, CategoriaTrattamento,
     CreateTrattamentoInput, UpdateTrattamentoInput,
@@ -38,8 +38,11 @@ pub async fn get_trattamenti(
          WHERE 1=1"
     );
 
+    let mut bind_cat_id: Option<String> = None;
+
     if let Some(cat_id) = &categoria_id {
-        query.push_str(&format!(" AND t.categoria_id = '{}'", cat_id));
+        query.push_str(" AND t.categoria_id = ?");
+        bind_cat_id = Some(cat_id.clone());
     }
 
     if attivo_only.unwrap_or(false) {
@@ -48,9 +51,12 @@ pub async fn get_trattamenti(
 
     query.push_str(" ORDER BY c.ordine, t.nome");
 
-    let result = sqlx::query_as::<_, TrattamentoWithCategoria>(&query)
-        .fetch_all(&state.db.pool)
-        .await?;
+    let mut sql_query = sqlx::query_as::<_, TrattamentoWithCategoria>(&query);
+    if let Some(ref cat_id) = bind_cat_id {
+        sql_query = sql_query.bind(cat_id);
+    }
+
+    let result = sql_query.fetch_all(&state.db.pool).await?;
 
     Ok(result)
 }
@@ -208,10 +214,28 @@ pub async fn delete_trattamento(
 ) -> AppResult<()> {
     let state = db.lock().await;
 
-    sqlx::query("DELETE FROM trattamenti WHERE id = ?")
+    // Verifica che non ci siano appuntamenti associati
+    let count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM appuntamenti WHERE trattamento_id = ?"
+    )
+    .bind(&id)
+    .fetch_one(&state.db.pool)
+    .await?;
+
+    if count > 0 {
+        return Err(AppError::InvalidInput(
+            format!("Impossibile eliminare il trattamento: ci sono {} appuntamenti associati. Disattivalo invece di eliminarlo.", count)
+        ));
+    }
+
+    let result = sqlx::query("DELETE FROM trattamenti WHERE id = ?")
         .bind(&id)
         .execute(&state.db.pool)
         .await?;
+
+    if result.rows_affected() == 0 {
+        return Err(AppError::NotFound("Trattamento non trovato".to_string()));
+    }
 
     Ok(())
 }

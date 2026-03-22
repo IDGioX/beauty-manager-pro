@@ -117,7 +117,7 @@ export const AppointmentTimeline: React.FC<AppointmentTimelineProps> = ({ appunt
                   {app.operatrice_nome && (
                     <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
                       <span className="text-gray-500 dark:text-gray-400">👤</span>
-                      <span>{app.operatrice_nome} {app.operatrice_cognome}</span>
+                      <span>{app.operatrice_nome} {app.operatrice_cognome || ''}</span>
                     </div>
                   )}
 

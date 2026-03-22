@@ -160,9 +160,7 @@ pub async fn get_prodotti(
     limit: Option<i32>,
     offset: Option<i32>,
 ) -> AppResult<Vec<ProdottoWithCategoria>> {
-    println!("DEBUG get_prodotti: starting...");
     let state = db.lock().await;
-    println!("DEBUG get_prodotti: got lock");
 
     let mut query = String::from(
         "SELECT p.id, p.codice, p.barcode, p.categoria_id, p.nome, p.descrizione,
@@ -175,16 +173,20 @@ pub async fn get_prodotti(
          WHERE 1=1"
     );
 
+    let mut bind_values: Vec<String> = Vec::new();
+
     if let Some(ref s) = search {
-        let search_lower = s.to_lowercase();
-        query.push_str(&format!(
-            " AND (LOWER(p.nome) LIKE '%{}%' OR LOWER(p.codice) LIKE '%{}%' OR LOWER(p.barcode) LIKE '%{}%' OR LOWER(p.marca) LIKE '%{}%')",
-            search_lower, search_lower, search_lower, search_lower
-        ));
+        let search_pattern = format!("%{}%", s.to_lowercase());
+        query.push_str(" AND (LOWER(p.nome) LIKE ? OR LOWER(p.codice) LIKE ? OR LOWER(p.barcode) LIKE ? OR LOWER(p.marca) LIKE ?)");
+        bind_values.push(search_pattern.clone());
+        bind_values.push(search_pattern.clone());
+        bind_values.push(search_pattern.clone());
+        bind_values.push(search_pattern);
     }
 
-    if let Some(cat_id) = &categoria_id {
-        query.push_str(&format!(" AND p.categoria_id = '{}'", cat_id));
+    if let Some(ref cat_id) = categoria_id {
+        query.push_str(" AND p.categoria_id = ?");
+        bind_values.push(cat_id.clone());
     }
 
     if attivo_only.unwrap_or(true) {
@@ -192,7 +194,7 @@ pub async fn get_prodotti(
     }
 
     if solo_sotto_scorta.unwrap_or(false) {
-        query.push_str(" AND p.giacenza <= p.scorta_minima");
+        query.push_str(" AND p.scorta_minima > 0 AND p.giacenza <= p.scorta_minima");
     }
 
     if solo_in_scadenza.unwrap_or(false) {
@@ -201,25 +203,30 @@ pub async fn get_prodotti(
 
     query.push_str(" ORDER BY p.nome");
 
+    if limit.is_some() {
+        query.push_str(" LIMIT ?");
+    }
+
+    if offset.is_some() {
+        query.push_str(" OFFSET ?");
+    }
+
+    let mut sql_query = sqlx::query_as::<_, ProdottoWithCategoria>(&query);
+    for val in &bind_values {
+        sql_query = sql_query.bind(val);
+    }
+
     if let Some(lim) = limit {
-        query.push_str(&format!(" LIMIT {}", lim));
+        sql_query = sql_query.bind(lim);
     }
 
     if let Some(off) = offset {
-        query.push_str(&format!(" OFFSET {}", off));
+        sql_query = sql_query.bind(off);
     }
 
-    println!("DEBUG get_prodotti: executing query: {}", query);
-    let result = sqlx::query_as::<_, ProdottoWithCategoria>(&query)
-        .fetch_all(&state.db.pool)
-        .await;
+    let result = sql_query.fetch_all(&state.db.pool).await?;
 
-    match &result {
-        Ok(items) => println!("DEBUG get_prodotti: success, found {} items", items.len()),
-        Err(e) => println!("DEBUG get_prodotti: ERROR: {:?}", e),
-    }
-
-    Ok(result?)
+    Ok(result)
 }
 
 #[tauri::command]
@@ -509,47 +516,67 @@ pub async fn get_movimenti(
          WHERE 1=1"
     );
 
+    let mut bind_values: Vec<String> = Vec::new();
+
     if let Some(ref prodotto_id) = filtri.prodotto_id {
-        query.push_str(&format!(" AND m.prodotto_id = '{}'", prodotto_id));
+        query.push_str(" AND m.prodotto_id = ?");
+        bind_values.push(prodotto_id.clone());
     }
 
     if let Some(ref tipo) = filtri.tipo {
-        query.push_str(&format!(" AND m.tipo = '{}'", tipo));
+        query.push_str(" AND m.tipo = ?");
+        bind_values.push(tipo.clone());
     }
 
     if let Some(ref data_da) = filtri.data_da {
-        query.push_str(&format!(" AND date(m.created_at) >= '{}'", data_da));
+        query.push_str(" AND date(m.created_at) >= ?");
+        bind_values.push(data_da.clone());
     }
 
     if let Some(ref data_a) = filtri.data_a {
-        query.push_str(&format!(" AND date(m.created_at) <= '{}'", data_a));
+        query.push_str(" AND date(m.created_at) <= ?");
+        bind_values.push(data_a.clone());
     }
 
     if let Some(ref operatrice_id) = filtri.operatrice_id {
-        query.push_str(&format!(" AND m.operatrice_id = '{}'", operatrice_id));
+        query.push_str(" AND m.operatrice_id = ?");
+        bind_values.push(operatrice_id.clone());
     }
 
     if let Some(ref cliente_id) = filtri.cliente_id {
-        query.push_str(&format!(" AND m.cliente_id = '{}'", cliente_id));
+        query.push_str(" AND m.cliente_id = ?");
+        bind_values.push(cliente_id.clone());
     }
 
     if let Some(ref fornitore) = filtri.fornitore {
-        query.push_str(&format!(" AND LOWER(m.fornitore) LIKE '%{}%'", fornitore.to_lowercase()));
+        query.push_str(" AND LOWER(m.fornitore) LIKE ?");
+        bind_values.push(format!("%{}%", fornitore.to_lowercase()));
     }
 
     query.push_str(" ORDER BY m.created_at DESC");
 
+    if limit.is_some() {
+        query.push_str(" LIMIT ?");
+    }
+
+    if offset.is_some() {
+        query.push_str(" OFFSET ?");
+    }
+
+    let mut sql_query = sqlx::query_as::<_, MovimentoWithDetails>(&query);
+    for val in &bind_values {
+        sql_query = sql_query.bind(val);
+    }
+
     if let Some(lim) = limit {
-        query.push_str(&format!(" LIMIT {}", lim));
+        sql_query = sql_query.bind(lim);
     }
 
     if let Some(off) = offset {
-        query.push_str(&format!(" OFFSET {}", off));
+        sql_query = sql_query.bind(off);
     }
 
-    let result = sqlx::query_as::<_, MovimentoWithDetails>(&query)
-        .fetch_all(&state.db.pool)
-        .await?;
+    let result = sql_query.fetch_all(&state.db.pool).await?;
 
     Ok(result)
 }
@@ -561,12 +588,15 @@ pub async fn registra_carico(
 ) -> AppResult<MovimentoMagazzino> {
     let state = db.lock().await;
 
+    // Usa transazione per garantire atomicità
+    let mut tx = state.db.pool.begin().await?;
+
     // Ottieni giacenza attuale
     let giacenza_attuale: f64 = sqlx::query_scalar(
         "SELECT giacenza FROM prodotti WHERE id = ?"
     )
     .bind(&input.prodotto_id)
-    .fetch_one(&state.db.pool)
+    .fetch_one(&mut *tx)
     .await?;
 
     let nuova_giacenza = giacenza_attuale + input.quantita;
@@ -590,14 +620,14 @@ pub async fn registra_carico(
     .bind(&input.lotto)
     .bind(&input.data_scadenza)
     .bind(&input.note)
-    .execute(&state.db.pool)
+    .execute(&mut *tx)
     .await?;
 
     // Aggiorna giacenza prodotto
     sqlx::query("UPDATE prodotti SET giacenza = ?, updated_at = datetime('now') WHERE id = ?")
         .bind(nuova_giacenza)
         .bind(&input.prodotto_id)
-        .execute(&state.db.pool)
+        .execute(&mut *tx)
         .await?;
 
     // Aggiorna data scadenza prodotto se fornita
@@ -606,7 +636,7 @@ pub async fn registra_carico(
             .bind(data_scadenza)
             .bind(&input.prodotto_id)
             .bind(data_scadenza)
-            .execute(&state.db.pool)
+            .execute(&mut *tx)
             .await?;
     }
 
@@ -615,8 +645,10 @@ pub async fn registra_carico(
         "SELECT * FROM movimenti_magazzino WHERE prodotto_id = ? ORDER BY created_at DESC LIMIT 1"
     )
     .bind(&input.prodotto_id)
-    .fetch_one(&state.db.pool)
+    .fetch_one(&mut *tx)
     .await?;
+
+    tx.commit().await?;
 
     Ok(movimento)
 }
@@ -635,12 +667,14 @@ pub async fn registra_scarico(
         ));
     }
 
+    let mut tx = state.db.pool.begin().await?;
+
     // Ottieni giacenza attuale
     let giacenza_attuale: f64 = sqlx::query_scalar(
         "SELECT giacenza FROM prodotti WHERE id = ?"
     )
     .bind(&input.prodotto_id)
-    .fetch_one(&state.db.pool)
+    .fetch_one(&mut *tx)
     .await?;
 
     if input.quantita > giacenza_attuale {
@@ -669,22 +703,24 @@ pub async fn registra_scarico(
     .bind(&input.cliente_id)
     .bind(&input.appuntamento_id)
     .bind(&input.note)
-    .execute(&state.db.pool)
+    .execute(&mut *tx)
     .await?;
 
     // Aggiorna giacenza prodotto
     sqlx::query("UPDATE prodotti SET giacenza = ?, updated_at = datetime('now') WHERE id = ?")
         .bind(nuova_giacenza)
         .bind(&input.prodotto_id)
-        .execute(&state.db.pool)
+        .execute(&mut *tx)
         .await?;
 
     let movimento = sqlx::query_as::<_, MovimentoMagazzino>(
         "SELECT * FROM movimenti_magazzino WHERE prodotto_id = ? ORDER BY created_at DESC LIMIT 1"
     )
     .bind(&input.prodotto_id)
-    .fetch_one(&state.db.pool)
+    .fetch_one(&mut *tx)
     .await?;
+
+    tx.commit().await?;
 
     Ok(movimento)
 }
@@ -695,13 +731,14 @@ pub async fn registra_reso(
     input: CreateResoInput,
 ) -> AppResult<MovimentoMagazzino> {
     let state = db.lock().await;
+    let mut tx = state.db.pool.begin().await?;
 
     // Ottieni giacenza attuale
     let giacenza_attuale: f64 = sqlx::query_scalar(
         "SELECT giacenza FROM prodotti WHERE id = ?"
     )
     .bind(&input.prodotto_id)
-    .fetch_one(&state.db.pool)
+    .fetch_one(&mut *tx)
     .await?;
 
     // Il reso aumenta la giacenza (rimette il prodotto in magazzino)
@@ -724,22 +761,24 @@ pub async fn registra_reso(
     .bind(&input.cliente_id)
     .bind(&input.appuntamento_id)
     .bind(&input.note)
-    .execute(&state.db.pool)
+    .execute(&mut *tx)
     .await?;
 
     // Aggiorna giacenza prodotto
     sqlx::query("UPDATE prodotti SET giacenza = ?, updated_at = datetime('now') WHERE id = ?")
         .bind(nuova_giacenza)
         .bind(&input.prodotto_id)
-        .execute(&state.db.pool)
+        .execute(&mut *tx)
         .await?;
 
     let movimento = sqlx::query_as::<_, MovimentoMagazzino>(
         "SELECT * FROM movimenti_magazzino WHERE prodotto_id = ? ORDER BY created_at DESC LIMIT 1"
     )
     .bind(&input.prodotto_id)
-    .fetch_one(&state.db.pool)
+    .fetch_one(&mut *tx)
     .await?;
+
+    tx.commit().await?;
 
     Ok(movimento)
 }
@@ -750,13 +789,14 @@ pub async fn registra_inventario(
     input: CreateInventarioInput,
 ) -> AppResult<MovimentoMagazzino> {
     let state = db.lock().await;
+    let mut tx = state.db.pool.begin().await?;
 
     // Ottieni giacenza attuale
     let giacenza_attuale: f64 = sqlx::query_scalar(
         "SELECT giacenza FROM prodotti WHERE id = ?"
     )
     .bind(&input.prodotto_id)
-    .fetch_one(&state.db.pool)
+    .fetch_one(&mut *tx)
     .await?;
 
     let differenza = input.nuova_giacenza - giacenza_attuale;
@@ -774,22 +814,24 @@ pub async fn registra_inventario(
     .bind(differenza)
     .bind(input.nuova_giacenza)
     .bind(&input.note)
-    .execute(&state.db.pool)
+    .execute(&mut *tx)
     .await?;
 
     // Aggiorna giacenza prodotto
     sqlx::query("UPDATE prodotti SET giacenza = ?, updated_at = datetime('now') WHERE id = ?")
         .bind(input.nuova_giacenza)
         .bind(&input.prodotto_id)
-        .execute(&state.db.pool)
+        .execute(&mut *tx)
         .await?;
 
     let movimento = sqlx::query_as::<_, MovimentoMagazzino>(
         "SELECT * FROM movimenti_magazzino WHERE prodotto_id = ? ORDER BY created_at DESC LIMIT 1"
     )
     .bind(&input.prodotto_id)
-    .fetch_one(&state.db.pool)
+    .fetch_one(&mut *tx)
     .await?;
+
+    tx.commit().await?;
 
     Ok(movimento)
 }
@@ -811,7 +853,7 @@ pub async fn get_alert_prodotti(
             CASE
                 WHEN data_scadenza IS NOT NULL AND date(data_scadenza) < date('now') THEN 'scaduto'
                 WHEN data_scadenza IS NOT NULL AND date(data_scadenza) <= date('now', '+30 days') THEN 'scadenza_vicina'
-                WHEN giacenza <= scorta_minima THEN 'scorta_minima'
+                WHEN scorta_minima > 0 AND giacenza <= scorta_minima THEN 'scorta_minima'
             END as tipo_alert,
             giacenza, scorta_minima, data_scadenza,
             CASE
@@ -821,7 +863,7 @@ pub async fn get_alert_prodotti(
             END as giorni_alla_scadenza
         FROM prodotti
         WHERE attivo = 1 AND (
-            giacenza <= scorta_minima OR
+            (scorta_minima > 0 AND giacenza <= scorta_minima) OR
             (data_scadenza IS NOT NULL AND date(data_scadenza) <= date('now', '+30 days'))
         )
         ORDER BY
@@ -846,7 +888,7 @@ pub async fn get_alert_count(
     let state = db.lock().await;
 
     let sotto_scorta: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM prodotti WHERE attivo = 1 AND giacenza <= scorta_minima"
+        "SELECT COUNT(*) FROM prodotti WHERE attivo = 1 AND scorta_minima > 0 AND giacenza <= scorta_minima"
     )
     .fetch_one(&state.db.pool)
     .await?;
@@ -884,7 +926,7 @@ pub async fn get_prodotti_sotto_scorta(
                 c.nome as categoria_nome, c.tipo as categoria_tipo
          FROM prodotti p
          LEFT JOIN categorie_prodotti c ON p.categoria_id = c.id
-         WHERE p.attivo = 1 AND p.giacenza <= p.scorta_minima
+         WHERE p.attivo = 1 AND p.scorta_minima > 0 AND p.giacenza <= p.scorta_minima
          ORDER BY p.giacenza ASC"
     )
     .fetch_all(&state.db.pool)
@@ -900,8 +942,12 @@ pub async fn get_prodotti_in_scadenza(
 ) -> AppResult<Vec<ProdottoWithCategoria>> {
     let state = db.lock().await;
     let giorni_val = giorni.unwrap_or(30);
+    if giorni_val <= 0 {
+        return Err(AppError::InvalidInput("Il numero di giorni deve essere positivo".to_string()));
+    }
+    let giorni_str = format!("+{} days", giorni_val);
 
-    let query = format!(
+    let result = sqlx::query_as::<_, ProdottoWithCategoria>(
         "SELECT p.id, p.codice, p.barcode, p.categoria_id, p.nome, p.descrizione,
                 p.marca, p.linea, p.unita_misura, p.capacita, p.giacenza,
                 p.scorta_minima, p.scorta_riordino, p.prezzo_acquisto, p.prezzo_vendita,
@@ -911,14 +957,12 @@ pub async fn get_prodotti_in_scadenza(
          LEFT JOIN categorie_prodotti c ON p.categoria_id = c.id
          WHERE p.attivo = 1
            AND p.data_scadenza IS NOT NULL
-           AND date(p.data_scadenza) <= date('now', '+{} days')
-         ORDER BY p.data_scadenza ASC",
-        giorni_val
-    );
-
-    let result = sqlx::query_as::<_, ProdottoWithCategoria>(&query)
-        .fetch_all(&state.db.pool)
-        .await?;
+           AND date(p.data_scadenza) <= date('now', ?)
+         ORDER BY p.data_scadenza ASC"
+    )
+    .bind(&giorni_str)
+    .fetch_all(&state.db.pool)
+    .await?;
 
     Ok(result)
 }
@@ -957,12 +1001,16 @@ pub async fn get_report_consumi(
         "#
     );
 
+    let mut extra_binds: Vec<String> = Vec::new();
+
     if let Some(ref cat_id) = categoria_id {
-        query.push_str(&format!(" AND p.categoria_id = '{}'", cat_id));
+        query.push_str(" AND p.categoria_id = ?");
+        extra_binds.push(cat_id.clone());
     }
 
     if let Some(ref op_id) = operatrice_id {
-        query.push_str(&format!(" AND m.operatrice_id = '{}'", op_id));
+        query.push_str(" AND m.operatrice_id = ?");
+        extra_binds.push(op_id.clone());
     }
 
     if let Some(ref t) = tipo {
@@ -975,11 +1023,14 @@ pub async fn get_report_consumi(
 
     query.push_str(" GROUP BY m.prodotto_id ORDER BY quantita_totale DESC");
 
-    let result = sqlx::query_as::<_, ReportConsumiResult>(&query)
+    let mut sql_query = sqlx::query_as::<_, ReportConsumiResult>(&query)
         .bind(&data_da)
-        .bind(&data_a)
-        .fetch_all(&state.db.pool)
-        .await?;
+        .bind(&data_a);
+    for val in &extra_binds {
+        sql_query = sql_query.bind(val);
+    }
+
+    let result = sql_query.fetch_all(&state.db.pool).await?;
 
     Ok(result)
 }
@@ -1063,15 +1114,20 @@ pub async fn get_inventari(
         WHERE 1=1"#
     );
 
-    if let Some(ref s) = stato {
-        query.push_str(&format!(" AND i.stato = '{}'", s));
+    let bind_stato = stato.clone();
+
+    if stato.is_some() {
+        query.push_str(" AND i.stato = ?");
     }
 
     query.push_str(" GROUP BY i.id ORDER BY i.data_inizio DESC");
 
-    let result = sqlx::query_as::<_, InventarioRiepilogo>(&query)
-        .fetch_all(&state.db.pool)
-        .await?;
+    let mut sql_query = sqlx::query_as::<_, InventarioRiepilogo>(&query);
+    if let Some(ref s) = bind_stato {
+        sql_query = sql_query.bind(s);
+    }
+
+    let result = sql_query.fetch_all(&state.db.pool).await?;
 
     Ok(result)
 }
@@ -1250,30 +1306,41 @@ pub async fn aggiorna_riga_inventario(
         ));
     }
 
-    // Costruisci query dinamica
-    let mut updates = Vec::new();
+    // Costruisci query dinamica con parametri bind
+    let mut update_fields = Vec::new();
     if input.quantita_contata.is_some() {
-        updates.push(format!("quantita_contata = {}", input.quantita_contata.unwrap()));
+        update_fields.push("quantita_contata = ?");
     }
-    if let Some(ref lotto) = input.lotto {
-        updates.push(format!("lotto = '{}'", lotto));
+    if input.lotto.is_some() {
+        update_fields.push("lotto = ?");
     }
-    if let Some(ref data_scad) = input.data_scadenza {
-        updates.push(format!("data_scadenza = '{}'", data_scad));
+    if input.data_scadenza.is_some() {
+        update_fields.push("data_scadenza = ?");
     }
-    if let Some(ref note) = input.note {
-        updates.push(format!("note = '{}'", note));
+    if input.note.is_some() {
+        update_fields.push("note = ?");
     }
 
-    if !updates.is_empty() {
-        let query = format!(
+    if !update_fields.is_empty() {
+        let query_str = format!(
             "UPDATE righe_inventario SET {} WHERE id = ?",
-            updates.join(", ")
+            update_fields.join(", ")
         );
-        sqlx::query(&query)
-            .bind(&id)
-            .execute(&state.db.pool)
-            .await?;
+        let mut query = sqlx::query(&query_str);
+        if let Some(quantita) = input.quantita_contata {
+            query = query.bind(quantita);
+        }
+        if let Some(ref lotto) = input.lotto {
+            query = query.bind(lotto);
+        }
+        if let Some(ref data_scad) = input.data_scadenza {
+            query = query.bind(data_scad);
+        }
+        if let Some(ref note) = input.note {
+            query = query.bind(note);
+        }
+        query = query.bind(&id);
+        query.execute(&state.db.pool).await?;
     }
 
     // Ritorna la riga aggiornata
@@ -1382,13 +1449,14 @@ pub async fn conferma_inventario(
     inventario_id: String,
 ) -> AppResult<Inventario> {
     let state = db.lock().await;
+    let mut tx = state.db.pool.begin().await?;
 
     // Verifica che l'inventario sia in corso
     let inventario = sqlx::query_as::<_, Inventario>(
         "SELECT * FROM inventari WHERE id = ?"
     )
     .bind(&inventario_id)
-    .fetch_one(&state.db.pool)
+    .fetch_one(&mut *tx)
     .await?;
 
     if inventario.stato != "in_corso" {
@@ -1414,7 +1482,7 @@ pub async fn conferma_inventario(
         WHERE r.inventario_id = ?"#
     )
     .bind(&inventario_id)
-    .fetch_all(&state.db.pool)
+    .fetch_all(&mut *tx)
     .await?;
 
     // Per ogni riga, crea un movimento di rettifica e aggiorna la giacenza
@@ -1434,7 +1502,7 @@ pub async fn conferma_inventario(
             .bind(riga.quantita_contata)
             .bind(format!("Rettifica inventario {} - Giac. teorica: {}, Contata: {}",
                          inventario.codice, riga.giacenza_teorica, riga.quantita_contata))
-            .execute(&state.db.pool)
+            .execute(&mut *tx)
             .await?;
 
             // Il trigger aggiorna automaticamente la giacenza del prodotto
@@ -1446,7 +1514,7 @@ pub async fn conferma_inventario(
         "UPDATE inventari SET stato = 'confermato', data_chiusura = datetime('now') WHERE id = ?"
     )
     .bind(&inventario_id)
-    .execute(&state.db.pool)
+    .execute(&mut *tx)
     .await?;
 
     // Ritorna l'inventario aggiornato
@@ -1454,8 +1522,10 @@ pub async fn conferma_inventario(
         "SELECT * FROM inventari WHERE id = ?"
     )
     .bind(&inventario_id)
-    .fetch_one(&state.db.pool)
+    .fetch_one(&mut *tx)
     .await?;
+
+    tx.commit().await?;
 
     Ok(result)
 }
@@ -1466,12 +1536,13 @@ pub async fn annulla_inventario(
     inventario_id: String,
 ) -> AppResult<Inventario> {
     let state = db.lock().await;
+    let mut tx = state.db.pool.begin().await?;
 
     let inventario = sqlx::query_as::<_, Inventario>(
         "SELECT * FROM inventari WHERE id = ?"
     )
     .bind(&inventario_id)
-    .fetch_one(&state.db.pool)
+    .fetch_one(&mut *tx)
     .await?;
 
     if inventario.stato == "annullato" {
@@ -1498,7 +1569,7 @@ pub async fn annulla_inventario(
             WHERE r.inventario_id = ?"#
         )
         .bind(&inventario_id)
-        .fetch_all(&state.db.pool)
+        .fetch_all(&mut *tx)
         .await?;
 
         // Per ogni riga, ripristina la giacenza teorica
@@ -1517,7 +1588,7 @@ pub async fn annulla_inventario(
                 .bind(riga.giacenza_teorica)
                 .bind(format!("STORNO inventario {} - Ripristino giacenza da {} a {}",
                              inventario.codice, riga.quantita_contata, riga.giacenza_teorica))
-                .execute(&state.db.pool)
+                .execute(&mut *tx)
                 .await?;
             }
         }
@@ -1527,15 +1598,17 @@ pub async fn annulla_inventario(
         "UPDATE inventari SET stato = 'annullato', data_chiusura = datetime('now') WHERE id = ?"
     )
     .bind(&inventario_id)
-    .execute(&state.db.pool)
+    .execute(&mut *tx)
     .await?;
 
     let result = sqlx::query_as::<_, Inventario>(
         "SELECT * FROM inventari WHERE id = ?"
     )
     .bind(&inventario_id)
-    .fetch_one(&state.db.pool)
+    .fetch_one(&mut *tx)
     .await?;
+
+    tx.commit().await?;
 
     Ok(result)
 }
@@ -1560,6 +1633,12 @@ pub async fn elimina_inventario(
         ));
     }
 
+    // Elimina prima le righe associate, poi l'inventario
+    sqlx::query("DELETE FROM righe_inventario WHERE inventario_id = ?")
+        .bind(&inventario_id)
+        .execute(&state.db.pool)
+        .await?;
+
     sqlx::query("DELETE FROM inventari WHERE id = ?")
         .bind(&inventario_id)
         .execute(&state.db.pool)
@@ -1577,7 +1656,6 @@ pub async fn get_movimenti_appuntamento(
     db: tauri::State<'_, Arc<Mutex<crate::AppState>>>,
     appuntamento_id: String,
 ) -> AppResult<Vec<MovimentoWithDetails>> {
-    println!("DEBUG get_movimenti_appuntamento: called with appuntamento_id={}", appuntamento_id);
     let state = db.lock().await;
 
     // Query che calcola la quantità NETTA per prodotto:
@@ -1626,11 +1704,6 @@ pub async fn get_movimenti_appuntamento(
     .bind(&appuntamento_id)
     .fetch_all(&state.db.pool)
     .await?;
-
-    println!("DEBUG get_movimenti_appuntamento: found {} prodotti netti", result.len());
-    for m in &result {
-        println!("  - prodotto: {:?}, quantita netta: {}", m.prodotto_nome, m.quantita);
-    }
 
     Ok(result)
 }

@@ -1,5 +1,5 @@
 // Commands per la gestione degli appuntamenti
-use crate::error::AppResult;
+use crate::error::{AppResult, AppError};
 use crate::models::{Appuntamento, AppuntamentoWithDetails, CreateAppuntamentoInput, UpdateAppuntamentoInput};
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -182,6 +182,62 @@ pub async fn update_appuntamento(
 ) -> AppResult<Appuntamento> {
     let state = db.lock().await;
 
+    // Valida lo stato se fornito
+    if let Some(ref stato) = input.stato {
+        let stati_validi = ["programmato", "confermato", "in_corso", "completato", "annullato", "no_show"];
+        if !stati_validi.contains(&stato.as_str()) {
+            return Err(crate::error::AppError::InvalidInput(
+                format!("Stato non valido: '{}'. Stati ammessi: programmato, confermato, in_corso, completato, annullato, no_show", stato)
+            ));
+        }
+    }
+
+    // Recupera l'appuntamento corrente per i campi non forniti nell'input
+    let current = sqlx::query_as::<_, Appuntamento>(
+        "SELECT * FROM appuntamenti WHERE id = ?1"
+    )
+    .bind(&id)
+    .fetch_optional(&state.db.pool)
+    .await?
+    .ok_or_else(|| crate::error::AppError::NotFound(
+        format!("Appuntamento non trovato: {}", id)
+    ))?;
+
+    let operatrice_id = input.operatrice_id.as_deref().unwrap_or(&current.operatrice_id);
+    let data_ora_inizio = input.data_ora_inizio.unwrap_or(current.data_ora_inizio);
+    let data_ora_fine = input.data_ora_fine.unwrap_or(current.data_ora_fine);
+
+    // Valida che la data di fine sia successiva alla data di inizio
+    if data_ora_fine <= data_ora_inizio {
+        return Err(crate::error::AppError::InvalidInput(
+            "La data di fine deve essere successiva alla data di inizio".to_string()
+        ));
+    }
+
+    // Controlla sovrapposizioni (escludendo l'appuntamento corrente)
+    let sovrapposizioni = sqlx::query_scalar::<_, i64>(
+        r#"
+        SELECT COUNT(*)
+        FROM appuntamenti
+        WHERE operatrice_id = ?1
+          AND id != ?2
+          AND stato NOT IN ('annullato', 'no_show')
+          AND ((data_ora_inizio < ?4 AND data_ora_fine > ?3))
+        "#
+    )
+    .bind(operatrice_id)
+    .bind(&id)
+    .bind(&data_ora_inizio)
+    .bind(&data_ora_fine)
+    .fetch_one(&state.db.pool)
+    .await?;
+
+    if sovrapposizioni > 0 {
+        return Err(crate::error::AppError::Conflict(
+            "L'operatrice ha già un appuntamento in questo orario".to_string()
+        ));
+    }
+
     sqlx::query(
         r#"UPDATE appuntamenti SET
            cliente_id = COALESCE(?1, cliente_id),
@@ -190,10 +246,11 @@ pub async fn update_appuntamento(
            data_ora_inizio = COALESCE(?4, data_ora_inizio),
            data_ora_fine = COALESCE(?5, data_ora_fine),
            stato = COALESCE(?6, stato),
-           note_prenotazione = COALESCE(?7, note_prenotazione),
-           prezzo_applicato = COALESCE(?8, prezzo_applicato),
+           note_prenotazione = ?7,
+           note_trattamento = ?8,
+           prezzo_applicato = ?9,
            updated_at = datetime('now')
-           WHERE id = ?9"#
+           WHERE id = ?10"#
     )
     .bind(&input.cliente_id)
     .bind(&input.operatrice_id)
@@ -202,6 +259,7 @@ pub async fn update_appuntamento(
     .bind(&input.data_ora_fine)
     .bind(&input.stato)
     .bind(&input.note_prenotazione)
+    .bind(&input.note_trattamento)
     .bind(&input.prezzo_applicato)
     .bind(&id)
     .execute(&state.db.pool)
@@ -284,8 +342,10 @@ pub async fn get_appuntamenti_giorno(
     let state = db.lock().await;
 
     // Calcola inizio e fine giornata
-    let data_inizio = data.date_naive().and_hms_opt(0, 0, 0).unwrap();
-    let data_fine = data.date_naive().and_hms_opt(23, 59, 59).unwrap();
+    let data_inizio = data.date_naive().and_hms_opt(0, 0, 0)
+        .ok_or_else(|| AppError::InvalidInput("Data non valida: impossibile calcolare inizio giornata".to_string()))?;
+    let data_fine = data.date_naive().and_hms_opt(23, 59, 59)
+        .ok_or_else(|| AppError::InvalidInput("Data non valida: impossibile calcolare fine giornata".to_string()))?;
 
     let data_inizio_utc = DateTime::<Utc>::from_naive_utc_and_offset(data_inizio, Utc);
     let data_fine_utc = DateTime::<Utc>::from_naive_utc_and_offset(data_fine, Utc);

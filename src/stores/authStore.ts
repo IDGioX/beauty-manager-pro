@@ -51,7 +51,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       const themeStore = await import('./themeStore');
       themeStore.useThemeStore.getState().initFromUserSettings(response.settings);
     } catch (error: any) {
-      const errorMessage = error?.message || error?.toString() || 'Errore durante il login';
+      const errorMessage = typeof error === 'string' ? error : error?.message || 'Errore durante il login';
       set({
         user: null,
         settings: null,
@@ -155,7 +155,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       // Il tema è già stato applicato via setTheme() nel componente Settings
       // Non chiamare initFromUserSettings qui perché sovrascrive le modifiche locali
     } catch (error: any) {
-      const errorMessage = error?.message || error?.toString() || 'Errore nell\'aggiornamento delle impostazioni';
+      const errorMessage = typeof error === 'string' ? error : error?.message || 'Errore nell\'aggiornamento delle impostazioni';
       set({
         isLoading: false,
         error: errorMessage,
@@ -196,7 +196,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       const themeStore = await import('./themeStore');
       themeStore.useThemeStore.getState().initFromUserSettings(response.settings);
     } catch (error: any) {
-      const errorMessage = error?.message || error?.toString() || 'Errore durante la registrazione';
+      const errorMessage = typeof error === 'string' ? error : error?.message || 'Errore durante la registrazione';
       set({
         isLoading: false,
         error: errorMessage,

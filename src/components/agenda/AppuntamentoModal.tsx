@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { Save, Trash2, Calendar, Clock, User, Scissors, UserPlus, X, Check } from 'lucide-react';
+import { Save, Trash2, Calendar, Clock, User, Scissors, UserPlus, X, Check, ExternalLink, Euro } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
@@ -38,6 +38,10 @@ export const AppuntamentoModal: React.FC = () => {
   const [quickClientNome, setQuickClientNome] = useState('');
   const [quickClientCognome, setQuickClientCognome] = useState('');
   const [quickClientCellulare, setQuickClientCellulare] = useState('');
+  const [quickClientEmail, setQuickClientEmail] = useState('');
+  const [quickClientDataNascita, setQuickClientDataNascita] = useState('');
+  const [quickClientConsensoWhatsapp, setQuickClientConsensoWhatsapp] = useState(true);
+  const [quickClientConsensoEmail, setQuickClientConsensoEmail] = useState(false);
   const [quickClientSaving, setQuickClientSaving] = useState(false);
 
   // Form state
@@ -160,6 +164,10 @@ export const AppuntamentoModal: React.FC = () => {
     setQuickClientNome('');
     setQuickClientCognome('');
     setQuickClientCellulare('');
+    setQuickClientEmail('');
+    setQuickClientDataNascita('');
+    setQuickClientConsensoWhatsapp(true);
+    setQuickClientConsensoEmail(false);
   };
 
   const handleQuickAddClient = async () => {
@@ -176,9 +184,12 @@ export const AppuntamentoModal: React.FC = () => {
         nome: quickClientNome.trim(),
         cognome: quickClientCognome.trim(),
         cellulare: quickClientCellulare.trim() || undefined,
+        email: quickClientEmail.trim() || undefined,
+        data_nascita: quickClientDataNascita || undefined,
         consenso_marketing: false,
-        consenso_whatsapp: false,
-        consenso_email: false,
+        consenso_sms: false,
+        consenso_whatsapp: quickClientConsensoWhatsapp,
+        consenso_email: quickClientConsensoEmail,
       };
 
       const newCliente = await invoke<Cliente>('create_cliente', { input });
@@ -194,7 +205,11 @@ export const AppuntamentoModal: React.FC = () => {
       setQuickClientNome('');
       setQuickClientCognome('');
       setQuickClientCellulare('');
-    } catch (err: any) {
+      setQuickClientEmail('');
+      setQuickClientDataNascita('');
+      setQuickClientConsensoWhatsapp(true);
+      setQuickClientConsensoEmail(false);
+      } catch (err: any) {
       console.error('Error creating quick client:', err);
       setError(err?.message || 'Errore durante la creazione del cliente');
     } finally {
@@ -209,6 +224,21 @@ export const AppuntamentoModal: React.FC = () => {
     const hours = String(date.getHours()).padStart(2, '0');
     const minutes = String(date.getMinutes()).padStart(2, '0');
     return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };
+
+  // Navigazione rapida verso le anagrafiche
+  const handleNavigateTo = (page: string, entityId?: string) => {
+    const appId = selectedAppuntamento?.id;
+    closeModal();
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('navigateToPage', {
+        detail: {
+          page,
+          ...(page === 'clienti' && entityId ? { clienteId: entityId } : {}),
+          fromAppuntamentoId: appId,
+        },
+      }));
+    }, 150);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -262,7 +292,6 @@ export const AppuntamentoModal: React.FC = () => {
         for (const prodotto of prodottiUsati) {
           try {
             if (prodotto.da_rimuovere && prodotto.gia_registrato) {
-              // Prodotto da rimuovere completamente → reso
               await magazzinoService.registraReso({
                 prodotto_id: prodotto.prodotto_id,
                 quantita: prodotto.quantita_originale || prodotto.quantita,
@@ -272,10 +301,8 @@ export const AppuntamentoModal: React.FC = () => {
                 note: `Reso per correzione appuntamento - ${trattamentoNome}`,
               });
             } else if (prodotto.gia_registrato && prodotto.quantita_originale !== undefined) {
-              // Prodotto già registrato con quantità modificata
               const differenza = prodotto.quantita - prodotto.quantita_originale;
               if (differenza > 0) {
-                // Quantità aumentata → scarico aggiuntivo
                 await magazzinoService.registraScarico({
                   prodotto_id: prodotto.prodotto_id,
                   quantita: differenza,
@@ -286,7 +313,6 @@ export const AppuntamentoModal: React.FC = () => {
                   note: `Correzione appuntamento (+${differenza}) - ${trattamentoNome}`,
                 });
               } else if (differenza < 0) {
-                // Quantità diminuita → reso parziale
                 await magazzinoService.registraReso({
                   prodotto_id: prodotto.prodotto_id,
                   quantita: Math.abs(differenza),
@@ -296,9 +322,7 @@ export const AppuntamentoModal: React.FC = () => {
                   note: `Correzione appuntamento (${differenza}) - ${trattamentoNome}`,
                 });
               }
-              // Se differenza === 0, non fare nulla
             } else if (!prodotto.gia_registrato && !prodotto.da_rimuovere) {
-              // Nuovo prodotto → scarico normale
               await magazzinoService.registraScarico({
                 prodotto_id: prodotto.prodotto_id,
                 quantita: prodotto.quantita,
@@ -311,7 +335,6 @@ export const AppuntamentoModal: React.FC = () => {
             }
           } catch (movimentoError) {
             console.error('Errore registrazione movimento prodotto:', movimentoError);
-            // Continua con gli altri prodotti anche se uno fallisce
           }
         }
       }
@@ -355,15 +378,49 @@ export const AppuntamentoModal: React.FC = () => {
     };
   });
 
-  const operatriciOptions = operatrici.map((o) => ({
-    value: o.id,
-    label: `${o.cognome} ${o.nome}${o.specializzazioni ? ` • ${o.specializzazioni.split(',')[0].trim()}` : ''}`,
-  }));
+  const parseSpecializzazioni = (spec: string | null): string => {
+    if (!spec) return '';
+    try {
+      const parsed = JSON.parse(spec);
+      if (Array.isArray(parsed)) return parsed.join(', ');
+      return spec;
+    } catch {
+      return spec;
+    }
+  };
+
+  const operatriciOptions = operatrici.map((o) => {
+    const spec = parseSpecializzazioni(o.specializzazioni);
+    return {
+      value: o.id,
+      label: `${o.cognome} ${o.nome}`,
+      subtitle: spec || undefined,
+    };
+  });
 
   const trattamentiOptions = trattamenti.map((t) => ({
     value: t.id,
-    label: `${t.nome} • ${t.durata_minuti} min${t.prezzo_listino ? ` • €${t.prezzo_listino.toFixed(2)}` : ''}`,
+    label: t.nome,
+    subtitle: `${t.durata_minuti} min${t.prezzo_listino ? ` — €${t.prezzo_listino.toFixed(2)}` : ''}`,
   }));
+
+  // Quick nav button component
+  const QuickNavButton = ({ page, entityId, title }: { page: string; entityId?: string; title: string }) => {
+    if (!entityId) return null;
+    return (
+      <button
+        type="button"
+        onClick={() => handleNavigateTo(page, entityId)}
+        className="p-1 rounded-md transition-colors"
+        style={{ color: 'var(--color-text-muted)' }}
+        onMouseEnter={e => { e.currentTarget.style.color = 'var(--color-primary)'; e.currentTarget.style.background = 'color-mix(in srgb, var(--color-primary) 10%, transparent)'; }}
+        onMouseLeave={e => { e.currentTarget.style.color = 'var(--color-text-muted)'; e.currentTarget.style.background = 'transparent'; }}
+        title={title}
+      >
+        <ExternalLink size={13} />
+      </button>
+    );
+  };
 
   return (
     <Modal
@@ -374,7 +431,14 @@ export const AppuntamentoModal: React.FC = () => {
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
-          <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg text-red-700 dark:text-red-300 text-sm">
+          <div
+            className="p-3 rounded-lg text-sm"
+            style={{
+              background: 'color-mix(in srgb, rgb(239, 68, 68) 10%, transparent)',
+              color: 'rgb(220, 38, 38)',
+              border: '1px solid color-mix(in srgb, rgb(239, 68, 68) 20%, transparent)',
+            }}
+          >
             {error}
           </div>
         )}
@@ -383,14 +447,18 @@ export const AppuntamentoModal: React.FC = () => {
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <User size={16} className="text-gray-400" />
-              <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Cliente</span>
+              <User size={16} style={{ color: 'var(--color-text-muted)' }} />
+              <span className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>Cliente</span>
+              <QuickNavButton page="clienti" entityId={clienteId} title="Apri anagrafica cliente" />
             </div>
             {!showQuickAddClient && (
               <button
                 type="button"
                 onClick={() => setShowQuickAddClient(true)}
-                className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-lg transition-colors"
+                style={{ color: 'var(--color-text-secondary)' }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'var(--glass-border)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
               >
                 <UserPlus size={14} />
                 Nuovo
@@ -400,9 +468,15 @@ export const AppuntamentoModal: React.FC = () => {
 
           {/* Quick Add Client Form */}
           {showQuickAddClient ? (
-            <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4 border border-gray-200 dark:border-gray-700 space-y-3">
+            <div
+              className="rounded-xl p-4 space-y-3"
+              style={{
+                background: 'var(--input-bg, var(--card-bg))',
+                border: '1px solid var(--glass-border)',
+              }}
+            >
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-gray-900 dark:text-white">Nuovo cliente</span>
+                <span className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>Nuovo cliente</span>
                 <button
                   type="button"
                   onClick={() => {
@@ -410,13 +484,22 @@ export const AppuntamentoModal: React.FC = () => {
                     setQuickClientNome('');
                     setQuickClientCognome('');
                     setQuickClientCellulare('');
-                  }}
-                  className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                    setQuickClientEmail('');
+                    setQuickClientDataNascita('');
+                    setQuickClientConsensoWhatsapp(true);
+                    setQuickClientConsensoEmail(false);
+                                  }}
+                  className="p-1 rounded-lg transition-colors"
+                  style={{ color: 'var(--color-text-muted)' }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--glass-border)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                 >
-                  <X size={16} className="text-gray-500" />
+                  <X size={16} />
                 </button>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+
+              {/* Anagrafica */}
+              <div className="grid grid-cols-3 gap-3">
                 <Input
                   type="text"
                   label="Nome *"
@@ -433,15 +516,60 @@ export const AppuntamentoModal: React.FC = () => {
                   placeholder="Cognome"
                   disabled={quickClientSaving}
                 />
+                <Input
+                  type="date"
+                  label="Data nascita"
+                  value={quickClientDataNascita}
+                  onChange={(e) => setQuickClientDataNascita(e.target.value)}
+                  disabled={quickClientSaving}
+                />
               </div>
-              <Input
-                type="tel"
-                label="Cellulare"
-                value={quickClientCellulare}
-                onChange={(e) => setQuickClientCellulare(e.target.value)}
-                placeholder="Es: 333 1234567"
-                disabled={quickClientSaving}
-              />
+
+              {/* Contatti */}
+              <div className="grid grid-cols-2 gap-3">
+                <Input
+                  type="tel"
+                  label="Cellulare"
+                  value={quickClientCellulare}
+                  onChange={(e) => setQuickClientCellulare(e.target.value)}
+                  placeholder="Es: 333 1234567"
+                  disabled={quickClientSaving}
+                />
+                <Input
+                  type="email"
+                  label="Email"
+                  value={quickClientEmail}
+                  onChange={(e) => setQuickClientEmail(e.target.value)}
+                  placeholder="email@esempio.it"
+                  disabled={quickClientSaving}
+                />
+              </div>
+
+              {/* Consensi */}
+              <div className="flex items-center gap-4 pt-1">
+                <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Consensi:</span>
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={quickClientConsensoWhatsapp}
+                    onChange={(e) => setQuickClientConsensoWhatsapp(e.target.checked)}
+                    disabled={quickClientSaving}
+                    className="rounded border-gray-300 text-green-600 focus:ring-green-500"
+                  />
+                  <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>WhatsApp</span>
+                </label>
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={quickClientConsensoEmail}
+                    onChange={(e) => setQuickClientConsensoEmail(e.target.checked)}
+                    disabled={quickClientSaving}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>Email</span>
+                </label>
+              </div>
+
               <div className="flex justify-end gap-2 pt-2">
                 <Button
                   type="button"
@@ -452,7 +580,11 @@ export const AppuntamentoModal: React.FC = () => {
                     setQuickClientNome('');
                     setQuickClientCognome('');
                     setQuickClientCellulare('');
-                  }}
+                    setQuickClientEmail('');
+                    setQuickClientDataNascita('');
+                    setQuickClientConsensoWhatsapp(true);
+                    setQuickClientConsensoEmail(false);
+                                  }}
                   disabled={quickClientSaving}
                 >
                   Annulla
@@ -491,7 +623,7 @@ export const AppuntamentoModal: React.FC = () => {
                 icon={<User size={18} />}
               />
               {clienti.length === 0 && (
-                <p className="text-xs text-gray-500 dark:text-gray-400">
+                <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
                   Nessun cliente disponibile. Clicca su "Nuovo" per crearne uno.
                 </p>
               )}
@@ -500,14 +632,17 @@ export const AppuntamentoModal: React.FC = () => {
         </div>
 
         {/* Sezione Servizio */}
-        <div className="space-y-3 pt-4 border-t border-gray-100 dark:border-gray-700">
+        <div className="space-y-3 pt-4" style={{ borderTop: '1px solid var(--glass-border)' }}>
           <div className="flex items-center gap-2">
-            <Scissors size={16} className="text-gray-400" />
-            <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Servizio</span>
+            <Scissors size={16} style={{ color: 'var(--color-text-muted)' }} />
+            <span className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>Servizio</span>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="space-y-3">
             <div>
-              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">Operatore *</label>
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <label className="block text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>Operatore *</label>
+                <QuickNavButton page="operatrici" entityId={operatriceId} title="Apri anagrafica operatore" />
+              </div>
               <SearchableSelect
                 value={operatriceId}
                 onChange={(value) => setOperatriceId(value)}
@@ -518,7 +653,10 @@ export const AppuntamentoModal: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">Trattamento *</label>
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <label className="block text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>Trattamento *</label>
+                <QuickNavButton page="trattamenti" entityId={trattamentoId} title="Apri scheda trattamento" />
+              </div>
               <SearchableSelect
                 value={trattamentoId}
                 onChange={(value) => setTrattamentoId(value)}
@@ -532,10 +670,10 @@ export const AppuntamentoModal: React.FC = () => {
         </div>
 
         {/* Sezione Orario */}
-        <div className="space-y-3 pt-4 border-t border-gray-100 dark:border-gray-700">
+        <div className="space-y-3 pt-4" style={{ borderTop: '1px solid var(--glass-border)' }}>
           <div className="flex items-center gap-2">
-            <Calendar size={16} className="text-gray-400" />
-            <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Orario</span>
+            <Calendar size={16} style={{ color: 'var(--color-text-muted)' }} />
+            <span className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>Orario</span>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input
@@ -556,7 +694,7 @@ export const AppuntamentoModal: React.FC = () => {
             />
           </div>
           {dataOraInizio && dataOraFine && (
-            <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+            <p className="text-xs flex items-center gap-1.5" style={{ color: 'var(--color-text-muted)' }}>
               <Clock size={14} />
               Durata: {Math.round((new Date(dataOraFine).getTime() - new Date(dataOraInizio).getTime()) / 60000)} minuti
             </p>
@@ -564,10 +702,10 @@ export const AppuntamentoModal: React.FC = () => {
         </div>
 
         {/* Sezione Dettagli */}
-        <div className="space-y-3 pt-4 border-t border-gray-100 dark:border-gray-700">
+        <div className="space-y-3 pt-4" style={{ borderTop: '1px solid var(--glass-border)' }}>
           <div className="flex items-center gap-2">
-            <span className="text-gray-400 font-medium text-sm">€</span>
-            <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Dettagli</span>
+            <Euro size={16} style={{ color: 'var(--color-text-muted)' }} />
+            <span className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>Dettagli</span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -609,7 +747,7 @@ export const AppuntamentoModal: React.FC = () => {
 
         {/* Sezione Prodotti Usati - visibile solo quando stato = completato */}
         {stato === 'completato' && (
-          <div className="pt-4 border-t border-gray-100 dark:border-gray-700">
+          <div className="pt-4" style={{ borderTop: '1px solid var(--glass-border)' }}>
             <ProdottiUsatiSection
               appuntamentoId={selectedAppuntamento?.id}
               operatriceId={operatriceId}
@@ -620,7 +758,7 @@ export const AppuntamentoModal: React.FC = () => {
         )}
 
         {/* Buttons */}
-        <div className="flex gap-3 pt-5 mt-2 border-t border-gray-100 dark:border-gray-700">
+        <div className="flex gap-3 pt-5 mt-2" style={{ borderTop: '1px solid var(--glass-border)' }}>
           {modalMode === 'edit' && (
             <Button
               type="button"
@@ -638,10 +776,9 @@ export const AppuntamentoModal: React.FC = () => {
           {modalMode === 'edit' && selectedAppuntamento && ['prenotato', 'confermato', 'in_corso'].includes(stato) && (() => {
             const cliente = clienti.find(c => c.id === clienteId);
             if (!cliente) {
-              // Se i clienti non sono ancora caricati, mostra un placeholder
               if (clienti.length === 0) {
                 return (
-                  <Button type="button" variant="secondary" size="sm" disabled className="gap-1.5 text-gray-400">
+                  <Button type="button" variant="secondary" size="sm" disabled className="gap-1.5" style={{ color: 'var(--color-text-muted)' }}>
                     Caricamento...
                   </Button>
                 );

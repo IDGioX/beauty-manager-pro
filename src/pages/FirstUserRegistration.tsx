@@ -74,8 +74,11 @@ export const FirstUserRegistration: React.FC = () => {
         // Non bloccare la registrazione se l'aggiornamento azienda fallisce
         console.error('Errore aggiornamento nome azienda');
       }
+
+      // Ricarica l'app per far partire il controllo licenza
+      window.location.reload();
     } catch (err: any) {
-      setFormError(err.message || 'Errore durante la registrazione');
+      setFormError(typeof err === 'string' ? err : err?.message || 'Errore durante la registrazione');
     }
   };
 

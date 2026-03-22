@@ -58,6 +58,7 @@ pub struct PeriodAnalytics {
     pub totale_appuntamenti: i64,
     pub appuntamenti_completati: i64,
     pub appuntamenti_annullati: i64,
+    pub appuntamenti_no_show: i64,
     pub tasso_completamento: f64,
     pub ricavo_totale: f64,
     pub ricavo_medio: f64,
@@ -65,6 +66,63 @@ pub struct PeriodAnalytics {
     pub nuovi_clienti: i64,
     pub media_appuntamenti_per_cliente: f64,
     pub durata_media_minuti: f64,
+}
+
+// ============================================
+// REPORT FILTRATO (filtri avanzati)
+// ============================================
+
+#[derive(Debug, Deserialize)]
+pub struct ReportFiltrato {
+    pub data_inizio: DateTime<Utc>,
+    pub data_fine: DateTime<Utc>,
+    pub cliente_ids: Option<Vec<String>>,
+    pub trattamento_ids: Option<Vec<String>>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ReportFiltratoResult {
+    pub kpi: PeriodAnalytics,
+    pub top_trattamenti: Vec<TrattamentoStats>,
+    pub top_clienti: Vec<ClienteTopRicavo>,
+    pub produttivita_operatrici: Vec<OperatriceProduttivita>,
+    pub ricavi_per_categoria: Vec<RicavoCategoria>,
+    pub dettaglio_appuntamenti: Vec<ReportAppuntamentoRow>,
+}
+
+#[derive(Debug, Serialize, FromRow)]
+pub struct OperatriceProduttivita {
+    pub operatrice_id: String,
+    pub operatrice_nome: String,
+    pub operatrice_cognome: String,
+    pub totale_appuntamenti: i64,
+    pub appuntamenti_completati: i64,
+    pub ricavo_totale: f64,
+    pub ricavo_medio: f64,
+    pub ore_lavorate: f64,
+}
+
+#[derive(Debug, Serialize, FromRow)]
+pub struct RicavoCategoria {
+    pub categoria_nome: String,
+    pub totale_appuntamenti: i64,
+    pub ricavo_totale: f64,
+    pub percentuale: f64,
+}
+
+#[derive(Debug, Serialize, FromRow)]
+pub struct ReportAppuntamentoRow {
+    pub data: String,
+    pub cliente_nome: String,
+    pub cliente_cognome: String,
+    pub trattamento_nome: String,
+    pub categoria_trattamento: String,
+    pub operatrice_nome: String,
+    pub operatrice_cognome: String,
+    pub durata_minuti: f64,
+    pub stato: String,
+    pub prezzo: f64,
+    pub note: String,
 }
 
 // ============================================

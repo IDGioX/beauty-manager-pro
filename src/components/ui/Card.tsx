@@ -4,40 +4,31 @@ interface CardProps {
   children: React.ReactNode;
   className?: string;
   hover?: boolean;
-  gradient?: 'primary' | 'blue' | 'purple' | 'orange' | 'none';
-  glass?: boolean;
+  style?: React.CSSProperties;
 }
 
 export const Card: React.FC<CardProps> = ({
   children,
   className = '',
   hover = false,
-  gradient = 'none',
-  glass: _glass = false,
+  style,
 }) => {
-  const gradients = {
-    primary: 'bg-gray-900 dark:bg-gray-100',
-    blue: 'bg-blue-600',
-    purple: 'bg-indigo-600',
-    orange: 'bg-amber-500',
-    none: 'bg-white dark:bg-gray-900',
-  };
-
-  const borderClass = gradient === 'none'
-    ? 'border border-gray-200/80 dark:border-gray-800'
-    : '';
-
   return (
     <div
-      className={`
-        ${gradients[gradient]}
-        rounded-xl shadow-sm
-        ${borderClass}
-        transition-all duration-150
-        ${hover ? 'hover:shadow-md hover:border-gray-300 dark:hover:border-gray-700' : ''}
-        ${gradient !== 'none' ? 'text-white dark:text-gray-900' : 'text-gray-900 dark:text-gray-100'}
-        ${className}
-      `}
+      className={`rounded-xl transition-all duration-150 ${hover ? 'cursor-pointer' : ''} ${className}`}
+      style={{
+        background: 'var(--card-bg)',
+        border: '1px solid var(--glass-border)',
+        ...style,
+      }}
+      onMouseEnter={hover ? e => {
+        e.currentTarget.style.background = 'var(--card-hover, var(--card-bg))';
+        e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)';
+      } : undefined}
+      onMouseLeave={hover ? e => {
+        e.currentTarget.style.background = 'var(--card-bg)';
+        e.currentTarget.style.boxShadow = 'none';
+      } : undefined}
     >
       {children}
     </div>

@@ -42,11 +42,25 @@ export const Agenda: React.FC<AgendaProps> = ({ openAppuntamentoId, onAppuntamen
 
   const [showExportModal, setShowExportModal] = useState(false);
   const [showOperatriciFilter, setShowOperatriciFilter] = useState(false);
+  const [showInattive, setShowInattive] = useState(false);
 
   // Carica operatrici all'avvio e quando si cambia vista
   useEffect(() => {
     loadOperatrici();
-  }, [viewMode]);
+  }, [viewMode, loadOperatrici]);
+
+  // Pulisce i filtri operatrici non più validi (es. operatore disattivato)
+  useEffect(() => {
+    if (operatrici.length > 0 && selectedOperatriciIds.length > 0) {
+      const validOperatriciIds = operatrici.map(op => op.id);
+      const cleanedSelection = selectedOperatriciIds.filter(id => validOperatriciIds.includes(id));
+
+      // Se alcuni ID non sono più validi, aggiorna la selezione
+      if (cleanedSelection.length !== selectedOperatriciIds.length) {
+        setSelectedOperatrici(cleanedSelection.length === validOperatriciIds.length ? [] : cleanedSelection);
+      }
+    }
+  }, [operatrici, selectedOperatriciIds, setSelectedOperatrici]);
 
   // Apri appuntamento specifico se richiesto
   useEffect(() => {
@@ -60,7 +74,7 @@ export const Agenda: React.FC<AgendaProps> = ({ openAppuntamentoId, onAppuntamen
           onAppuntamentoOpened?.();
         });
     }
-  }, [openAppuntamentoId]);
+  }, [openAppuntamentoId, openEditModalById, onAppuntamentoOpened]);
 
   // Polling automatico ogni minuto per aggiornare stati
   useEffect(() => {
@@ -107,13 +121,22 @@ export const Agenda: React.FC<AgendaProps> = ({ openAppuntamentoId, onAppuntamen
     }
   }, [viewMode]);
 
+  // Separa operatrici attive e inattive
+  const operatriciAttive = operatrici.filter(op => op.attiva);
+  const operatriciInattive = operatrici.filter(op => !op.attiva);
+
+  // Operatrici da mostrare (attive + inattive se showInattive è true)
+  const operatriciVisibili = showInattive
+    ? [...operatriciAttive, ...operatriciInattive]
+    : operatriciAttive;
+
   // Prepara le risorse (operatrici) per FullCalendar
-  const resources = operatrici
+  const resources = operatriciVisibili
     .filter(op => selectedOperatriciIds.length === 0 || selectedOperatriciIds.includes(op.id))
     .map((op) => ({
       id: op.id,
-      title: `${op.nome} ${op.cognome}`,
-      eventColor: op.colore_agenda,
+      title: op.attiva ? `${op.nome} ${op.cognome}` : `${op.nome} ${op.cognome} (inattiva)`,
+      eventColor: op.attiva ? op.colore_agenda : '#9CA3AF', // Grigio per inattive
     }));
 
   // Toggle singola operatrice
@@ -128,7 +151,8 @@ export const Agenda: React.FC<AgendaProps> = ({ openAppuntamentoId, onAppuntamen
     } else {
       // Non è selezionata -> aggiungi
       const newSelection = [...selectedOperatriciIds, id];
-      setSelectedOperatrici(newSelection.length === operatrici.length ? [] : newSelection);
+      // Se tutte le visibili sono selezionate, torna a "mostra tutte"
+      setSelectedOperatrici(newSelection.length === operatriciVisibili.length ? [] : newSelection);
     }
   };
 
@@ -136,8 +160,13 @@ export const Agenda: React.FC<AgendaProps> = ({ openAppuntamentoId, onAppuntamen
     setSelectedOperatrici([]);
   };
 
-  // Prepara gli eventi per FullCalendar
-  const events = appuntamenti.map((app) => ({
+  // Prepara gli eventi per FullCalendar (filtrati per operatore selezionato e visibilità inattive)
+  const operatriciVisibiliIds = operatriciVisibili.map(op => op.id);
+  const filteredAppuntamenti = appuntamenti
+    .filter(app => operatriciVisibiliIds.includes(app.operatrice_id)) // Filtra per operatrici visibili
+    .filter(app => selectedOperatriciIds.length === 0 || selectedOperatriciIds.includes(app.operatrice_id));
+
+  const events = filteredAppuntamenti.map((app) => ({
     id: app.id,
     resourceId: app.operatrice_id,
     title: `${app.cliente_nome} ${app.cliente_cognome} - ${app.trattamento_nome}`,
@@ -288,10 +317,10 @@ export const Agenda: React.FC<AgendaProps> = ({ openAppuntamentoId, onAppuntamen
     setViewMode('day');
   };
 
-  // Conta operatrici visibili
+  // Conta operatrici visibili (solo quelle effettivamente mostrate)
   const visibleOperatriciCount = selectedOperatriciIds.length === 0
-    ? operatrici.length
-    : selectedOperatriciIds.length;
+    ? operatriciVisibili.length
+    : selectedOperatriciIds.filter(id => operatriciVisibili.some(op => op.id === id)).length;
 
   return (
     <>
@@ -307,7 +336,7 @@ export const Agenda: React.FC<AgendaProps> = ({ openAppuntamentoId, onAppuntamen
 
       <div className="flex-1 flex flex-col min-h-0">
         {/* Header con controlli */}
-        <div className="mb-4 flex items-center justify-between">
+        <div className="mb-4 flex items-center justify-between animate-fade-in-up">
           <div>
             <h2
               className="text-xl font-semibold capitalize"
@@ -319,7 +348,7 @@ export const Agenda: React.FC<AgendaProps> = ({ openAppuntamentoId, onAppuntamen
               className="text-sm mt-1"
               style={{ color: 'var(--color-text-secondary)' }}
             >
-              {visibleOperatriciCount} operator{visibleOperatriciCount === 1 ? 'e' : 'i'} • {appuntamenti.length} appuntament{appuntamenti.length === 1 ? 'o' : 'i'}
+              {visibleOperatriciCount} operator{visibleOperatriciCount === 1 ? 'e' : 'i'} • {filteredAppuntamenti.length} appuntament{filteredAppuntamenti.length === 1 ? 'o' : 'i'}
             </p>
           </div>
 
@@ -419,44 +448,64 @@ export const Agenda: React.FC<AgendaProps> = ({ openAppuntamentoId, onAppuntamen
                         fontWeight: selectedOperatriciIds.length === 0 ? 500 : 400,
                       }}
                     >
-                      Mostra tutte ({operatrici.length})
+                      Mostra tutte ({operatriciVisibili.length})
                     </button>
                     <div className="my-2" style={{ borderTop: '1px solid var(--glass-border)' }} />
 
-                    {/* Lista operatrici */}
-                    {operatrici.map((op) => {
-                      const isVisible = selectedOperatriciIds.length === 0 || selectedOperatriciIds.includes(op.id);
+                    {/* Lista operatrici visibili */}
+                    {operatriciVisibili.map((op) => {
+                      const isSelected = selectedOperatriciIds.length === 0 || selectedOperatriciIds.includes(op.id);
+                      const displayColor = op.attiva ? op.colore_agenda : '#9CA3AF';
 
                       return (
                         <button
                           key={op.id}
                           onClick={() => toggleOperatrice(op.id)}
                           className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
-                            isVisible ? '' : 'opacity-50'
+                            isSelected ? '' : 'opacity-50'
                           }`}
                         >
                           <div
                             className="w-5 h-5 rounded border-2 flex items-center justify-center transition-colors"
                             style={{
-                              borderColor: isVisible ? op.colore_agenda : 'var(--color-text-muted)',
-                              backgroundColor: isVisible ? op.colore_agenda : 'transparent',
+                              borderColor: isSelected ? displayColor : 'var(--color-text-muted)',
+                              backgroundColor: isSelected ? displayColor : 'transparent',
                             }}
                           >
-                            {isVisible && (
+                            {isSelected && (
                               <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                               </svg>
                             )}
                           </div>
                           <span
-                            className="text-sm"
-                            style={{ color: isVisible ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}
+                            className="text-sm flex items-center gap-2"
+                            style={{ color: isSelected ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}
                           >
                             {op.nome} {op.cognome}
+                            {!op.attiva && (
+                              <span className="text-xs px-1.5 py-0.5 rounded bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
+                                inattiva
+                              </span>
+                            )}
                           </span>
                         </button>
                       );
                     })}
+
+                    {/* Toggle mostra inattive - solo se ce ne sono */}
+                    {operatriciInattive.length > 0 && (
+                      <>
+                        <div className="my-2" style={{ borderTop: '1px solid var(--glass-border)' }} />
+                        <button
+                          onClick={() => setShowInattive(!showInattive)}
+                          className="w-full text-left px-3 py-2 text-sm rounded-lg transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
+                          style={{ color: 'var(--color-text-secondary)' }}
+                        >
+                          {showInattive ? 'Nascondi' : 'Mostra'} inattive ({operatriciInattive.length})
+                        </button>
+                      </>
+                    )}
                   </div>
 
                   {/* Footer info */}
@@ -543,8 +592,8 @@ export const Agenda: React.FC<AgendaProps> = ({ openAppuntamentoId, onAppuntamen
           ) : viewMode === 'week' ? (
             <WeekViewCalendar
               selectedDate={selectedDate}
-              appuntamenti={appuntamenti}
-              operatrici={operatrici}
+              appuntamenti={filteredAppuntamenti}
+              operatrici={operatriciVisibili}
               selectedOperatriciIds={selectedOperatriciIds}
               onDateClick={handleWeekDateClick}
               onAppuntamentoClick={handleWeekAppuntamentoClick}
@@ -588,6 +637,7 @@ export const Agenda: React.FC<AgendaProps> = ({ openAppuntamentoId, onAppuntamen
               slotMinTime="08:00:00"
               slotMaxTime="20:00:00"
               slotDuration="00:15:00"
+              snapDuration="00:05:00"
               slotLabelInterval="01:00"
               slotLabelFormat={{
                 hour: '2-digit',

@@ -1,131 +1,98 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { useAuthStore } from './authStore';
 
-export interface DashboardWidget {
-  id: string;
-  type: 'kpi' | 'appuntamenti' | 'churn' | 'revenue';
-  title: string;
-  enabled: boolean;
-}
+// Sezioni visibili nella dashboard
+export type DashboardSectionId =
+  | 'oggi'
+  | 'grafici'
+  | 'azioni'
+  | 'andamento'
+  | 'trattamenti_top'
+  | 'prossimi_appuntamenti';
 
-export interface LayoutItem {
-  i: string; // widget id
-  x: number;
-  y: number;
-  w: number; // width in grid units
-  h: number; // height in grid units
-  minW?: number;
-  minH?: number;
+export interface DashboardSection {
+  id: DashboardSectionId;
+  label: string;
+  visible: boolean;
 }
 
 interface DashboardState {
-  layout: LayoutItem[];
-  widgets: DashboardWidget[];
-  isEditMode: boolean;
+  sections: DashboardSection[];
+  isCustomizing: boolean;
 
-  // Actions
-  setLayout: (layout: LayoutItem[]) => void;
-  toggleWidget: (widgetId: string) => void;
-  setEditMode: (enabled: boolean) => void;
-  saveLayout: () => Promise<void>;
-  loadLayout: () => void;
-  resetLayout: () => void;
+  toggleSection: (id: DashboardSectionId) => void;
+  reorderSections: (reordered: DashboardSection[]) => void;
+  setCustomizing: (v: boolean) => void;
+  isSectionVisible: (id: DashboardSectionId) => boolean;
+  resetSections: () => void;
 }
 
-// Layout di default
-const DEFAULT_LAYOUT: LayoutItem[] = [
-  { i: 'kpi-appuntamenti', x: 0, y: 0, w: 3, h: 2, minW: 2, minH: 2 },
-  { i: 'kpi-clienti', x: 3, y: 0, w: 3, h: 2, minW: 2, minH: 2 },
-  { i: 'kpi-fatturato', x: 6, y: 0, w: 3, h: 2, minW: 2, minH: 2 },
-  { i: 'kpi-prodotti', x: 9, y: 0, w: 3, h: 2, minW: 2, minH: 2 },
-  { i: 'appuntamenti-oggi', x: 0, y: 2, w: 6, h: 4, minW: 4, minH: 3 },
-  { i: 'churn-risk', x: 6, y: 2, w: 6, h: 4, minW: 4, minH: 3 },
+const DEFAULT_SECTIONS: DashboardSection[] = [
+  { id: 'oggi', label: 'Oggi', visible: true },
+  { id: 'grafici', label: 'Andamento Settimanale', visible: true },
+  { id: 'azioni', label: 'Azioni', visible: true },
+  { id: 'andamento', label: 'Andamento', visible: true },
+  { id: 'trattamenti_top', label: 'Trattamenti Top', visible: true },
+  { id: 'prossimi_appuntamenti', label: 'Prossimi Appuntamenti', visible: true },
 ];
 
-// Widgets disponibili
-const DEFAULT_WIDGETS: DashboardWidget[] = [
-  { id: 'kpi-appuntamenti', type: 'kpi', title: 'Appuntamenti Oggi', enabled: true },
-  { id: 'kpi-clienti', type: 'kpi', title: 'Clienti Attivi', enabled: true },
-  { id: 'kpi-fatturato', type: 'kpi', title: 'Fatturato Mese', enabled: true },
-  { id: 'kpi-prodotti', type: 'kpi', title: 'Scorte Basse', enabled: true },
-  { id: 'appuntamenti-oggi', type: 'appuntamenti', title: 'Prossimi Appuntamenti', enabled: true },
-  { id: 'churn-risk', type: 'churn', title: 'Clienti a Rischio', enabled: true },
-];
+// Merge stored sections with defaults (handles new sections added after user saved)
+function migrateSections(stored: DashboardSection[]): DashboardSection[] {
+  const storedIds = new Set(stored.map(s => s.id));
+  const merged = [...stored];
+  for (const def of DEFAULT_SECTIONS) {
+    if (!storedIds.has(def.id)) {
+      merged.push(def);
+    }
+  }
+  // Remove sections that no longer exist in defaults
+  const validIds = new Set(DEFAULT_SECTIONS.map(s => s.id));
+  return merged.filter(s => validIds.has(s.id));
+}
 
 export const useDashboardStore = create<DashboardState>()(
   persist(
     (set, get) => ({
-      layout: DEFAULT_LAYOUT,
-      widgets: DEFAULT_WIDGETS,
-      isEditMode: false,
+      sections: DEFAULT_SECTIONS,
+      isCustomizing: false,
 
-      setLayout: (newLayout: LayoutItem[]) => {
-        set({ layout: newLayout });
-      },
-
-      toggleWidget: (widgetId: string) => {
-        const { widgets } = get();
-        const updatedWidgets = widgets.map((w) =>
-          w.id === widgetId ? { ...w, enabled: !w.enabled } : w
-        );
-        set({ widgets: updatedWidgets });
-      },
-
-      setEditMode: (enabled: boolean) => {
-        set({ isEditMode: enabled });
-      },
-
-      saveLayout: async () => {
-        const { layout } = get();
-
-        // Salva nel backend se l'utente è autenticato
-        try {
-          const { useAuthStore } = await import('./authStore');
-          const authState = useAuthStore.getState();
-
-          if (authState.isAuthenticated && authState.user) {
-            const layoutJson = JSON.stringify(layout);
-            await authState.updateSettings({
-              dashboard_layout: layoutJson,
-            });
-          }
-        } catch (error) {
-          console.error('Errore salvataggio layout:', error);
-          // Il layout è comunque salvato in localStorage tramite persist
-        }
-      },
-
-      loadLayout: () => {
-        // Il layout viene automaticamente caricato dal persist middleware
-        // Questa funzione può essere usata per forzare un reload se necessario
-        const authState = useAuthStore.getState();
-
-        if (authState.settings?.dashboard_layout) {
-          try {
-            const parsedLayout = JSON.parse(authState.settings.dashboard_layout);
-            set({ layout: parsedLayout });
-          } catch (error) {
-            console.error('Errore parsing layout salvato:', error);
-            set({ layout: DEFAULT_LAYOUT });
-          }
-        }
-      },
-
-      resetLayout: () => {
+      toggleSection: (id: DashboardSectionId) => {
+        const { sections } = get();
         set({
-          layout: DEFAULT_LAYOUT,
-          widgets: DEFAULT_WIDGETS,
-          isEditMode: false,
+          sections: sections.map((s) =>
+            s.id === id ? { ...s, visible: !s.visible } : s
+          ),
         });
+      },
+
+      reorderSections: (reordered: DashboardSection[]) => {
+        set({ sections: reordered });
+      },
+
+      setCustomizing: (v: boolean) => {
+        set({ isCustomizing: v });
+      },
+
+      isSectionVisible: (id: DashboardSectionId) => {
+        return get().sections.find((s) => s.id === id)?.visible ?? true;
+      },
+
+      resetSections: () => {
+        set({ sections: DEFAULT_SECTIONS });
       },
     }),
     {
       name: 'dashboard-storage',
       partialize: (state) => ({
-        layout: state.layout,
-        widgets: state.widgets,
+        sections: state.sections,
       }),
+      merge: (persisted, current) => {
+        const p = persisted as Partial<DashboardState>;
+        return {
+          ...current,
+          sections: p.sections ? migrateSections(p.sections) : current.sections,
+        };
+      },
     }
   )
 );
