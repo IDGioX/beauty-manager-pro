@@ -4,7 +4,7 @@ import resourceTimeGridPlugin from '@fullcalendar/resource-timegrid';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin, { EventResizeDoneArg } from '@fullcalendar/interaction';
 import itLocale from '@fullcalendar/core/locales/it';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Filter, X, FileDown } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Filter, X, FileDown, AlertTriangle, Check, XCircle, UserX } from 'lucide-react';
 import { useAgendaStore } from '../stores/agendaStore';
 import { AppuntamentoModal } from '../components/agenda/AppuntamentoModal';
 import { ExportModal } from '../components/agenda/ExportModal';
@@ -43,6 +43,11 @@ export const Agenda: React.FC<AgendaProps> = ({ openAppuntamentoId, onAppuntamen
   const [showExportModal, setShowExportModal] = useState(false);
   const [showOperatriciFilter, setShowOperatriciFilter] = useState(false);
   const [showInattive, setShowInattive] = useState(false);
+  const [pendingAppuntamenti, setPendingAppuntamenti] = useState<AppuntamentoWithDetails[]>([]);
+  const [showPendingPopup, setShowPendingPopup] = useState(false);
+  const [updatingAppId, setUpdatingAppId] = useState<string | null>(null);
+  // Tiene traccia dei giorni già controllati per non riaprire il popup navigando via e tornando
+  const checkedDaysRef = useRef<Set<string>>(new Set());
 
   // Carica operatrici all'avvio e quando si cambia vista
   useEffect(() => {
@@ -120,6 +125,55 @@ export const Agenda: React.FC<AgendaProps> = ({ openAppuntamentoId, onAppuntamen
       }
     }
   }, [viewMode]);
+
+  // Controlla appuntamenti passati non risolti (prenotato/in_corso in giorni passati)
+  const wasLoadingRef = useRef(false);
+  useEffect(() => {
+    // Intercetta la transizione isLoading: true → false (caricamento appena completato)
+    if (isLoading) {
+      wasLoadingRef.current = true;
+      return;
+    }
+    if (!wasLoadingRef.current) return;
+    wasLoadingRef.current = false;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const selDay = new Date(selectedDate);
+    selDay.setHours(0, 0, 0, 0);
+    const dayKey = selDay.toISOString().slice(0, 10);
+
+    // Solo per giorni passati, non già controllati, in vista giorno
+    if (selDay >= today || checkedDaysRef.current.has(dayKey) || viewMode !== 'day') return;
+
+    const nonRisolti = appuntamenti.filter(
+      a => a.stato === 'prenotato' || a.stato === 'in_corso'
+    );
+
+    checkedDaysRef.current.add(dayKey);
+
+    if (nonRisolti.length > 0) {
+      setPendingAppuntamenti(nonRisolti);
+      setShowPendingPopup(true);
+    }
+  }, [appuntamenti, selectedDate, viewMode, isLoading]);
+
+  // Aggiorna stato di un appuntamento dal popup
+  const handleResolvePending = async (appId: string, nuovoStato: 'completato' | 'annullato' | 'no_show') => {
+    setUpdatingAppId(appId);
+    try {
+      await updateAppuntamento(appId, { stato: nuovoStato });
+      setPendingAppuntamenti(prev => {
+        const remaining = prev.filter(a => a.id !== appId);
+        if (remaining.length === 0) setShowPendingPopup(false);
+        return remaining;
+      });
+    } catch (err) {
+      console.error('Errore aggiornamento stato:', err);
+    } finally {
+      setUpdatingAppId(null);
+    }
+  };
 
   // Separa operatrici attive e inattive
   const operatriciAttive = operatrici.filter(op => op.attiva);
@@ -325,6 +379,150 @@ export const Agenda: React.FC<AgendaProps> = ({ openAppuntamentoId, onAppuntamen
   return (
     <>
       <AppuntamentoModal />
+
+      {/* Popup appuntamenti passati non risolti */}
+      {showPendingPopup && pendingAppuntamenti.length > 0 && (
+        <>
+          <div
+            className="fixed inset-0 z-[100]"
+            style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
+            onClick={() => setShowPendingPopup(false)}
+          />
+          <div className="fixed inset-0 z-[101] overflow-y-auto pointer-events-none">
+            <div className="min-h-full flex items-start justify-center p-4 pt-[10vh]">
+              <div
+                className="pointer-events-auto relative w-full max-w-lg rounded-2xl shadow-2xl"
+                style={{ background: 'var(--card-bg)', border: '1px solid var(--glass-border)' }}
+                onClick={e => e.stopPropagation()}
+              >
+                {/* Header */}
+                <div
+                  className="flex items-center gap-3 px-6 py-4 rounded-t-2xl"
+                  style={{ background: 'color-mix(in srgb, var(--color-warning) 15%, var(--card-bg))', borderBottom: '1px solid var(--glass-border)' }}
+                >
+                  <AlertTriangle size={20} style={{ color: 'var(--color-warning)' }} />
+                  <div className="flex-1">
+                    <h3 className="text-[15px] font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+                      Appuntamenti da confermare
+                    </h3>
+                    <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>
+                      {pendingAppuntamenti.length} appuntament{pendingAppuntamenti.length === 1 ? 'o' : 'i'} del {new Date(selectedDate).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })} senza esito
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowPendingPopup(false)}
+                    className="p-1.5 rounded-lg transition-colors"
+                    style={{ color: 'var(--color-text-muted)' }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'var(--glass-border)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+
+                {/* Lista appuntamenti */}
+                <div className="px-6 py-4 space-y-3 max-h-[50vh] overflow-y-auto">
+                  {pendingAppuntamenti.map(app => {
+                    const ora = new Date(app.data_ora_inizio).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+                    const isUpdating = updatingAppId === app.id;
+                    return (
+                      <div
+                        key={app.id}
+                        className="rounded-xl p-3"
+                        style={{ background: 'var(--glass-border)', border: '1px solid var(--glass-border)' }}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <div>
+                            <p className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
+                              {app.cliente_nome} {app.cliente_cognome}
+                            </p>
+                            <p className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+                              {ora} • {app.trattamento_nome} • {app.operatrice_nome} {app.operatrice_cognome}
+                            </p>
+                          </div>
+                          <span
+                            className="text-xs px-2 py-0.5 rounded-full font-medium"
+                            style={{
+                              background: 'color-mix(in srgb, var(--color-warning) 15%, transparent)',
+                              color: 'var(--color-warning)',
+                            }}
+                          >
+                            {app.stato}
+                          </span>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleResolvePending(app.id, 'completato')}
+                            disabled={isUpdating}
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors"
+                            style={{
+                              background: 'color-mix(in srgb, var(--color-success) 15%, transparent)',
+                              color: 'var(--color-success)',
+                            }}
+                            onMouseEnter={e => { e.currentTarget.style.background = 'color-mix(in srgb, var(--color-success) 25%, transparent)'; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = 'color-mix(in srgb, var(--color-success) 15%, transparent)'; }}
+                          >
+                            <Check size={14} />
+                            Completato
+                          </button>
+                          <button
+                            onClick={() => handleResolvePending(app.id, 'annullato')}
+                            disabled={isUpdating}
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors"
+                            style={{
+                              background: 'color-mix(in srgb, var(--color-danger) 15%, transparent)',
+                              color: 'var(--color-danger)',
+                            }}
+                            onMouseEnter={e => { e.currentTarget.style.background = 'color-mix(in srgb, var(--color-danger) 25%, transparent)'; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = 'color-mix(in srgb, var(--color-danger) 15%, transparent)'; }}
+                          >
+                            <XCircle size={14} />
+                            Annullato
+                          </button>
+                          <button
+                            onClick={() => handleResolvePending(app.id, 'no_show')}
+                            disabled={isUpdating}
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors"
+                            style={{
+                              background: 'var(--glass-border)',
+                              color: 'var(--color-text-secondary)',
+                            }}
+                            onMouseEnter={e => { e.currentTarget.style.background = 'color-mix(in srgb, var(--color-text-muted) 20%, transparent)'; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = 'var(--glass-border)'; }}
+                          >
+                            <UserX size={14} />
+                            No Show
+                          </button>
+                          {isUpdating && (
+                            <div className="flex items-center ml-2">
+                              <div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: 'var(--glass-border)', borderTopColor: 'var(--color-primary)' }} />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Footer */}
+                <div
+                  className="px-6 py-3 flex justify-end rounded-b-2xl"
+                  style={{ borderTop: '1px solid var(--glass-border)' }}
+                >
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setShowPendingPopup(false)}
+                  >
+                    Chiudi
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
       {showExportModal && (
         <ExportModal
           onClose={() => setShowExportModal(false)}

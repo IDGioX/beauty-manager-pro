@@ -221,6 +221,8 @@ pub fn run() {
                 commands::messaggistica::get_birthdays_today,
                 commands::messaggistica::get_upcoming_birthdays,
                 commands::messaggistica::get_appuntamenti_pending_reminder,
+                // Insights
+                commands::insights::get_insights_data,
             ])
             .run(tauri::generate_context!())
             .expect("error while running tauri application");

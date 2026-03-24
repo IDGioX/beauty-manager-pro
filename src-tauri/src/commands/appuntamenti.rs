@@ -184,7 +184,7 @@ pub async fn update_appuntamento(
 
     // Valida lo stato se fornito
     if let Some(ref stato) = input.stato {
-        let stati_validi = ["programmato", "confermato", "in_corso", "completato", "annullato", "no_show"];
+        let stati_validi = ["prenotato", "programmato", "confermato", "in_corso", "completato", "annullato", "no_show"];
         if !stati_validi.contains(&stato.as_str()) {
             return Err(crate::error::AppError::InvalidInput(
                 format!("Stato non valido: '{}'. Stati ammessi: programmato, confermato, in_corso, completato, annullato, no_show", stato)

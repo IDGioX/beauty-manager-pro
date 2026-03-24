@@ -4,6 +4,7 @@ import { ThemeProvider } from "./components/theme/ThemeProvider";
 import { AuthGuard } from "./components/auth/AuthGuard";
 import { LicenseGuard } from "./components/license/LicenseGuard";
 import { ToastContainer } from "./components/ui/Toast";
+import { useAgendaStore } from "./stores/agendaStore";
 
 // Lazy load all pages — each becomes a separate chunk
 const Dashboard = lazy(() => import("./pages/Dashboard").then(m => ({ default: m.Dashboard })));
@@ -15,8 +16,9 @@ const Magazzino = lazy(() => import("./pages/Magazzino").then(m => ({ default: m
 const Comunicazioni = lazy(() => import("./pages/Comunicazioni").then(m => ({ default: m.Comunicazioni })));
 const Settings = lazy(() => import("./pages/Settings").then(m => ({ default: m.Settings })));
 const Report = lazy(() => import("./pages/Report").then(m => ({ default: m.Report })));
+const Insights = lazy(() => import("./pages/Insights").then(m => ({ default: m.Insights })));
 
-type PageType = 'dashboard' | 'agenda' | 'clienti' | 'operatrici' | 'trattamenti' | 'magazzino' | 'comunicazioni' | 'report' | 'settings';
+type PageType = 'dashboard' | 'agenda' | 'clienti' | 'operatrici' | 'trattamenti' | 'magazzino' | 'comunicazioni' | 'report' | 'insights' | 'settings';
 
 const pageTitles: Record<PageType, string> = {
   dashboard: 'Dashboard',
@@ -27,6 +29,7 @@ const pageTitles: Record<PageType, string> = {
   magazzino: 'Magazzino Prodotti',
   comunicazioni: 'Comunicazioni',
   report: 'Report e Analytics',
+  insights: 'Insights',
   settings: 'Impostazioni',
 };
 
@@ -44,6 +47,7 @@ function App() {
   const [pendingAppuntamentoId, setPendingAppuntamentoId] = useState<string | null>(null);
   const [pendingClienteId, setPendingClienteId] = useState<string | null>(null);
   const [backToAppuntamentoId, setBackToAppuntamentoId] = useState<string | null>(null);
+  const setAgendaDate = useAgendaStore(s => s.setSelectedDate);
 
   // Handler per navigare all'Agenda con un appuntamento specifico
   const navigateToAgendaWithAppuntamento = (appuntamentoId: string) => {
@@ -96,7 +100,10 @@ function App() {
       case 'dashboard':
         return (
           <Dashboard
-            onNavigate={(page) => setCurrentPage(page as PageType)}
+            onNavigate={(page) => {
+              if (page === 'agenda') setAgendaDate(new Date());
+              setCurrentPage(page as PageType);
+            }}
             onOpenAppuntamento={navigateToAgendaWithAppuntamento}
             onOpenCliente={navigateToClientiWithCliente}
           />
@@ -115,6 +122,8 @@ function App() {
         return <Comunicazioni />;
       case 'report':
         return <Report />;
+      case 'insights':
+        return <Insights />;
       case 'settings':
         return <Settings />;
       default:

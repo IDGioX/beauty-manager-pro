@@ -117,6 +117,17 @@ const PanoramicaTab: React.FC = () => {
     loadAllData();
   }, []);
 
+  const emptyAnalytics: PeriodAnalytics = {
+    totale_appuntamenti: 0, appuntamenti_completati: 0, appuntamenti_annullati: 0,
+    appuntamenti_no_show: 0, tasso_completamento: 0, ricavo_totale: 0, ricavo_medio: 0,
+    clienti_unici: 0, nuovi_clienti: 0, media_appuntamenti_per_cliente: 0, durata_media_minuti: 0,
+  };
+
+  const safePeriodAnalytics = async (filter: { data_inizio: string; data_fine: string }) => {
+    try { return await analyticsService.getPeriodAnalytics(filter); }
+    catch (e) { console.error('Analytics fallback:', e); return emptyAnalytics; }
+  };
+
   const loadAllData = async () => {
     setLoading(true);
     try {
@@ -127,12 +138,12 @@ const PanoramicaTab: React.FC = () => {
       const thisYearRange = { data_inizio: startOfYear(now).toISOString(), data_fine: endOfYear(now).toISOString() };
 
       const [todayData, thisMonthData, lastMonthData, thisYearData, treatments, clients] = await Promise.all([
-        analyticsService.getPeriodAnalytics(todayRange),
-        analyticsService.getPeriodAnalytics(thisMonthRange),
-        analyticsService.getPeriodAnalytics(lastMonthRange),
-        analyticsService.getPeriodAnalytics(thisYearRange),
-        analyticsService.getTrattamentiPiuUsati(thisMonthRange, 5),
-        analyticsService.getClientiTopRicavo(thisMonthRange, 5),
+        safePeriodAnalytics(todayRange),
+        safePeriodAnalytics(thisMonthRange),
+        safePeriodAnalytics(lastMonthRange),
+        safePeriodAnalytics(thisYearRange),
+        analyticsService.getTrattamentiPiuUsati(thisMonthRange, 5).catch(() => [] as TrattamentoStats[]),
+        analyticsService.getClientiTopRicavo(thisMonthRange, 5).catch(() => [] as ClienteTopRicavo[]),
       ]);
 
       setTodayStats(todayData);
@@ -145,7 +156,7 @@ const PanoramicaTab: React.FC = () => {
       const trendMonths = Array.from({ length: 6 }, (_, i) => subMonths(now, 5 - i));
       const trendResults = await Promise.all(
         trendMonths.map(monthDate =>
-          analyticsService.getPeriodAnalytics({
+          safePeriodAnalytics({
             data_inizio: startOfMonth(monthDate).toISOString(),
             data_fine: endOfMonth(monthDate).toISOString(),
           })
@@ -432,6 +443,7 @@ const InterrogazioneTab: React.FC = () => {
   // Results
   const [result, setResult] = useState<ReportFiltratoResult | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     loadFilterOptions();
@@ -452,6 +464,7 @@ const InterrogazioneTab: React.FC = () => {
 
   const executeReport = async () => {
     setLoading(true);
+    setError(null);
     try {
       const data = await analyticsService.getReportFiltrato({
         data_inizio: startOfDay(parseISO(dataInizio)).toISOString(),
@@ -460,8 +473,9 @@ const InterrogazioneTab: React.FC = () => {
         trattamento_ids: selectedTrattamenti.length > 0 ? selectedTrattamenti.map(t => t.id) : undefined,
       });
       setResult(data);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Errore report:', err);
+      setError(typeof err === 'string' ? err : err?.message || 'Errore durante la generazione del report');
     } finally {
       setLoading(false);
     }
@@ -792,6 +806,20 @@ const InterrogazioneTab: React.FC = () => {
       {/* Click-away */}
       {(showClientiDropdown || showTrattamentiDropdown) && (
         <div className="fixed inset-0 z-40" onClick={() => { setShowClientiDropdown(false); setShowTrattamentiDropdown(false); }} />
+      )}
+
+      {/* ERRORE */}
+      {error && (
+        <div
+          className="rounded-2xl p-5 flex items-center gap-3"
+          style={{ background: 'color-mix(in srgb, var(--color-danger) 8%, var(--card-bg))', border: '1px solid color-mix(in srgb, var(--color-danger) 20%, transparent)' }}
+        >
+          <AlertTriangle size={20} style={{ color: 'var(--color-danger)', flexShrink: 0 }} />
+          <div>
+            <p className="text-sm font-medium" style={{ color: 'var(--color-danger)' }}>Errore nella generazione del report</p>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>{error}</p>
+          </div>
+        </div>
       )}
 
       {/* LOADING */}

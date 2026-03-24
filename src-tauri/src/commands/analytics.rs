@@ -143,9 +143,9 @@ pub async fn get_period_analytics(
         r#"
         SELECT
             COUNT(*) as totale,
-            SUM(CASE WHEN stato IN ('completato', 'in_corso') THEN 1 ELSE 0 END) as completati,
-            SUM(CASE WHEN stato = 'annullato' THEN 1 ELSE 0 END) as annullati,
-            SUM(CASE WHEN stato = 'no_show' THEN 1 ELSE 0 END) as no_show,
+            COALESCE(SUM(CASE WHEN stato IN ('completato', 'in_corso') THEN 1 ELSE 0 END), 0) as completati,
+            COALESCE(SUM(CASE WHEN stato = 'annullato' THEN 1 ELSE 0 END), 0) as annullati,
+            COALESCE(SUM(CASE WHEN stato = 'no_show' THEN 1 ELSE 0 END), 0) as no_show,
             COALESCE(SUM(CASE WHEN stato IN ('completato', 'in_corso') THEN prezzo_applicato ELSE 0 END), 0.0) as ricavo
         FROM appuntamenti
         WHERE data_ora_inizio >= ?1
@@ -279,9 +279,9 @@ pub async fn get_report_filtrato(
     let kpi_sql = format!(
         r#"SELECT
             COUNT(*) as totale,
-            SUM(CASE WHEN a.stato IN ('completato', 'in_corso') THEN 1 ELSE 0 END) as completati,
-            SUM(CASE WHEN a.stato = 'annullato' THEN 1 ELSE 0 END) as annullati,
-            SUM(CASE WHEN a.stato = 'no_show' THEN 1 ELSE 0 END) as no_show,
+            COALESCE(SUM(CASE WHEN a.stato IN ('completato', 'in_corso') THEN 1 ELSE 0 END), 0) as completati,
+            COALESCE(SUM(CASE WHEN a.stato = 'annullato' THEN 1 ELSE 0 END), 0) as annullati,
+            COALESCE(SUM(CASE WHEN a.stato = 'no_show' THEN 1 ELSE 0 END), 0) as no_show,
             COALESCE(SUM(CASE WHEN a.stato IN ('completato', 'in_corso') THEN a.prezzo_applicato ELSE 0 END), 0.0) as ricavo
         FROM appuntamenti a
         WHERE {}"#,

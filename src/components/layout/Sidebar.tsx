@@ -7,6 +7,7 @@ import {
   Package,
   MessageSquare,
   BarChart3,
+  Lightbulb,
   Settings,
   Sparkles,
   ChevronRight,
@@ -31,6 +32,7 @@ const menuItems = [
   { id: 'magazzino', label: 'Magazzino', icon: Package },
   { id: 'comunicazioni', label: 'Comunicazioni', icon: MessageSquare },
   { id: 'report', label: 'Report', icon: BarChart3 },
+  { id: 'insights', label: 'Insights', icon: Lightbulb },
 ];
 
 export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate }) => {

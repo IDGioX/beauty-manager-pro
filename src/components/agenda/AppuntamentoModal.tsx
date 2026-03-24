@@ -284,6 +284,31 @@ export const AppuntamentoModal: React.FC = () => {
         await updateAppuntamento(selectedAppuntamento.id, input);
       }
 
+      // Reso automatico prodotti se si torna da completato a un altro stato
+      if (modalMode === 'edit' && selectedAppuntamento?.stato === 'completato' && stato !== 'completato') {
+        const appId = selectedAppuntamento.id;
+        const trattamentoNome = trattamenti.find(t => t.id === trattamentoId)?.nome || 'Trattamento';
+        try {
+          const movimenti = await magazzinoService.getMovimentiAppuntamento(appId);
+          for (const mov of movimenti) {
+            try {
+              await magazzinoService.registraReso({
+                prodotto_id: mov.prodotto_id,
+                quantita: mov.quantita,
+                operatrice_id: operatriceId || undefined,
+                cliente_id: clienteId || undefined,
+                appuntamento_id: appId || undefined,
+                note: `Reso automatico - stato cambiato da completato a ${stato} - ${trattamentoNome}`,
+              });
+            } catch (movErr) {
+              console.error('Errore reso prodotto:', movErr);
+            }
+          }
+        } catch (err) {
+          console.error('Errore caricamento movimenti per reso:', err);
+        }
+      }
+
       // Gestione prodotti usati quando l'appuntamento è completato
       if (stato === 'completato') {
         const appId = selectedAppuntamento?.id;

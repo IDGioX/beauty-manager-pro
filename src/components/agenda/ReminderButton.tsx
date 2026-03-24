@@ -165,11 +165,11 @@ export const ReminderButton: React.FC<ReminderButtonProps> = ({
       {isOpen && !loading && createPortal(
         <>
           {/* Overlay per chiudere al click fuori */}
-          <div className="fixed inset-0 z-[50]" onClick={() => setIsOpen(false)} />
+          <div className="fixed inset-0 z-[110]" onClick={() => setIsOpen(false)} />
 
           {/* Dropdown menu - renderizzato tramite Portal per evitare problemi con overflow del modal */}
           <div
-            className="fixed w-44 rounded-xl shadow-xl py-1 z-[51]"
+            className="fixed w-44 rounded-xl shadow-xl py-1 z-[111]"
             style={{ background: 'var(--card-bg)', border: '1px solid var(--glass-border)', top: dropdownPosition.top, left: dropdownPosition.left }}
           >
             <div className="px-3 py-1.5 text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--color-text-muted)', borderBottom: '1px solid var(--glass-border)' }}>

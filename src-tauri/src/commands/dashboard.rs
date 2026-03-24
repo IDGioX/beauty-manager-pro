@@ -1,6 +1,6 @@
 use crate::error::AppResult;
 use crate::models::AppuntamentoWithDetails;
-use chrono::{DateTime, Utc, Local, Datelike, NaiveDate};
+use chrono::{DateTime, Utc, Local, Datelike, Timelike, NaiveDate};
 use serde::Serialize;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -247,7 +247,7 @@ pub async fn get_dashboard_completo(
     let state = db.lock().await;
     let now = Local::now();
     let oggi = now.format("%Y-%m-%d").to_string();
-    let now_iso = now.format("%Y-%m-%dT%H:%M:%S").to_string();
+    let now_iso = now.format("%Y-%m-%d %H:%M:%S").to_string();
 
     // Primo giorno del mese corrente
     let primo_mese = now.with_day(1).unwrap_or(now).format("%Y-%m-%d").to_string();
@@ -261,13 +261,13 @@ pub async fn get_dashboard_completo(
     let app_stats = sqlx::query_as::<_, (i64, i64, i64, i64, i64, i64, i64)>(
         r#"
         SELECT
-            SUM(CASE WHEN stato != 'annullato' THEN 1 ELSE 0 END) as totale,
-            SUM(CASE WHEN stato = 'confermato' THEN 1 ELSE 0 END),
-            SUM(CASE WHEN stato = 'prenotato' THEN 1 ELSE 0 END),
-            SUM(CASE WHEN stato = 'in_corso' THEN 1 ELSE 0 END),
-            SUM(CASE WHEN stato = 'completato' THEN 1 ELSE 0 END),
-            SUM(CASE WHEN stato = 'no_show' THEN 1 ELSE 0 END),
-            SUM(CASE WHEN stato = 'annullato' THEN 1 ELSE 0 END)
+            COALESCE(SUM(CASE WHEN stato != 'annullato' THEN 1 ELSE 0 END), 0) as totale,
+            COALESCE(SUM(CASE WHEN stato = 'confermato' THEN 1 ELSE 0 END), 0),
+            COALESCE(SUM(CASE WHEN stato = 'prenotato' THEN 1 ELSE 0 END), 0),
+            COALESCE(SUM(CASE WHEN stato = 'in_corso' THEN 1 ELSE 0 END), 0),
+            COALESCE(SUM(CASE WHEN stato = 'completato' THEN 1 ELSE 0 END), 0),
+            COALESCE(SUM(CASE WHEN stato = 'no_show' THEN 1 ELSE 0 END), 0),
+            COALESCE(SUM(CASE WHEN stato = 'annullato' THEN 1 ELSE 0 END), 0)
         FROM appuntamenti
         WHERE DATE(data_ora_inizio) = ?1
         "#,
@@ -299,12 +299,6 @@ pub async fn get_dashboard_completo(
         no_show: app_stats.5,
         in_ritardo,
     };
-
-    // Slot effettivamente occupati: escludi annullati e no_show (non occupano slot reali)
-    let slot_occupati_effettivi = appuntamenti_oggi.confermati
-        + appuntamenti_oggi.in_attesa
-        + appuntamenti_oggi.in_corso
-        + appuntamenti_oggi.completati;
 
     // --- PROSSIMO APPUNTAMENTO ---
     let prossimo = sqlx::query_as::<_, (String, String, String, String, String, String)>(
@@ -357,8 +351,7 @@ pub async fn get_dashboard_completo(
     });
 
     // --- SLOT LIBERI OGGI ---
-    // Calcola basandosi sulle ore lavorative e la durata media dei trattamenti
-    // Un "slot" = un appuntamento che potrebbe ancora entrare in agenda
+    // Calcola gli slot rimanenti da ADESSO fino a chiusura
     let config = sqlx::query_as::<_, (String, String, i64)>(
         r#"
         SELECT
@@ -378,37 +371,78 @@ pub async fn get_dashboard_completo(
     .fetch_one(&state.db.pool)
     .await?;
 
-    // Durata media reale dei trattamenti prenotati (o 45 min default)
-    let durata_media = sqlx::query_scalar::<_, f64>(
+    let parse_hhmm = |s: &str| -> i64 {
+        let parts: Vec<&str> = s.split(':').collect();
+        parts.get(0).and_then(|h| h.parse::<i64>().ok()).unwrap_or(9) * 60
+            + parts.get(1).and_then(|m| m.parse::<i64>().ok()).unwrap_or(0)
+    };
+    let apertura_min = parse_hhmm(&config.0);
+    let chiusura_min = parse_hhmm(&config.1);
+    let now_min = now.hour() as i64 * 60 + now.minute() as i64;
+
+    // Minuti occupati da appuntamenti FUTURI (da adesso in poi)
+    let minuti_occupati_futuri = sqlx::query_scalar::<_, f64>(
         r#"
-        SELECT COALESCE(AVG(t.durata_minuti), 45.0)
+        SELECT COALESCE(SUM(t.durata_minuti), 0.0)
         FROM appuntamenti a
         JOIN trattamenti t ON a.trattamento_id = t.id
         WHERE DATE(a.data_ora_inizio) = ?1
-          AND a.stato NOT IN ('annullato')
+          AND a.data_ora_inizio >= ?2
+          AND a.stato NOT IN ('annullato', 'no_show', 'completato')
+        "#,
+    )
+    .bind(&oggi)
+    .bind(&now_iso)
+    .fetch_one(&state.db.pool)
+    .await
+    .unwrap_or(0.0) as i64;
+
+    // Durata media trattamenti per convertire minuti liberi in slot
+    let durata_media_globale = sqlx::query_scalar::<_, f64>(
+        "SELECT COALESCE(AVG(durata_minuti), 45.0) FROM trattamenti WHERE attivo = 1"
+    )
+    .fetch_one(&state.db.pool)
+    .await
+    .unwrap_or(45.0);
+    let durata_slot = if durata_media_globale > 0.0 { durata_media_globale as i64 } else { 45 };
+
+    // Minuti rimanenti da adesso a chiusura (per ogni operatrice)
+    let minuti_rimanenti = if now_min >= chiusura_min {
+        0 // Giornata finita
+    } else {
+        let start = now_min.max(apertura_min);
+        (chiusura_min - start) * operatrici_attive
+    };
+
+    let slot_liberi_oggi = if operatrici_attive == 0 || minuti_rimanenti == 0 {
+        0
+    } else {
+        let minuti_liberi = (minuti_rimanenti - minuti_occupati_futuri).max(0);
+        if durata_slot > 0 { minuti_liberi / durata_slot } else { 0 }
+    };
+
+    // Slot totali giornata (per saturazione)
+    let minuti_giornata = chiusura_min - apertura_min;
+    let slot_totali = if operatrici_attive > 0 && durata_slot > 0 {
+        (minuti_giornata / durata_slot) * operatrici_attive
+    } else {
+        0
+    };
+
+    // Minuti occupati oggi (tutti, per saturazione)
+    let minuti_occupati_oggi = sqlx::query_scalar::<_, f64>(
+        r#"
+        SELECT COALESCE(SUM(t.durata_minuti), 0.0)
+        FROM appuntamenti a
+        JOIN trattamenti t ON a.trattamento_id = t.id
+        WHERE DATE(a.data_ora_inizio) = ?1
+          AND a.stato NOT IN ('annullato', 'no_show')
         "#,
     )
     .bind(&oggi)
     .fetch_one(&state.db.pool)
     .await
-    .unwrap_or(45.0);
-
-    // Se non ci sono appuntamenti oggi, usa la durata media globale
-    let durata_slot = if durata_media > 0.0 { durata_media as i64 } else { 45 };
-
-    let slot_totali = {
-        let apertura_parts: Vec<&str> = config.0.split(':').collect();
-        let chiusura_parts: Vec<&str> = config.1.split(':').collect();
-        let apertura_min: i64 = apertura_parts.get(0).and_then(|h| h.parse::<i64>().ok()).unwrap_or(9) * 60
-            + apertura_parts.get(1).and_then(|m| m.parse::<i64>().ok()).unwrap_or(0);
-        let chiusura_min: i64 = chiusura_parts.get(0).and_then(|h| h.parse::<i64>().ok()).unwrap_or(19) * 60
-            + chiusura_parts.get(1).and_then(|m| m.parse::<i64>().ok()).unwrap_or(0);
-        let minuti_giornata = chiusura_min - apertura_min;
-        let slot_per_operatrice = if durata_slot > 0 { minuti_giornata / durata_slot } else { 0 };
-        slot_per_operatrice * operatrici_attive.max(1)
-    };
-
-    let slot_liberi_oggi = (slot_totali - slot_occupati_effettivi).max(0);
+    .unwrap_or(0.0) as i64;
 
     // --- COMPLEANNI OGGI ---
     let month = now.month() as i32;
@@ -640,26 +674,27 @@ pub async fn get_dashboard_completo(
     .await?;
 
     // --- SATURAZIONE ---
-    let saturazione_oggi_percentuale = if slot_totali > 0 {
-        (slot_occupati_effettivi as f64 / slot_totali as f64) * 100.0
-    } else {
-        0.0
+    let saturazione_oggi_percentuale = {
+        let minuti_totali = minuti_giornata * operatrici_attive.max(1);
+        if minuti_totali > 0 { (minuti_occupati_oggi as f64 / minuti_totali as f64) * 100.0 } else { 0.0 }
     };
 
-    // Saturazione settimana: calcola per i prossimi 7 giorni
-    let app_settimana = sqlx::query_scalar::<_, i64>(
+    // Saturazione settimana: minuti occupati vs minuti disponibili
+    let minuti_occupati_settimana = sqlx::query_scalar::<_, f64>(
         r#"
-        SELECT COUNT(*) FROM appuntamenti
-        WHERE DATE(data_ora_inizio) >= ?1
-          AND DATE(data_ora_inizio) < DATE(?1, '+7 days')
-          AND stato NOT IN ('annullato', 'no_show')
+        SELECT COALESCE(SUM(t.durata_minuti), 0.0)
+        FROM appuntamenti a
+        JOIN trattamenti t ON a.trattamento_id = t.id
+        WHERE DATE(a.data_ora_inizio) >= ?1
+          AND DATE(a.data_ora_inizio) < DATE(?1, '+7 days')
+          AND a.stato NOT IN ('annullato', 'no_show')
         "#,
     )
     .bind(&oggi)
     .fetch_one(&state.db.pool)
-    .await?;
+    .await
+    .unwrap_or(0.0) as i64;
 
-    // Giorni lavorativi nella settimana (default 6: lun-sab)
     let giorni_lavorativi = sqlx::query_scalar::<_, String>(
         "SELECT COALESCE(giorni_lavorativi, '[1,2,3,4,5,6]') FROM config_centro LIMIT 1"
     )
@@ -668,11 +703,9 @@ pub async fn get_dashboard_completo(
     .unwrap_or("[1,2,3,4,5,6]".to_string());
 
     let num_giorni_lav: i64 = giorni_lavorativi.matches(',').count() as i64 + 1;
-    let slot_settimana = slot_totali * num_giorni_lav.min(7);
-    let saturazione_settimana_percentuale = if slot_settimana > 0 {
-        (app_settimana as f64 / slot_settimana as f64) * 100.0
-    } else {
-        0.0
+    let saturazione_settimana_percentuale = {
+        let minuti_sett = minuti_giornata * operatrici_attive.max(1) * num_giorni_lav.min(7);
+        if minuti_sett > 0 { (minuti_occupati_settimana as f64 / minuti_sett as f64) * 100.0 } else { 0.0 }
     };
 
     // --- PROSSIMI APPUNTAMENTI (lista top 5) ---
