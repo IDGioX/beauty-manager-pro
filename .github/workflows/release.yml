@@ -56,6 +56,7 @@ jobs:
             **macOS:**
             - `Beauty.Manager.Pro_*_aarch64.dmg` - Apple Silicon (M1/M2/M3)
             - `Beauty.Manager.Pro_*_x64.dmg` - Intel
-          releaseDraft: true
+          releaseDraft: false
           prerelease: false
+          updaterJsonKeepUniversal: true
           args: ${{ matrix.args }}
