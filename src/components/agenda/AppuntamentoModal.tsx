@@ -338,6 +338,7 @@ export const AppuntamentoModal: React.FC = () => {
     setTrattamentiPacchetto([]);
     setSelectedTrattamentiPkgIds([]);
     setWasUnlinked(false);
+    setShowDeleteConfirm(false);
     prezzoPrePacchettoRef.current = '';
     trattamentoPrePacchettoRef.current = '';
     // Reset quick add client form
@@ -499,6 +500,10 @@ export const AppuntamentoModal: React.FC = () => {
           if (createStato === 'completato' && shouldLinkPkg && linkSedutaId) {
             await pacchettiService.completaSedutaById(linkSedutaId, editAppId);
           }
+          // Se stato diventa annullato/no_show, scollega la seduta dal pacchetto
+          if ((createStato === 'annullato' || createStato === 'no_show') && hadLinkedSeduta) {
+            await pacchettiService.scollegaSedutaAppuntamento(editAppId);
+          }
         } catch (e) { console.error('Errore gestione pacchetto:', e); }
       }
 
@@ -639,6 +644,8 @@ export const AppuntamentoModal: React.FC = () => {
       setIsLoading(false);
     }
   };
+
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const handleDelete = async () => {
     if (!selectedAppuntamento) return;
@@ -1338,17 +1345,24 @@ export const AppuntamentoModal: React.FC = () => {
 
         {/* Buttons */}
         <div className="flex gap-3 pt-5 mt-2" style={{ borderTop: '1px solid var(--glass-border)' }}>
-          {modalMode === 'edit' && (
+          {modalMode === 'edit' && !showDeleteConfirm && (
             <Button
               type="button"
               variant="danger"
-              onClick={handleDelete}
+              onClick={() => setShowDeleteConfirm(true)}
               disabled={isLoading}
               className="gap-1.5"
             >
               <Trash2 size={16} />
               Elimina
             </Button>
+          )}
+          {modalMode === 'edit' && showDeleteConfirm && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium" style={{ color: 'var(--color-danger, #ef4444)' }}>Confermi?</span>
+              <Button type="button" variant="danger" onClick={handleDelete} disabled={isLoading} size="sm">Sì, elimina</Button>
+              <Button type="button" variant="ghost" onClick={() => setShowDeleteConfirm(false)} size="sm">No</Button>
+            </div>
           )}
 
           {/* Reminder Button - solo in edit e con stato prenotato/confermato/in_corso */}
