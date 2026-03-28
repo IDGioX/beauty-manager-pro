@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  release:
     permissions:
       contents: write
     strategy:
@@ -39,7 +39,6 @@ jobs:
         run: npm install
 
       - name: Build the app
-        id: build
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -48,80 +47,18 @@ jobs:
         with:
           tagName: v__VERSION__
           releaseName: 'Beauty Manager Pro v__VERSION__'
-          releaseBody: 'Internal release'
+          releaseBody: |
+            ## Download
+
+            **Windows:**
+            - `Beauty.Manager.Pro_*_x64-setup.exe` - Installer (consigliato)
+
+            **macOS:**
+            - `Beauty.Manager.Pro_*_aarch64.dmg` - Apple Silicon (M1/M2/M3)
+            - `Beauty.Manager.Pro_*_x64.dmg` - Intel
           releaseDraft: false
           prerelease: false
+          includeUpdaterJson: true
+          updaterJsonPreferNsis: true
+          updaterJsonKeepUniversal: true
           args: ${{ matrix.args }}
-
-  publish:
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Get version
-        id: version
-        run: echo "version=$(jq -r .version src-tauri/tauri.conf.json)" >> $GITHUB_OUTPUT
-
-      - name: Download release assets from private repo
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERSION: ${{ steps.version.outputs.version }}
-        run: |
-          mkdir -p assets
-          # Download all assets from the private release
-          gh release download "v${VERSION}" --dir assets/ || true
-          ls -la assets/
-
-      - name: Create public release with updater
-        env:
-          GH_TOKEN: ${{ secrets.PUBLIC_RELEASE_TOKEN }}
-          VERSION: ${{ steps.version.outputs.version }}
-        run: |
-          # Create release in public repo
-          gh release create "v${VERSION}" \
-            --repo IDGioX/beauty-manager-releases \
-            --title "Beauty Manager Pro v${VERSION}" \
-            --notes "Aggiornamento Beauty Manager Pro v${VERSION}" \
-            --latest \
-            assets/* || true
-
-          # Generate latest.json pointing to public repo
-          # Read signatures if available
-          WIN_SIG=""
-          MAC_X64_SIG=""
-          MAC_ARM_SIG=""
-
-          if [ -f "assets/Beauty.Manager.Pro_${VERSION}_x64-setup.nsis.zip.sig" ]; then
-            WIN_SIG=$(cat "assets/Beauty.Manager.Pro_${VERSION}_x64-setup.nsis.zip.sig")
-          fi
-
-          cat > latest.json << EOF
-          {
-            "version": "${VERSION}",
-            "notes": "Aggiornamento Beauty Manager Pro v${VERSION}",
-            "pub_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-            "platforms": {
-              "windows-x86_64": {
-                "signature": "${WIN_SIG}",
-                "url": "https://github.com/IDGioX/beauty-manager-releases/releases/download/v${VERSION}/Beauty.Manager.Pro_${VERSION}_x64-setup.exe"
-              },
-              "darwin-x86_64": {
-                "signature": "${MAC_X64_SIG}",
-                "url": "https://github.com/IDGioX/beauty-manager-releases/releases/download/v${VERSION}/Beauty.Manager.Pro_x64.app.tar.gz"
-              },
-              "darwin-aarch64": {
-                "signature": "${MAC_ARM_SIG}",
-                "url": "https://github.com/IDGioX/beauty-manager-releases/releases/download/v${VERSION}/Beauty.Manager.Pro_aarch64.app.tar.gz"
-              }
-            }
-          }
-          EOF
-
-          # Upload latest.json to public release
-          gh release upload "v${VERSION}" latest.json --clobber --repo IDGioX/beauty-manager-releases
-
-          # Update gist too
-          gh gist edit 1de50f67291be8d8e72feec4eda38256 -f latest.json latest.json || true
