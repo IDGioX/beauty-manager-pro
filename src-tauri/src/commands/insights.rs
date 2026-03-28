@@ -201,9 +201,10 @@ pub async fn get_insights_data(
     // 4b. Aggiungi pagamenti pacchetti al confronto mensile
     let pagamenti_mese: Vec<(String, f64)> = sqlx::query_as(
         r#"
-        SELECT strftime('%Y-%m', created_at) as mese, COALESCE(SUM(importo), 0.0) as ricavo
-        FROM pacchetto_pagamenti
-        WHERE created_at >= datetime('now', '-12 months')
+        SELECT strftime('%Y-%m', pp.created_at) as mese, COALESCE(SUM(pp.importo), 0.0) as ricavo
+        FROM pacchetto_pagamenti pp
+        JOIN pacchetti_cliente pc ON pc.id = pp.pacchetto_cliente_id
+        WHERE pc.stato != 'annullato' AND pp.created_at >= datetime('now', '-12 months')
         GROUP BY mese
         "#
     )
@@ -240,7 +241,7 @@ pub async fn get_insights_data(
     .await
     .unwrap_or(0.0);
     let previsione_pkg: f64 = sqlx::query_scalar::<_, f64>(
-        "SELECT COALESCE(AVG(ricavo_mese), 0.0) FROM (SELECT SUM(importo) as ricavo_mese FROM pacchetto_pagamenti WHERE created_at >= datetime('now', '-3 months') GROUP BY strftime('%Y-%m', created_at))"
+        "SELECT COALESCE(AVG(ricavo_mese), 0.0) FROM (SELECT SUM(pp.importo) as ricavo_mese FROM pacchetto_pagamenti pp JOIN pacchetti_cliente pc ON pc.id = pp.pacchetto_cliente_id WHERE pc.stato != 'annullato' AND pp.created_at >= datetime('now', '-3 months') GROUP BY strftime('%Y-%m', pp.created_at))"
     ).fetch_one(pool).await.unwrap_or(0.0);
     let previsione_fatturato = previsione_app + previsione_pkg;
 
@@ -315,6 +316,7 @@ async fn build_segmentazione(pool: &sqlx::SqlitePool) -> AppResult<Segmentazione
             SELECT pc.cliente_id, SUM(pp.importo) as spesa_pacchetti
             FROM pacchetto_pagamenti pp
             JOIN pacchetti_cliente pc ON pc.id = pp.pacchetto_cliente_id
+            WHERE pc.stato != 'annullato'
             GROUP BY pc.cliente_id
         ) pkg ON pkg.cliente_id = c.id
         WHERE c.attivo = 1

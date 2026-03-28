@@ -76,7 +76,7 @@ export const FirstUserRegistration: React.FC = () => {
       }
 
       // Ricarica l'app per far partire il controllo licenza
-      window.location.reload();
+      try { const { relaunch } = await import('@tauri-apps/plugin-process'); await relaunch(); } catch { window.location.reload(); }
     } catch (err: any) {
       setFormError(typeof err === 'string' ? err : err?.message || 'Errore durante la registrazione');
     }

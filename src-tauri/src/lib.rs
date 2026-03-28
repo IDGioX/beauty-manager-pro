@@ -245,6 +245,8 @@ pub fn run() {
                 commands::pacchetti::aggiungi_pagamento_pacchetto,
                 commands::pacchetti::get_pagamenti_pacchetto,
                 commands::pacchetti::aggiorna_data_prevista_seduta,
+                // Changelog
+                commands::changelog::generate_changelog_pdf,
             ])
             .run(tauri::generate_context!())
             .expect("error while running tauri application");

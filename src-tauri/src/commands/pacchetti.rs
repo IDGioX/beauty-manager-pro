@@ -692,6 +692,21 @@ pub async fn assegna_pacchetto_cliente(
         return Err(AppError::NotFound("Cliente non trovato".to_string()));
     }
 
+    // Verifica che non ci sia già un'assegnazione attiva dello stesso pacchetto per questo cliente
+    let duplicato: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM pacchetti_cliente WHERE pacchetto_id = ? AND cliente_id = ? AND stato = 'attivo'"
+    )
+    .bind(&input.pacchetto_id)
+    .bind(&input.cliente_id)
+    .fetch_one(pool)
+    .await?;
+
+    if duplicato > 0 {
+        return Err(AppError::InvalidInput(
+            "Il cliente ha già un'assegnazione attiva di questo pacchetto".to_string()
+        ));
+    }
+
     let pc_id = generate_uuid();
     let importo_totale = input.importo_totale.unwrap_or(pacchetto.prezzo_totale);
     let sedute_totali = pacchetto.num_sedute;
@@ -1019,25 +1034,33 @@ pub async fn update_pacchetto_cliente(
     .await?
     .ok_or_else(|| AppError::NotFound("Pacchetto cliente non trovato".to_string()))?;
 
-    let mut updates = vec!["updated_at = datetime('now')".to_string()];
-    if let Some(importo) = input.importo_totale {
-        updates.push(format!("importo_totale = {}", importo));
-    }
-    if let Some(ref note) = input.note {
-        updates.push(format!("note = '{}'", note.replace('\'', "''")));
-    }
-    if let Some(ref stato) = input.stato {
-        updates.push(format!("stato = '{}'", stato));
-    }
-
-    let sql = format!(
-        "UPDATE pacchetti_cliente SET {} WHERE id = ?",
-        updates.join(", ")
-    );
-    sqlx::query(&sql)
+    // Usa query parametrizzate separate per evitare SQL injection
+    sqlx::query("UPDATE pacchetti_cliente SET updated_at = datetime('now') WHERE id = ?")
         .bind(&input.pacchetto_cliente_id)
         .execute(pool)
         .await?;
+
+    if let Some(importo) = input.importo_totale {
+        sqlx::query("UPDATE pacchetti_cliente SET importo_totale = ? WHERE id = ?")
+            .bind(importo)
+            .bind(&input.pacchetto_cliente_id)
+            .execute(pool)
+            .await?;
+    }
+    if let Some(ref note) = input.note {
+        sqlx::query("UPDATE pacchetti_cliente SET note = ? WHERE id = ?")
+            .bind(note)
+            .bind(&input.pacchetto_cliente_id)
+            .execute(pool)
+            .await?;
+    }
+    if let Some(ref stato) = input.stato {
+        sqlx::query("UPDATE pacchetti_cliente SET stato = ? WHERE id = ?")
+            .bind(stato)
+            .bind(&input.pacchetto_cliente_id)
+            .execute(pool)
+            .await?;
+    }
 
     Ok(())
 }

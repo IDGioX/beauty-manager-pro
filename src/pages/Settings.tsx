@@ -201,18 +201,15 @@ export function Settings() {
     }
   };
 
-  const handleRestoreBackup = async (backupPath: string) => {
-    if (!confirm('Sei sicuro di voler ripristinare questo backup? Tutti i dati correnti verranno sostituiti.')) {
-      return;
-    }
+  const [confirmAction, setConfirmAction] = useState<{ type: string; path: string } | null>(null);
 
+  const handleRestoreBackup = async (backupPath: string) => {
     try {
       setLoading(true);
       await backupService.restoreBackup(backupPath);
-      showToast('Backup ripristinato con successo! Ricarica l\'applicazione per vedere i cambiamenti.', 'success');
-      // Ricarica la pagina dopo 2 secondi
-      setTimeout(() => {
-        window.location.reload();
+      showToast('Backup ripristinato! L\'app si riavvierà.', 'success');
+      setTimeout(async () => {
+        try { const { relaunch } = await import('@tauri-apps/plugin-process'); await relaunch(); } catch { window.location.reload(); }
       }, 2000);
     } catch (error) {
       console.error('Errore ripristino backup:', error);
@@ -222,9 +219,6 @@ export function Settings() {
   };
 
   const handleDeleteBackup = async (backupPath: string) => {
-    if (!confirm('Sei sicuro di voler eliminare questo backup?')) {
-      return;
-    }
 
     try {
       await backupService.deleteBackup(backupPath);
@@ -250,8 +244,10 @@ export function Settings() {
 
       setLoading(true);
       await backupService.importBackupFromFile(filePath);
-      showToast('Backup importato e ripristinato! L\'app si ricaricherà.', 'success');
-      setTimeout(() => window.location.reload(), 2000);
+      showToast('Backup importato! L\'app si riavvierà.', 'success');
+      setTimeout(async () => {
+        try { const { relaunch } = await import('@tauri-apps/plugin-process'); await relaunch(); } catch { window.location.reload(); }
+      }, 2000);
     } catch (error) {
       console.error('Errore importazione backup:', error);
       showToast('Errore durante l\'importazione del backup', 'error');
@@ -1361,27 +1357,55 @@ export function Settings() {
                               </div>
                             </div>
 
-                            <div className="flex gap-2 flex-shrink-0">
-                              <button
-                                onClick={() => handleRestoreBackup(backup.file_path)}
-                                className="p-2 rounded-lg transition-colors"
-                                style={{
-                                  background: 'color-mix(in srgb, var(--color-success) 15%, transparent)',
-                                  color: 'var(--color-success)',
-                                }}
-                              >
-                                <Upload className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => handleDeleteBackup(backup.file_path)}
-                                className="p-2 rounded-lg transition-colors"
-                                style={{
-                                  background: 'color-mix(in srgb, var(--color-danger) 15%, transparent)',
-                                  color: 'var(--color-danger)',
-                                }}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
+                            <div className="flex gap-2 flex-shrink-0 items-center">
+                              {confirmAction?.path === backup.file_path ? (
+                                <div className="flex items-center gap-2 text-xs font-medium">
+                                  <span style={{ color: 'var(--color-text-secondary)' }}>
+                                    {confirmAction.type === 'restore' ? 'Ripristinare?' : 'Eliminare?'}
+                                  </span>
+                                  <button
+                                    onClick={() => {
+                                      if (confirmAction.type === 'restore') handleRestoreBackup(backup.file_path);
+                                      else handleDeleteBackup(backup.file_path);
+                                      setConfirmAction(null);
+                                    }}
+                                    className="px-2 py-1 rounded text-white"
+                                    style={{ background: confirmAction.type === 'restore' ? 'var(--color-success)' : 'var(--color-danger)' }}
+                                  >
+                                    Sì
+                                  </button>
+                                  <button
+                                    onClick={() => setConfirmAction(null)}
+                                    className="px-2 py-1 rounded"
+                                    style={{ background: 'var(--glass-border)', color: 'var(--color-text-secondary)' }}
+                                  >
+                                    No
+                                  </button>
+                                </div>
+                              ) : (
+                                <>
+                                  <button
+                                    onClick={() => setConfirmAction({ type: 'restore', path: backup.file_path })}
+                                    className="p-2 rounded-lg transition-colors"
+                                    style={{
+                                      background: 'color-mix(in srgb, var(--color-success) 15%, transparent)',
+                                      color: 'var(--color-success)',
+                                    }}
+                                  >
+                                    <Upload className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => setConfirmAction({ type: 'delete', path: backup.file_path })}
+                                    className="p-2 rounded-lg transition-colors"
+                                    style={{
+                                      background: 'color-mix(in srgb, var(--color-danger) 15%, transparent)',
+                                      color: 'var(--color-danger)',
+                                    }}
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </>
+                              )}
                             </div>
                           </div>
                         </div>

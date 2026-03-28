@@ -251,7 +251,7 @@ export const AppuntamentoModal: React.FC = () => {
         // Aggiorna entrambi nello stesso batch
         setPacchettiCliente(pks);
         setSeduteDisponibili(map);
-      } catch { /* ignore */ }
+      } catch (e) { console.error('Errore caricamento pacchetti cliente:', e); }
     };
     fetchPacchetti();
   }, [clienteId]);
@@ -266,7 +266,7 @@ export const AppuntamentoModal: React.FC = () => {
           setSelectedPacchettoClienteId(s.pacchetto_cliente_id);
           setSelectedNumeroSeduta(s.numero_seduta);
         }
-      }).catch(() => {});
+      }).catch(e => console.error('Errore caricamento seduta collegata:', e));
     }
   }, [modalMode, selectedAppuntamento]);
 

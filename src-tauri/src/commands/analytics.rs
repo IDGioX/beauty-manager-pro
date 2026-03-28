@@ -172,7 +172,7 @@ pub async fn get_period_analytics(
             COALESCE(SUM(CASE WHEN stato IN ('completato', 'in_corso') THEN 1 ELSE 0 END), 0) as completati,
             COALESCE(SUM(CASE WHEN stato = 'annullato' THEN 1 ELSE 0 END), 0) as annullati,
             COALESCE(SUM(CASE WHEN stato = 'no_show' THEN 1 ELSE 0 END), 0) as no_show,
-            COALESCE(SUM(CASE WHEN stato IN ('completato', 'in_corso') THEN prezzo_applicato ELSE 0 END), 0.0) as ricavo
+            COALESCE(SUM(CASE WHEN stato IN ('completato', 'in_corso') AND (omaggio IS NULL OR omaggio = 0) THEN prezzo_applicato ELSE 0 END), 0.0) as ricavo
         FROM appuntamenti
         WHERE datetime(data_ora_inizio) >= datetime(?1)
           AND datetime(data_ora_inizio) < datetime(?2)
@@ -187,7 +187,7 @@ pub async fn get_period_analytics(
 
     // Aggiungi ricavo pacchetti nel periodo
     let ricavo_pacchetti: f64 = sqlx::query_scalar(
-        "SELECT COALESCE(SUM(importo), 0.0) FROM pacchetto_pagamenti WHERE datetime(created_at) >= datetime(?1) AND datetime(created_at) < datetime(?2)"
+        "SELECT COALESCE(SUM(pp.importo), 0.0) FROM pacchetto_pagamenti pp JOIN pacchetti_cliente pc ON pc.id = pp.pacchetto_cliente_id WHERE pc.stato != 'annullato' AND datetime(pp.created_at) >= datetime(?1) AND datetime(pp.created_at) < datetime(?2)"
     )
     .bind(normalize_date(&filter.data_inizio))
     .bind(normalize_date(&filter.data_fine))
@@ -320,7 +320,7 @@ pub async fn get_report_filtrato(
             COALESCE(SUM(CASE WHEN a.stato IN ('completato', 'in_corso') THEN 1 ELSE 0 END), 0) as completati,
             COALESCE(SUM(CASE WHEN a.stato = 'annullato' THEN 1 ELSE 0 END), 0) as annullati,
             COALESCE(SUM(CASE WHEN a.stato = 'no_show' THEN 1 ELSE 0 END), 0) as no_show,
-            COALESCE(SUM(CASE WHEN a.stato IN ('completato', 'in_corso') THEN a.prezzo_applicato ELSE 0 END), 0.0) as ricavo
+            COALESCE(SUM(CASE WHEN a.stato IN ('completato', 'in_corso') AND (a.omaggio IS NULL OR a.omaggio = 0) THEN a.prezzo_applicato ELSE 0 END), 0.0) as ricavo
         FROM appuntamenti a
         WHERE {}"#,
         where_sql
@@ -345,7 +345,7 @@ pub async fn get_report_filtrato(
 
     // Aggiungi ricavo pacchetti nel periodo del report
     let ricavo_pacchetti_report: f64 = sqlx::query_scalar(
-        "SELECT COALESCE(SUM(importo), 0.0) FROM pacchetto_pagamenti WHERE datetime(created_at) >= datetime(?1) AND datetime(created_at) < datetime(?2)"
+        "SELECT COALESCE(SUM(pp.importo), 0.0) FROM pacchetto_pagamenti pp JOIN pacchetti_cliente pc ON pc.id = pp.pacchetto_cliente_id WHERE pc.stato != 'annullato' AND datetime(pp.created_at) >= datetime(?1) AND datetime(pp.created_at) < datetime(?2)"
     )
     .bind(normalize_date(&filtro.data_inizio))
     .bind(normalize_date(&filtro.data_fine))

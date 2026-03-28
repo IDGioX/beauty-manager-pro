@@ -59,8 +59,8 @@ export const LicenseActivation: React.FC = () => {
       await licenseService.activateLicense(generated.key);
 
       setSuccess(true);
-      setTimeout(() => {
-        window.location.reload();
+      setTimeout(async () => {
+        try { const { relaunch } = await import('@tauri-apps/plugin-process'); await relaunch(); } catch { window.location.reload(); }
       }, 1500);
     } catch (err: any) {
       setError(err.message || 'Errore durante l\'attivazione');

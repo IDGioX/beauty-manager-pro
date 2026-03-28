@@ -4,6 +4,8 @@ import { ThemeProvider } from "./components/theme/ThemeProvider";
 import { AuthGuard } from "./components/auth/AuthGuard";
 import { LicenseGuard } from "./components/license/LicenseGuard";
 import { ToastContainer } from "./components/ui/Toast";
+import { WhatsNewModal } from "./components/WhatsNewModal";
+import { changelogService, type ReleaseInfo } from "./services/changelog";
 import { useAgendaStore } from "./stores/agendaStore";
 
 // Lazy load all pages — each becomes a separate chunk
@@ -50,7 +52,32 @@ function App() {
   const [pendingClienteId, setPendingClienteId] = useState<string | null>(null);
   const [pendingPacchettiClienteId, setPendingPacchettiClienteId] = useState<string | null>(null);
   const [backToAppuntamentoId, setBackToAppuntamentoId] = useState<string | null>(null);
+  const [whatsNewOpen, setWhatsNewOpen] = useState(false);
+  const [releaseInfo, setReleaseInfo] = useState<ReleaseInfo | null>(null);
   const setAgendaDate = useAgendaStore(s => s.setSelectedDate);
+
+  // Controlla se mostrare popup "Novita" dopo aggiornamento
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      try {
+        if (await changelogService.shouldShowWhatsNew()) {
+          const info = await changelogService.fetchReleaseNotes();
+          setReleaseInfo(info);
+          setWhatsNewOpen(true);
+        }
+      } catch (e) {
+        console.error('Errore controllo novita:', e);
+      }
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const handleWhatsNewClose = () => {
+    setWhatsNewOpen(false);
+    if (releaseInfo) {
+      changelogService.setLastSeenVersion(releaseInfo.version);
+    }
+  };
 
   // Handler per navigare all'Agenda con un appuntamento specifico
   const navigateToAgendaWithAppuntamento = (appuntamentoId: string) => {
@@ -152,6 +179,13 @@ function App() {
               {renderPage()}
             </Suspense>
           </MainLayout>
+          {releaseInfo && (
+            <WhatsNewModal
+              isOpen={whatsNewOpen}
+              onClose={handleWhatsNewClose}
+              releaseInfo={releaseInfo}
+            />
+          )}
           <ToastContainer />
         </AuthGuard>
       </ThemeProvider>

@@ -289,6 +289,12 @@ pub async fn delete_appuntamento(
 ) -> AppResult<()> {
     let state = db.lock().await;
 
+    // Scollega eventuali sedute pacchetto prima di eliminare
+    sqlx::query("UPDATE pacchetto_sedute SET appuntamento_id = NULL WHERE appuntamento_id = ?1")
+        .bind(&id)
+        .execute(&state.db.pool)
+        .await?;
+
     let result = sqlx::query("DELETE FROM appuntamenti WHERE id = ?1")
         .bind(&id)
         .execute(&state.db.pool)

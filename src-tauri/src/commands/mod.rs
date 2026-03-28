@@ -17,3 +17,4 @@ pub mod export;
 pub mod license;
 pub mod insights;
 pub mod pacchetti;
+pub mod changelog;

@@ -376,7 +376,7 @@ export const Pacchetti: React.FC<{
       data_inizio: todayISO(),
       importo_personalizzato: false,
       importo_totale: pkg?.prezzo_totale || 0,
-      tipo_pagamento: 'anticipo',
+      tipo_pagamento: pkg?.tipo_pagamento || 'anticipo',
       note: '',
     });
     setIsAssegnaOpen(true);
@@ -887,7 +887,7 @@ const ClientePacchettiPanel: React.FC<{
       const p = await pacchettiService.getPagamentiPacchetto(pcId);
       setPagamentiMap(prev => { const m = new Map(prev); m.set(pcId, p); return m; });
       onReloadData();
-    } catch { /* */ }
+    } catch (e) { console.error('Errore registrazione pagamento:', e); }
   };
   const [quickPayPkgId, setQuickPayPkgId] = useState<string | null>(null);
   const [quickPayAmount, setQuickPayAmount] = useState('');
@@ -1461,7 +1461,7 @@ function ClienteSearchSelect({ value, onChange }: { value: string; onChange: (id
   useEffect(() => {
     if (!search.trim()) { setResults([]); return; }
     const t = setTimeout(async () => {
-      try { const cls = await clientiService.getClienti(search, 10); setResults(cls); setOpen(true); } catch { /* */ }
+      try { const cls = await clientiService.getClienti(search, 10); setResults(cls); setOpen(true); } catch (e) { console.error('Errore ricerca clienti:', e); }
     }, 200);
     return () => clearTimeout(t);
   }, [search]);

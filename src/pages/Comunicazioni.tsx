@@ -19,7 +19,10 @@ import {
   Copy,
   Check,
   Sparkles,
+  Megaphone,
+  FileText,
 } from 'lucide-react';
+import { CampagneTab } from '../components/comunicazioni/CampagneTab';
 import * as comunicazioniService from '../services/comunicazioni';
 import type {
   TemplateMesaggio,
@@ -33,7 +36,7 @@ interface ToastState {
   type: 'success' | 'error';
 }
 
-type TabKey = 'whatsapp' | 'email';
+type TabKey = 'campagne' | 'templates' | 'compleanni';
 
 const TIPI_SEMPLICI = [
   { value: 'reminder_appuntamento', label: 'Promemoria', icon: Calendar, desc: 'Prima di un appuntamento' },
@@ -54,7 +57,8 @@ const PLACEHOLDERS = [
 export function Comunicazioni() {
   const [toast, setToast] = useState<ToastState | null>(null);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<TabKey>('whatsapp');
+  const [activeTab, setActiveTab] = useState<TabKey>('campagne');
+  const [templateSubTab, setTemplateSubTab] = useState<'whatsapp' | 'email'>('whatsapp');
 
   const [birthdaysToday, setBirthdaysToday] = useState<Cliente[]>([]);
   const [upcomingBirthdays, setUpcomingBirthdays] = useState<Cliente[]>([]);
@@ -73,6 +77,7 @@ export function Comunicazioni() {
   const [showPreview, setShowPreview] = useState(false);
   const [copiedPlaceholder, setCopiedPlaceholder] = useState<string | null>(null);
   const [templateStep, setTemplateStep] = useState<1 | 2>(1);
+  const [confirmDeleteTemplateId, setConfirmDeleteTemplateId] = useState<string | null>(null);
 
   const showToast = (message: string, type: 'success' | 'error') => {
     setToast({ message, type });
@@ -177,10 +182,10 @@ export function Comunicazioni() {
   };
 
   const handleDeleteTemplate = async (id: string) => {
-    if (!confirm('Eliminare questo template?')) return;
     try {
       await comunicazioniService.deleteTemplate(id);
       showToast('Template eliminato', 'success');
+      setConfirmDeleteTemplateId(null);
       loadData();
     } catch (error: any) {
       showToast(error?.message || 'Errore durante l\'eliminazione', 'error');
@@ -291,14 +296,29 @@ export function Comunicazioni() {
             >
               <Edit2 size={14} />
             </button>
-            <button
-              onClick={() => handleDeleteTemplate(template.id)}
-              className="p-1.5 rounded-lg transition-colors hover:bg-[color-mix(in_srgb,var(--color-danger)_10%,transparent)]"
-              style={{ color: 'var(--color-text-muted)' }}
-              title="Elimina"
-            >
-              <Trash2 size={14} />
-            </button>
+            {confirmDeleteTemplateId === template.id ? (
+              <span className="flex items-center gap-1 text-[10px] font-medium">
+                <button
+                  onClick={() => handleDeleteTemplate(template.id)}
+                  className="px-1.5 py-0.5 rounded text-white"
+                  style={{ background: 'var(--color-danger)' }}
+                >Sì</button>
+                <button
+                  onClick={() => setConfirmDeleteTemplateId(null)}
+                  className="px-1.5 py-0.5 rounded"
+                  style={{ background: 'var(--glass-border)', color: 'var(--color-text-secondary)' }}
+                >No</button>
+              </span>
+            ) : (
+              <button
+                onClick={() => setConfirmDeleteTemplateId(template.id)}
+                className="p-1.5 rounded-lg transition-colors hover:bg-[color-mix(in_srgb,var(--color-danger)_10%,transparent)]"
+                style={{ color: 'var(--color-text-muted)' }}
+                title="Elimina"
+              >
+                <Trash2 size={14} />
+              </button>
+            )}
           </div>
         </div>
         <div className="px-4 pb-4">
@@ -402,7 +422,7 @@ export function Comunicazioni() {
     );
   };
 
-  const baseTemplates = activeTab === 'whatsapp' ? whatsappTemplates : emailTemplates;
+  const baseTemplates = templateSubTab === 'whatsapp' ? whatsappTemplates : emailTemplates;
   const currentTemplates = selectedTipo
     ? baseTemplates.filter(t => t.tipo === selectedTipo)
     : baseTemplates;
@@ -415,155 +435,105 @@ export function Comunicazioni() {
           Comunicazioni
         </h1>
         <p className="text-sm mt-1" style={{ color: 'var(--color-text-secondary)' }}>
-          Gestisci i testi per WhatsApp e Email
+          Centro Comunicazioni — Campagne, template e compleanni
         </p>
       </div>
 
-      {/* COMPLEANNI - Banner compatto (sempre visibile, indipendente dai tab) */}
-      {(birthdaysToday.length > 0 || upcomingBirthdays.length > 0) && (
-        <div className="animate-fade-in-up" style={{ animationDelay: '50ms' }}>
-          <div
-            className="rounded-2xl overflow-hidden"
+      {/* TAB BAR PRINCIPALE */}
+      <div
+        className="flex gap-1 p-1 rounded-xl animate-fade-in-up"
+        style={{ background: 'var(--glass-border)', animationDelay: '50ms' }}
+      >
+        {([
+          { key: 'campagne' as const, label: 'Campagne', Icon: Megaphone, color: 'var(--color-primary)' },
+          { key: 'templates' as const, label: 'Templates', Icon: FileText, color: 'var(--color-accent)' },
+          { key: 'compleanni' as const, label: 'Compleanni', Icon: Cake, color: 'var(--color-warning)', badge: birthdaysToday.length > 0 ? birthdaysToday.length : undefined },
+        ]).map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all"
             style={{
-              background: 'var(--card-bg)',
-              border: '1px solid color-mix(in srgb, var(--color-warning) 25%, var(--glass-border))',
-              boxShadow: '0 4px 20px var(--glass-shadow)',
+              background: activeTab === tab.key ? 'var(--card-bg)' : 'transparent',
+              color: activeTab === tab.key ? tab.color : 'var(--color-text-muted)',
+              boxShadow: activeTab === tab.key ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
             }}
           >
-            <div
-              className="px-5 py-3.5 flex items-center gap-3"
-              style={{
-                background: 'color-mix(in srgb, var(--color-warning) 8%, transparent)',
-                borderBottom: '1px solid var(--glass-border)',
-              }}
-            >
-              <Cake size={18} style={{ color: 'var(--color-warning)' }} />
-              <span className="font-semibold text-sm" style={{ color: 'var(--color-text-primary)' }}>
-                Compleanni
+            <tab.Icon size={16} />
+            {tab.label}
+            {tab.badge && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full font-bold text-white" style={{ background: tab.color }}>
+                {tab.badge}
               </span>
-              {birthdaysToday.length > 0 && (
-                <span
-                  className="text-xs px-2 py-0.5 rounded-full font-medium"
-                  style={{ background: 'var(--color-warning)', color: 'white' }}
-                >
-                  {birthdaysToday.length} oggi
-                </span>
-              )}
-            </div>
-            <div className="p-4 space-y-3">
-              {birthdaysToday.map((cliente) => (
-                <div
-                  key={cliente.id}
-                  className="flex items-center justify-between p-3 rounded-xl"
-                  style={{
-                    background: 'color-mix(in srgb, var(--color-warning) 8%, transparent)',
-                    border: '1px solid color-mix(in srgb, var(--color-warning) 15%, transparent)',
-                  }}
-                >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold"
-                      style={{ background: 'var(--color-warning)', color: 'white' }}
-                    >
-                      {cliente.nome.charAt(0)}{cliente.cognome.charAt(0)}
-                    </div>
-                    <div>
-                      <p className="font-medium text-sm" style={{ color: 'var(--color-text-primary)' }}>
-                        {cliente.nome} {cliente.cognome}
-                      </p>
-                      <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                        {[
-                          cliente.cellulare && cliente.consenso_whatsapp ? 'WhatsApp' : '',
-                          cliente.email && cliente.consenso_email ? 'Email' : '',
-                        ].filter(Boolean).join(' / ') || 'Nessun canale'}
-                      </p>
-                    </div>
-                  </div>
-                  <Button size="sm" onClick={() => sendBirthdayWish(cliente)}>
-                    <Gift size={14} className="mr-1.5" />
-                    Auguri
-                  </Button>
-                </div>
-              ))}
-              {upcomingBirthdays.length > 0 && (
-                <div className="flex flex-wrap gap-2 pt-1">
-                  <span className="text-xs font-medium w-full mb-1" style={{ color: 'var(--color-text-muted)' }}>
-                    Prossimi 7 giorni
-                  </span>
-                  {upcomingBirthdays.map((cliente) => (
-                    <span
-                      key={cliente.id}
-                      className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full"
-                      style={{
-                        background: 'color-mix(in srgb, var(--color-text-primary) 5%, transparent)',
-                        color: 'var(--color-text-secondary)',
-                      }}
-                    >
-                      {cliente.nome} {cliente.cognome}
-                      <span style={{ color: 'var(--color-text-muted)' }}>
-                        {cliente.data_nascita
-                          ? new Date(cliente.data_nascita).toLocaleDateString('it-IT', { day: '2-digit', month: 'short' })
-                          : ''}
-                      </span>
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* TAB: CAMPAGNE */}
+      {activeTab === 'campagne' && (
+        <div className="animate-fade-in-up">
+          <CampagneTab templates={templates} showToast={showToast} />
         </div>
       )}
 
-      {/* TAB BAR */}
-      <div
-        className="flex gap-1 p-1 rounded-xl animate-fade-in-up"
-        style={{ background: 'var(--glass-border)', animationDelay: '100ms' }}
-      >
-        <button
-          onClick={() => setActiveTab('whatsapp')}
-          className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all"
-          style={{
-            background: activeTab === 'whatsapp' ? 'var(--card-bg)' : 'transparent',
-            color: activeTab === 'whatsapp' ? '#25D366' : 'var(--color-text-muted)',
-            boxShadow: activeTab === 'whatsapp' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-          }}
-        >
-          <MessageCircle size={16} />
-          WhatsApp
-          {whatsappTemplates.length > 0 && (
-            <span
-              className="text-xs px-1.5 py-0.5 rounded-full font-medium"
-              style={{
-                background: activeTab === 'whatsapp' ? 'color-mix(in srgb, #25D366 15%, transparent)' : 'var(--glass-border)',
-                color: activeTab === 'whatsapp' ? '#25D366' : 'var(--color-text-muted)',
-              }}
-            >
-              {whatsappTemplates.length}
-            </span>
+      {/* TAB: COMPLEANNI */}
+      {activeTab === 'compleanni' && (
+        <div className="animate-fade-in-up space-y-4">
+          {birthdaysToday.length === 0 && upcomingBirthdays.length === 0 ? (
+            <div className="rounded-2xl p-8 text-center" style={{ background: 'color-mix(in srgb, var(--color-warning) 4%, transparent)', border: '1px solid var(--glass-border)' }}>
+              <Cake size={32} className="mx-auto mb-3 opacity-30" style={{ color: 'var(--color-warning)' }} />
+              <p className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>Nessun compleanno nei prossimi giorni</p>
+            </div>
+          ) : (
+            <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--card-bg)', border: '1px solid color-mix(in srgb, var(--color-warning) 25%, var(--glass-border))' }}>
+              <div className="px-5 py-3.5 flex items-center gap-3" style={{ background: 'color-mix(in srgb, var(--color-warning) 8%, transparent)', borderBottom: '1px solid var(--glass-border)' }}>
+                <Cake size={18} style={{ color: 'var(--color-warning)' }} />
+                <span className="font-semibold text-sm" style={{ color: 'var(--color-text-primary)' }}>Compleanni</span>
+                {birthdaysToday.length > 0 && (
+                  <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: 'var(--color-warning)', color: 'white' }}>{birthdaysToday.length} oggi</span>
+                )}
+              </div>
+              <div className="p-4 space-y-3">
+                {birthdaysToday.map(cliente => (
+                  <div key={cliente.id} className="flex items-center justify-between p-3 rounded-xl" style={{ background: 'color-mix(in srgb, var(--color-warning) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--color-warning) 15%, transparent)' }}>
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold" style={{ background: 'var(--color-warning)', color: 'white' }}>{cliente.nome.charAt(0)}{cliente.cognome.charAt(0)}</div>
+                      <div>
+                        <p className="font-medium text-sm" style={{ color: 'var(--color-text-primary)' }}>{cliente.nome} {cliente.cognome}</p>
+                        <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{[cliente.cellulare && cliente.consenso_whatsapp ? 'WhatsApp' : '', cliente.email && cliente.consenso_email ? 'Email' : ''].filter(Boolean).join(' / ') || 'Nessun canale'}</p>
+                      </div>
+                    </div>
+                    <Button size="sm" onClick={() => sendBirthdayWish(cliente)}><Gift size={14} className="mr-1.5" />Auguri</Button>
+                  </div>
+                ))}
+                {upcomingBirthdays.length > 0 && (
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    <span className="text-xs font-medium w-full mb-1" style={{ color: 'var(--color-text-muted)' }}>Prossimi 7 giorni</span>
+                    {upcomingBirthdays.map(cliente => (
+                      <span key={cliente.id} className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full" style={{ background: 'color-mix(in srgb, var(--color-text-primary) 5%, transparent)', color: 'var(--color-text-secondary)' }}>
+                        {cliente.nome} {cliente.cognome}
+                        <span style={{ color: 'var(--color-text-muted)' }}>{cliente.data_nascita ? new Date(cliente.data_nascita).toLocaleDateString('it-IT', { day: '2-digit', month: 'short' }) : ''}</span>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           )}
+        </div>
+      )}
+
+      {/* TAB: TEMPLATES */}
+      {activeTab === 'templates' && (<div className="space-y-4 animate-fade-in-up">
+
+      {/* Sub-tab WhatsApp / Email */}
+      <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'color-mix(in srgb, var(--color-primary) 6%, transparent)' }}>
+        <button onClick={() => setTemplateSubTab('whatsapp')} className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-medium transition-all" style={{ background: templateSubTab === 'whatsapp' ? 'var(--card-bg)' : 'transparent', color: templateSubTab === 'whatsapp' ? '#25D366' : 'var(--color-text-muted)' }}>
+          <MessageCircle size={14} /> WhatsApp ({whatsappTemplates.length})
         </button>
-        <button
-          onClick={() => setActiveTab('email')}
-          className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all"
-          style={{
-            background: activeTab === 'email' ? 'var(--card-bg)' : 'transparent',
-            color: activeTab === 'email' ? 'var(--color-accent)' : 'var(--color-text-muted)',
-            boxShadow: activeTab === 'email' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-          }}
-        >
-          <Mail size={16} />
-          Email
-          {emailTemplates.length > 0 && (
-            <span
-              className="text-xs px-1.5 py-0.5 rounded-full font-medium"
-              style={{
-                background: activeTab === 'email' ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--glass-border)',
-                color: activeTab === 'email' ? 'var(--color-accent)' : 'var(--color-text-muted)',
-              }}
-            >
-              {emailTemplates.length}
-            </span>
-          )}
+        <button onClick={() => setTemplateSubTab('email')} className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-medium transition-all" style={{ background: templateSubTab === 'email' ? 'var(--card-bg)' : 'transparent', color: templateSubTab === 'email' ? 'var(--color-accent)' : 'var(--color-text-muted)' }}>
+          <Mail size={14} /> Email ({emailTemplates.length})
         </button>
       </div>
 
@@ -607,19 +577,19 @@ export function Comunicazioni() {
             <div
               className="w-8 h-8 rounded-lg flex items-center justify-center"
               style={{
-                background: activeTab === 'whatsapp'
+                background: templateSubTab === 'whatsapp'
                   ? 'color-mix(in srgb, #25D366 15%, transparent)'
                   : 'color-mix(in srgb, var(--color-accent) 15%, transparent)',
               }}
             >
-              {activeTab === 'whatsapp'
+              {templateSubTab === 'whatsapp'
                 ? <MessageCircle size={18} style={{ color: '#25D366' }} />
                 : <Mail size={18} style={{ color: 'var(--color-accent)' }} />
               }
             </div>
             <div>
               <h2 className="font-semibold text-base" style={{ color: 'var(--color-text-primary)' }}>
-                Testi {activeTab === 'whatsapp' ? 'WhatsApp' : 'Email'}
+                Testi {templateSubTab === 'whatsapp' ? 'WhatsApp' : 'Email'}
                 {selectedTipo && (
                   <span className="text-xs font-normal ml-2" style={{ color: 'var(--color-text-muted)' }}>
                     — {TIPI_SEMPLICI.find(t => t.value === selectedTipo)?.label}
@@ -632,7 +602,7 @@ export function Comunicazioni() {
             </div>
           </div>
           <Button
-            onClick={() => { setTemplateForm(f => ({ ...f, canale: activeTab })); openTemplateModal(); }}
+            onClick={() => { setTemplateForm(f => ({ ...f, canale: templateSubTab })); openTemplateModal(); }}
             size="sm"
           >
             <Plus size={16} className="mr-1.5" />
@@ -642,11 +612,11 @@ export function Comunicazioni() {
 
         {/* Templates grid */}
         {currentTemplates.length === 0 ? (
-          renderEmptyState(activeTab)
+          renderEmptyState(templateSubTab)
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {currentTemplates.map(renderTemplateCard)}
-            {renderAddCard(activeTab)}
+            {renderAddCard(templateSubTab)}
           </div>
         )}
       </div>
@@ -872,6 +842,8 @@ export function Comunicazioni() {
           </div>
         </div>
       </Modal>
+
+      </div>)}
 
       {toast && (
         <Toast

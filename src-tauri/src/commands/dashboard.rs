@@ -525,7 +525,7 @@ pub async fn get_dashboard_completo(
 
     // Pagamenti pacchetti del giorno (anticipo/dilazionato)
     let pacchetti_oggi: f64 = sqlx::query_scalar(
-        "SELECT COALESCE(SUM(importo), 0.0) FROM pacchetto_pagamenti WHERE DATE(created_at) = ?"
+        "SELECT COALESCE(SUM(pp.importo), 0.0) FROM pacchetto_pagamenti pp JOIN pacchetti_cliente pc ON pc.id = pp.pacchetto_cliente_id WHERE pc.stato != 'annullato' AND DATE(pp.created_at) = ?"
     ).bind(&oggi).fetch_one(&state.db.pool).await.unwrap_or(0.0);
 
     let fatturato_oggi = fatturato_oggi_row.0 + pacchetti_oggi;
@@ -546,7 +546,7 @@ pub async fn get_dashboard_completo(
     .fetch_one(&state.db.pool)
     .await?;
     let pacchetti_ieri: f64 = sqlx::query_scalar(
-        "SELECT COALESCE(SUM(importo), 0.0) FROM pacchetto_pagamenti WHERE DATE(created_at) = ?"
+        "SELECT COALESCE(SUM(pp.importo), 0.0) FROM pacchetto_pagamenti pp JOIN pacchetti_cliente pc ON pc.id = pp.pacchetto_cliente_id WHERE pc.stato != 'annullato' AND DATE(pp.created_at) = ?"
     ).bind(&ieri).fetch_one(&state.db.pool).await.unwrap_or(0.0);
     let fatturato_ieri = fatturato_ieri_app + pacchetti_ieri;
 
@@ -565,7 +565,7 @@ pub async fn get_dashboard_completo(
     .fetch_one(&state.db.pool)
     .await?;
     let pacchetti_sett: f64 = sqlx::query_scalar(
-        "SELECT COALESCE(SUM(importo), 0.0) FROM pacchetto_pagamenti WHERE DATE(created_at) = ?"
+        "SELECT COALESCE(SUM(pp.importo), 0.0) FROM pacchetto_pagamenti pp JOIN pacchetti_cliente pc ON pc.id = pp.pacchetto_cliente_id WHERE pc.stato != 'annullato' AND DATE(pp.created_at) = ?"
     ).bind(&settimana_scorsa).fetch_one(&state.db.pool).await.unwrap_or(0.0);
     let fatturato_settimana_scorsa = fatturato_sett_app + pacchetti_sett;
 
@@ -586,7 +586,7 @@ pub async fn get_dashboard_completo(
     .fetch_one(&state.db.pool)
     .await?;
     let pacchetti_mese: f64 = sqlx::query_scalar(
-        "SELECT COALESCE(SUM(importo), 0.0) FROM pacchetto_pagamenti WHERE DATE(created_at) >= ?"
+        "SELECT COALESCE(SUM(pp.importo), 0.0) FROM pacchetto_pagamenti pp JOIN pacchetti_cliente pc ON pc.id = pp.pacchetto_cliente_id WHERE pc.stato != 'annullato' AND DATE(pp.created_at) >= ?"
     ).bind(&primo_mese).fetch_one(&state.db.pool).await.unwrap_or(0.0);
 
     let fatturato_mese = mese_row.0 + pacchetti_mese;

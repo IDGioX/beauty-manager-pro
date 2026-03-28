@@ -164,7 +164,7 @@ export const Agenda: React.FC<AgendaProps> = ({ openAppuntamentoId, onAppuntamen
       // Carica info pacchetto per ogni appuntamento
       const seduteMap = new Map<string, SedutaConPacchetto>();
       Promise.all(nonRisolti.map(a =>
-        pacchettiService.getSedutaByAppuntamento(a.id).then(s => { if (s) seduteMap.set(a.id, s); }).catch(() => {})
+        pacchettiService.getSedutaByAppuntamento(a.id).then(s => { if (s) seduteMap.set(a.id, s); }).catch(e => console.error('Errore caricamento seduta pacchetto:', e))
       )).then(() => setRecapSedute(new Map(seduteMap)));
     }
   }, [appuntamenti, selectedDate, viewMode, isLoading]);
@@ -319,7 +319,8 @@ export const Agenda: React.FC<AgendaProps> = ({ openAppuntamentoId, onAppuntamen
         data_ora_fine: info.event.end?.toISOString(),
         operatrice_id: newResourceId || appuntamento.operatrice_id,
       });
-    } catch {
+    } catch (err) {
+      console.error('Errore spostamento appuntamento:', err);
       info.revert();
     }
   };
@@ -334,7 +335,8 @@ export const Agenda: React.FC<AgendaProps> = ({ openAppuntamentoId, onAppuntamen
         data_ora_inizio: info.event.start?.toISOString(),
         data_ora_fine: info.event.end?.toISOString(),
       });
-    } catch {
+    } catch (err) {
+      console.error('Errore ridimensionamento appuntamento:', err);
       info.revert();
     }
   };
