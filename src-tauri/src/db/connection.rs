@@ -18,6 +18,10 @@ impl Database {
             .connect_with(options)
             .await?;
 
+        // Verifica colonne necessarie prima delle migration (sicurezza per backup da versioni precedenti)
+        // SQLite non supporta IF NOT EXISTS per ADD COLUMN, quindi controlliamo manualmente
+        Self::ensure_backup_compatibility(&pool).await;
+
         // Esegui le migrations
         sqlx::migrate!("./migrations")
             .run(&pool)
@@ -34,6 +38,67 @@ impl Database {
 
         path.push("beauty_manager.db");
         path
+    }
+
+    /// Garantisce compatibilità con backup da versioni precedenti.
+    /// Se un backup viene ripristinato senza le colonne/tabelle nuove,
+    /// le aggiunge prima che sqlx tenti le migrazioni (che fallirebbero su ALTER TABLE duplicato).
+    async fn ensure_backup_compatibility(pool: &SqlitePool) {
+        // Controlla se la tabella _sqlx_migrations esiste e se le migrazioni recenti sono registrate
+        // Se le colonne esistono ma le migrazioni non sono registrate, il DB è da un backup post-migrazione
+        // ma senza la entry nella tabella migrazioni. In quel caso, registriamo le migrazioni come fatte.
+
+        let tables: Vec<(String,)> = sqlx::query_as(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        ).fetch_all(pool).await.unwrap_or_default();
+
+        let table_names: Vec<&str> = tables.iter().map(|t| t.0.as_str()).collect();
+
+        // Se pacchetto_sedute esiste, verifica le colonne
+        if table_names.contains(&"pacchetto_sedute") {
+            let cols: Vec<(String,)> = sqlx::query_as(
+                "SELECT name FROM pragma_table_info('pacchetto_sedute')"
+            ).fetch_all(pool).await.unwrap_or_default();
+            let col_names: Vec<&str> = cols.iter().map(|c| c.0.as_str()).collect();
+
+            // Aggiungi colonne mancanti (ignora errori se già esistono)
+            if !col_names.contains(&"importo_pagato") {
+                let _ = sqlx::query("ALTER TABLE pacchetto_sedute ADD COLUMN importo_pagato REAL NOT NULL DEFAULT 0.0")
+                    .execute(pool).await;
+            }
+            if !col_names.contains(&"data_prevista") {
+                let _ = sqlx::query("ALTER TABLE pacchetto_sedute ADD COLUMN data_prevista TEXT")
+                    .execute(pool).await;
+            }
+        }
+
+        if table_names.contains(&"pacchetti_cliente") {
+            let cols: Vec<(String,)> = sqlx::query_as(
+                "SELECT name FROM pragma_table_info('pacchetti_cliente')"
+            ).fetch_all(pool).await.unwrap_or_default();
+            let col_names: Vec<&str> = cols.iter().map(|c| c.0.as_str()).collect();
+
+            if !col_names.contains(&"tipo_pagamento") {
+                let _ = sqlx::query("ALTER TABLE pacchetti_cliente ADD COLUMN tipo_pagamento TEXT NOT NULL DEFAULT 'anticipo'")
+                    .execute(pool).await;
+            }
+        }
+
+        // Crea tabella pacchetto_pagamenti se non esiste
+        if !table_names.contains(&"pacchetto_pagamenti") {
+            let _ = sqlx::query(
+                "CREATE TABLE IF NOT EXISTS pacchetto_pagamenti (
+                    id TEXT PRIMARY KEY NOT NULL,
+                    pacchetto_cliente_id TEXT NOT NULL REFERENCES pacchetti_cliente(id) ON DELETE CASCADE,
+                    importo REAL NOT NULL,
+                    tipo TEXT NOT NULL DEFAULT 'pagamento',
+                    note TEXT,
+                    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+                )"
+            ).execute(pool).await;
+            let _ = sqlx::query("CREATE INDEX IF NOT EXISTS idx_pacchetto_pagamenti_pacchetto ON pacchetto_pagamenti(pacchetto_cliente_id)")
+                .execute(pool).await;
+        }
     }
 }
 
