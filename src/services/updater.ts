@@ -31,12 +31,7 @@ export const updaterService = {
     const currentVersion = await this.getCurrentVersion();
 
     try {
-      const update = await check({
-        headers: {
-          'Authorization': 'Bearer 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',
-          'Accept': 'application/octet-stream',
-        },
-      });
+      const update = await check();
 
       if (update) {
         return {
@@ -65,12 +60,7 @@ export const updaterService = {
     onProgress?: (progress: UpdateProgress) => void
   ): Promise<boolean> {
     try {
-      const update = await check({
-        headers: {
-          'Authorization': 'Bearer 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',
-          'Accept': 'application/octet-stream',
-        },
-      });
+      const update = await check();
 
       if (!update) {
         return false;
