@@ -16,10 +16,13 @@ jobs:
         include:
           - platform: 'macos-latest'
             args: '--target aarch64-apple-darwin'
+            artifact: 'sig-macos-arm'
           - platform: 'macos-latest'
             args: '--target x86_64-apple-darwin'
+            artifact: 'sig-macos-x64'
           - platform: 'windows-latest'
             args: ''
+            artifact: 'sig-windows'
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -51,7 +54,7 @@ jobs:
             ## Download
 
             **Windows:**
-            - `BeautyManagerPro_*_x64-setup.exe` - Installer (consigliato)
+            - `BeautyManagerPro_*_x64-setup.exe` - Installer
 
             **macOS:**
             - `BeautyManagerPro_*_aarch64.dmg` - Apple Silicon (M1/M2/M3)
@@ -59,6 +62,23 @@ jobs:
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
+
+      - name: Find sig file and save as artifact
+        shell: bash
+        run: |
+          mkdir -p /tmp/sigs
+          find src-tauri/target -name "*.sig" -type f | while read f; do
+            echo "Found sig: $f"
+            cp "$f" /tmp/sigs/
+          done
+          ls -la /tmp/sigs/ || echo "No sigs found"
+
+      - name: Upload sig artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: /tmp/sigs/
+          if-no-files-found: warn
 
   updater-json:
     needs: release
@@ -72,27 +92,62 @@ jobs:
         id: ver
         run: echo "v=$(jq -r .version src-tauri/tauri.conf.json)" >> $GITHUB_OUTPUT
 
-      - name: Create and upload latest.json
+      - name: Download sig artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: sigs/
+
+      - name: List all sigs
+        run: find sigs/ -type f | sort
+
+      - name: Create latest.json with signatures
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           V: ${{ steps.ver.outputs.v }}
         run: |
-          cat > latest.json << EOF
+          WIN_SIG=""
+          MAC_X64_SIG=""
+          MAC_ARM_SIG=""
+
+          # Windows: nsis.zip.sig
+          for f in sigs/sig-windows/*nsis.zip.sig; do
+            [ -f "$f" ] && WIN_SIG=$(cat "$f") && echo "WIN SIG found: ${WIN_SIG:0:30}..."
+          done
+
+          # macOS x64: app.tar.gz.sig
+          for f in sigs/sig-macos-x64/*app.tar.gz.sig; do
+            [ -f "$f" ] && MAC_X64_SIG=$(cat "$f") && echo "MAC X64 SIG found: ${MAC_X64_SIG:0:30}..."
+          done
+
+          # macOS ARM: app.tar.gz.sig
+          for f in sigs/sig-macos-arm/*app.tar.gz.sig; do
+            [ -f "$f" ] && MAC_ARM_SIG=$(cat "$f") && echo "MAC ARM SIG found: ${MAC_ARM_SIG:0:30}..."
+          done
+
+          cat > latest.json << ENDJSON
           {
             "version": "${V}",
             "notes": "Aggiornamento BeautyManagerPro v${V}",
             "pub_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
             "platforms": {
               "windows-x86_64": {
+                "signature": "${WIN_SIG}",
                 "url": "https://github.com/IDGioX/beauty-manager-pro/releases/download/v${V}/BeautyManagerPro_${V}_x64-setup.exe"
               },
               "darwin-x86_64": {
+                "signature": "${MAC_X64_SIG}",
                 "url": "https://github.com/IDGioX/beauty-manager-pro/releases/download/v${V}/BeautyManagerPro_x64.app.tar.gz"
               },
               "darwin-aarch64": {
+                "signature": "${MAC_ARM_SIG}",
                 "url": "https://github.com/IDGioX/beauty-manager-pro/releases/download/v${V}/BeautyManagerPro_aarch64.app.tar.gz"
               }
             }
           }
-          EOF
+          ENDJSON
+
+          echo "=== latest.json ==="
+          cat latest.json
+          echo "==================="
+
           gh release upload "v${V}" latest.json --clobber
