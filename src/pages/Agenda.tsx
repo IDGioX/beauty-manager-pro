@@ -183,6 +183,10 @@ export const Agenda: React.FC<AgendaProps> = ({ openAppuntamentoId, onAppuntamen
           await pacchettiService.completaSedutaById(seduta.seduta_id, appId);
         }
       }
+      // Scollega seduta pacchetto se annullato/no_show
+      if (nuovoStato === 'annullato' || nuovoStato === 'no_show') {
+        try { await pacchettiService.scollegaSedutaAppuntamento(appId); } catch { /* ignora */ }
+      }
       setPendingAppuntamenti(prev => {
         const remaining = prev.filter(a => a.id !== appId);
         if (remaining.length === 0) setShowPendingPopup(false);

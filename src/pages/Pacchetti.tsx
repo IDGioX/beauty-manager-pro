@@ -1234,7 +1234,7 @@ const ClientePacchettiPanel: React.FC<{
                                             className="px-2 py-1 rounded-md text-xs"
                                             style={{ background: 'var(--input-bg, var(--card-bg))', border: '1px solid var(--glass-border)', color: 'var(--color-text-primary)', outline: 'none', width: 80 }}
                                             autoFocus />
-                                          <button onClick={() => { onRegistraPagamentoSeduta(s.id, payInput?.importo || 0); onPayInputChange(null); }}
+                                          <button onClick={() => { const amt = payInput?.importo || 0; if (amt > 0) onRegistraPagamentoSeduta(s.id, amt); onPayInputChange(null); }}
                                             className="text-[10px] font-medium px-2 py-1 rounded-md" style={{ background: 'var(--color-success)', color: 'white' }}>OK</button>
                                           <button onClick={() => onPayInputChange(null)} className="p-0.5" style={{ color: 'var(--color-text-muted)' }}><X size={12} /></button>
                                         </>
