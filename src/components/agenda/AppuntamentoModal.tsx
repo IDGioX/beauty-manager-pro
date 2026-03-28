@@ -643,16 +643,12 @@ export const AppuntamentoModal: React.FC = () => {
   const handleDelete = async () => {
     if (!selectedAppuntamento) return;
 
-    if (!confirm('Sei sicuro di voler eliminare questo appuntamento?')) {
-      return;
-    }
-
     setIsLoading(true);
     try {
-      // Scollega seduta pacchetto se collegata
-      if (sedutaLinkata && sedutaLinkata.stato_seduta === 'pianificata') {
+      // Scollega seduta pacchetto se collegata (ignora errori)
+      try {
         await pacchettiService.scollegaSedutaAppuntamento(selectedAppuntamento.id);
-      }
+      } catch { /* ignora — potrebbe non avere seduta collegata */ }
       await deleteAppuntamento(selectedAppuntamento.id);
       closeModal();
     } catch (err: any) {
