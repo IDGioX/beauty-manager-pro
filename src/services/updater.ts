@@ -19,9 +19,6 @@ export interface UpdateProgress {
 export type UpdateStatus = 'idle' | 'checking' | 'downloading' | 'ready' | 'error';
 
 export const updaterService = {
-  /**
-   * Ottiene la versione corrente dell'app
-   */
   async getCurrentVersion(): Promise<string> {
     try {
       return await getVersion();
@@ -30,14 +27,16 @@ export const updaterService = {
     }
   },
 
-  /**
-   * Controlla se sono disponibili aggiornamenti
-   */
   async checkForUpdates(): Promise<UpdateInfo> {
     const currentVersion = await this.getCurrentVersion();
 
     try {
-      const update = await check();
+      const update = await check({
+        headers: {
+          'Authorization': 'Bearer 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',
+          'Accept': 'application/octet-stream',
+        },
+      });
 
       if (update) {
         return {
@@ -62,51 +61,43 @@ export const updaterService = {
     }
   },
 
-  /**
-   * Scarica e installa l'aggiornamento
-   */
   async downloadAndInstall(
     onProgress?: (progress: UpdateProgress) => void
   ): Promise<boolean> {
     try {
-      const update = await check();
+      const update = await check({
+        headers: {
+          'Authorization': 'Bearer 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',
+          'Accept': 'application/octet-stream',
+        },
+      });
 
       if (!update) {
-        console.log('Nessun aggiornamento disponibile');
         return false;
       }
 
       let downloaded = 0;
       let contentLength = 0;
 
-      // Download con progress tracking
       await update.downloadAndInstall((event) => {
         switch (event.event) {
           case 'Started':
             contentLength = event.data.contentLength || 0;
-            console.log(`Download iniziato: ${contentLength} bytes`);
             break;
           case 'Progress':
             downloaded += event.data.chunkLength;
             const percentage = contentLength > 0
               ? Math.round((downloaded / contentLength) * 100)
               : 0;
-
             if (onProgress) {
-              onProgress({
-                downloaded,
-                total: contentLength,
-                percentage,
-              });
+              onProgress({ downloaded, total: contentLength, percentage });
             }
             break;
           case 'Finished':
-            console.log('Download completato');
             break;
         }
       });
 
-      console.log('Aggiornamento installato, pronto per riavvio');
       return true;
     } catch (error) {
       console.error('Errore download/installazione aggiornamento:', error);
@@ -114,9 +105,6 @@ export const updaterService = {
     }
   },
 
-  /**
-   * Riavvia l'applicazione per applicare l'aggiornamento
-   */
   async restartApp(): Promise<void> {
     try {
       await relaunch();

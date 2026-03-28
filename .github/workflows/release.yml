@@ -16,10 +16,16 @@ jobs:
         include:
           - platform: 'macos-latest'
             args: '--target aarch64-apple-darwin'
+            sig_path: 'src-tauri/target/aarch64-apple-darwin/release/bundle/macos'
+            sig_name: 'sig-macos-aarch64'
           - platform: 'macos-latest'
             args: '--target x86_64-apple-darwin'
+            sig_path: 'src-tauri/target/x86_64-apple-darwin/release/bundle/macos'
+            sig_name: 'sig-macos-x64'
           - platform: 'windows-latest'
             args: ''
+            sig_path: 'src-tauri/target/release/bundle/nsis'
+            sig_name: 'sig-windows'
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -58,32 +64,14 @@ jobs:
             - `Beauty.Manager.Pro_*_x64.dmg` - Intel
           releaseDraft: false
           prerelease: false
-          includeUpdaterJson: true
-          updaterJsonPreferNsis: true
-          updaterJsonKeepUniversal: true
           args: ${{ matrix.args }}
 
-      # Upload signature files as artifacts for the updater job
-      - name: Upload sig files (Windows)
-        if: matrix.platform == 'windows-latest'
+      - name: Find and upload sig files
         uses: actions/upload-artifact@v4
         with:
-          name: sig-windows
-          path: src-tauri/target/release/bundle/nsis/*.nsis.zip.sig
-
-      - name: Upload sig files (macOS aarch64)
-        if: matrix.platform == 'macos-latest' && contains(matrix.args, 'aarch64')
-        uses: actions/upload-artifact@v4
-        with:
-          name: sig-macos-aarch64
-          path: src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.tar.gz.sig
-
-      - name: Upload sig files (macOS x64)
-        if: matrix.platform == 'macos-latest' && contains(matrix.args, 'x86_64')
-        uses: actions/upload-artifact@v4
-        with:
-          name: sig-macos-x64
-          path: src-tauri/target/x86_64-apple-darwin/release/bundle/macos/*.tar.gz.sig
+          name: ${{ matrix.sig_name }}
+          path: "${{ matrix.sig_path }}/"
+          if-no-files-found: warn
 
   updater:
     needs: build
@@ -97,50 +85,70 @@ jobs:
         id: version
         run: echo "version=$(jq -r .version src-tauri/tauri.conf.json)" >> $GITHUB_OUTPUT
 
-      - name: Download all sig artifacts
+      - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: sigs/
 
-      - name: Read signatures
-        id: sigs
+      - name: List downloaded files
+        run: find sigs/ -type f -name "*.sig" | sort
+
+      - name: Read signatures and create latest.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           WIN_SIG=""
           MAC_X64_SIG=""
           MAC_ARM_SIG=""
-          if [ -f sigs/sig-windows/*.sig ]; then WIN_SIG=$(cat sigs/sig-windows/*.sig); fi
-          if [ -f sigs/sig-macos-x64/*.sig ]; then MAC_X64_SIG=$(cat sigs/sig-macos-x64/*.sig); fi
-          if [ -f sigs/sig-macos-aarch64/*.sig ]; then MAC_ARM_SIG=$(cat sigs/sig-macos-aarch64/*.sig); fi
-          echo "win=$WIN_SIG" >> $GITHUB_OUTPUT
-          echo "mac_x64=$MAC_X64_SIG" >> $GITHUB_OUTPUT
-          echo "mac_arm=$MAC_ARM_SIG" >> $GITHUB_OUTPUT
 
-      - name: Create latest.json
-        run: |
-          VERSION=${{ steps.version.outputs.version }}
-          cat > latest.json << HEREDOC
+          # Read Windows NSIS signature
+          for f in sigs/sig-windows/*.nsis.zip.sig; do
+            if [ -f "$f" ]; then WIN_SIG=$(cat "$f"); fi
+          done
+
+          # Read macOS x64 signature
+          for f in sigs/sig-macos-x64/*.tar.gz.sig; do
+            if [ -f "$f" ]; then MAC_X64_SIG=$(cat "$f"); fi
+          done
+
+          # Read macOS aarch64 signature
+          for f in sigs/sig-macos-aarch64/*.tar.gz.sig; do
+            if [ -f "$f" ]; then MAC_ARM_SIG=$(cat "$f"); fi
+          done
+
+          echo "Windows sig: ${WIN_SIG:0:20}..."
+          echo "macOS x64 sig: ${MAC_X64_SIG:0:20}..."
+          echo "macOS arm sig: ${MAC_ARM_SIG:0:20}..."
+
+          # Generate latest.json
+          cat > latest.json << EOF
           {
             "version": "${VERSION}",
             "notes": "Aggiornamento Beauty Manager Pro v${VERSION}",
             "pub_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
             "platforms": {
               "windows-x86_64": {
-                "signature": "${{ steps.sigs.outputs.win }}",
+                "signature": "${WIN_SIG}",
                 "url": "https://github.com/IDGioX/beauty-manager-pro/releases/download/v${VERSION}/Beauty.Manager.Pro_${VERSION}_x64-setup.nsis.zip"
               },
               "darwin-x86_64": {
-                "signature": "${{ steps.sigs.outputs.mac_x64 }}",
+                "signature": "${MAC_X64_SIG}",
                 "url": "https://github.com/IDGioX/beauty-manager-pro/releases/download/v${VERSION}/Beauty.Manager.Pro_x64.app.tar.gz"
               },
               "darwin-aarch64": {
-                "signature": "${{ steps.sigs.outputs.mac_arm }}",
+                "signature": "${MAC_ARM_SIG}",
                 "url": "https://github.com/IDGioX/beauty-manager-pro/releases/download/v${VERSION}/Beauty.Manager.Pro_aarch64.app.tar.gz"
               }
             }
           }
-          HEREDOC
+          EOF
 
-      - name: Upload latest.json to release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload "v${{ steps.version.outputs.version }}" latest.json --clobber
+          cat latest.json
+
+          # Upload to release
+          gh release upload "v${VERSION}" latest.json --clobber
+
+          # Also update the Gist for public access
+          echo "$(<latest.json)" > /tmp/gist_latest.json
+          gh gist edit 1de50f67291be8d8e72feec4eda38256 -f latest.json /tmp/gist_latest.json || true
