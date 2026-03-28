@@ -58,5 +58,7 @@ jobs:
             - `Beauty.Manager.Pro_*_x64.dmg` - Intel
           releaseDraft: false
           prerelease: false
+          includeUpdaterJson: true
+          updaterJsonPreferNsis: true
           updaterJsonKeepUniversal: true
           args: ${{ matrix.args }}
