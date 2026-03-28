@@ -241,7 +241,7 @@ export function Settings() {
       const { open } = await import('@tauri-apps/plugin-dialog');
       const selected = await open({
         title: 'Seleziona file di backup',
-        filters: [{ name: 'Database', extensions: ['db', 'sqlite', 'sqlite3', 'bak'] }],
+        filters: [{ name: 'Backup Beauty Manager', extensions: ['bmbackup', 'db', 'sqlite', 'sqlite3', 'bak'] }],
         multiple: false,
       });
       if (!selected) return;
