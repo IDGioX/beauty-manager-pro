@@ -51,14 +51,48 @@ jobs:
             ## Download
 
             **Windows:**
-            - `Beauty.Manager.Pro_*_x64-setup.exe` - Installer (consigliato)
+            - `BeautyManagerPro_*_x64-setup.exe` - Installer (consigliato)
 
             **macOS:**
-            - `Beauty.Manager.Pro_*_aarch64.dmg` - Apple Silicon (M1/M2/M3)
-            - `Beauty.Manager.Pro_*_x64.dmg` - Intel
+            - `BeautyManagerPro_*_aarch64.dmg` - Apple Silicon (M1/M2/M3)
+            - `BeautyManagerPro_*_x64.dmg` - Intel
           releaseDraft: false
           prerelease: false
-          includeUpdaterJson: true
-          updaterJsonPreferNsis: true
-          updaterJsonKeepUniversal: true
           args: ${{ matrix.args }}
+
+  updater-json:
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get version
+        id: ver
+        run: echo "v=$(jq -r .version src-tauri/tauri.conf.json)" >> $GITHUB_OUTPUT
+
+      - name: Create and upload latest.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          V: ${{ steps.ver.outputs.v }}
+        run: |
+          cat > latest.json << EOF
+          {
+            "version": "${V}",
+            "notes": "Aggiornamento BeautyManagerPro v${V}",
+            "pub_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "platforms": {
+              "windows-x86_64": {
+                "url": "https://github.com/IDGioX/beauty-manager-pro/releases/download/v${V}/BeautyManagerPro_${V}_x64-setup.exe"
+              },
+              "darwin-x86_64": {
+                "url": "https://github.com/IDGioX/beauty-manager-pro/releases/download/v${V}/BeautyManagerPro_x64.app.tar.gz"
+              },
+              "darwin-aarch64": {
+                "url": "https://github.com/IDGioX/beauty-manager-pro/releases/download/v${V}/BeautyManagerPro_aarch64.app.tar.gz"
+              }
+            }
+          }
+          EOF
+          gh release upload "v${V}" latest.json --clobber
