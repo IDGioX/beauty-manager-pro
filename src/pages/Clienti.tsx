@@ -541,7 +541,7 @@ const ClientDetailPanel: React.FC<DetailPanelProps> = ({
   return (
     <div className="flex flex-col h-full">
       {/* Panel Header - Avatar & Name */}
-      <div className="p-5 pb-4">
+      <div className="p-4 pb-3">
         <div className="max-w-2xl">
         <div className="flex items-start justify-between mb-4">
           <button onClick={onClose} className="p-1.5 rounded-lg transition-colors" style={{ color: 'var(--color-text-muted)' }}
@@ -551,7 +551,7 @@ const ClientDetailPanel: React.FC<DetailPanelProps> = ({
           </button>
           <div className="flex items-center gap-1">
             {!isEditing && (
-              <button onClick={onStartEdit} className="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors" style={{ color: 'var(--color-primary)', background: 'color-mix(in srgb, var(--color-primary) 8%, transparent)' }}>
+              <button onClick={onStartEdit} className="px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors" style={{ color: 'var(--color-primary)', background: 'color-mix(in srgb, var(--color-primary) 8%, transparent)' }}>
                 <Edit2 size={13} className="inline mr-1" />Modifica
               </button>
             )}
@@ -564,7 +564,7 @@ const ClientDetailPanel: React.FC<DetailPanelProps> = ({
               {showActions && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setShowActions(false)} />
-                  <div className="absolute right-0 top-full mt-1 w-44 rounded-xl shadow-lg py-1 z-50" style={{ background: 'var(--card-bg)', border: '1px solid var(--glass-border)' }}>
+                  <div className="absolute right-0 top-full mt-1 w-48 rounded-xl shadow-lg py-1 z-50" style={{ background: 'var(--card-bg)', border: '1px solid var(--glass-border)' }}>
                     {cliente.attivo ? (
                       <button onClick={() => { setShowActions(false); onDeactivate(); }} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left transition-colors" style={{ color: '#f59e0b' }}
                         onMouseEnter={e => { e.currentTarget.style.background = 'var(--glass-border)'; }}
@@ -706,7 +706,7 @@ const PanoramicaTab: React.FC<{ profile: ClienteCompleteProfile | null; loading:
   const { statistiche: s } = profile;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-3">
       {/* KPI Grid */}
       <div className="grid grid-cols-2 gap-2.5">
         {[
@@ -747,7 +747,7 @@ const PanoramicaTab: React.FC<{ profile: ClienteCompleteProfile | null; loading:
       {/* Trattamenti Preferiti */}
       {profile.trattamenti_frequenti.length > 0 && (
         <div>
-          <h4 className="text-xs font-medium uppercase tracking-wider mb-2.5" style={{ color: 'var(--color-text-muted)' }}>
+          <h4 className="text-[10px] font-medium uppercase tracking-wider mb-2.5" style={{ color: 'var(--color-text-muted)' }}>
             Trattamenti Preferiti
           </h4>
           <div className="space-y-1.5">
@@ -773,7 +773,7 @@ const PanoramicaTab: React.FC<{ profile: ClienteCompleteProfile | null; loading:
 
       {/* Ultimi Appuntamenti */}
       <div>
-        <h4 className="text-xs font-medium uppercase tracking-wider mb-2.5" style={{ color: 'var(--color-text-muted)' }}>
+        <h4 className="text-[10px] font-medium uppercase tracking-wider mb-2.5" style={{ color: 'var(--color-text-muted)' }}>
           Ultimi Appuntamenti
         </h4>
         {profile.appuntamenti.length === 0 ? (
@@ -851,7 +851,7 @@ const AnagraficaTab: React.FC<{
     ];
 
     return (
-      <div className="space-y-5">
+      <div className="space-y-3">
         <div className="space-y-3">
           {fields.map((f, i) => (
             <div key={i}>
@@ -1054,7 +1054,7 @@ const SchedaEsteticaTab: React.FC<{
   const hasData = fields.some(f => f.value);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div className="flex justify-end">
         <button onClick={startEdit} className="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors" style={{ color: 'var(--color-primary)', background: 'color-mix(in srgb, var(--color-primary) 8%, transparent)' }}>
           <Edit2 size={13} className="inline mr-1" />{hasData ? 'Modifica' : 'Compila'}

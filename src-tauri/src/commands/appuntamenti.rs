@@ -3,7 +3,7 @@ use crate::error::{AppResult, AppError};
 use crate::models::{Appuntamento, AppuntamentoWithDetails, CreateAppuntamentoInput, UpdateAppuntamentoInput};
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use chrono::{DateTime, Utc};
+use super::analytics::normalize_date;
 
 // Helper per generare UUID
 fn generate_uuid() -> String {
@@ -13,10 +13,12 @@ fn generate_uuid() -> String {
 #[tauri::command]
 pub async fn get_appuntamenti_by_date_range(
     db: tauri::State<'_, Arc<Mutex<crate::AppState>>>,
-    data_inizio: DateTime<Utc>,
-    data_fine: DateTime<Utc>,
+    data_inizio: String,
+    data_fine: String,
 ) -> AppResult<Vec<AppuntamentoWithDetails>> {
     let state = db.lock().await;
+    let di = normalize_date(&data_inizio);
+    let df = normalize_date(&data_fine);
 
     let appuntamenti = sqlx::query_as::<_, AppuntamentoWithDetails>(
         r#"
@@ -39,20 +41,21 @@ pub async fn get_appuntamenti_by_date_range(
             a.note_prenotazione,
             a.note_trattamento,
             a.prezzo_applicato,
+            a.omaggio,
             a.created_at,
             a.updated_at
         FROM appuntamenti a
         INNER JOIN clienti c ON a.cliente_id = c.id
         INNER JOIN operatrici o ON a.operatrice_id = o.id
         INNER JOIN trattamenti t ON a.trattamento_id = t.id
-        WHERE a.data_ora_inizio >= ?1
-          AND a.data_ora_inizio < ?2
+        WHERE datetime(a.data_ora_inizio) >= datetime(?1)
+          AND datetime(a.data_ora_inizio) < datetime(?2)
           AND a.stato != 'annullato'
         ORDER BY a.data_ora_inizio ASC
         "#
     )
-    .bind(data_inizio)
-    .bind(data_fine)
+    .bind(&di)
+    .bind(&df)
     .fetch_all(&state.db.pool)
     .await?;
 
@@ -87,6 +90,7 @@ pub async fn get_appuntamento_by_id(
             a.note_prenotazione,
             a.note_trattamento,
             a.prezzo_applicato,
+            a.omaggio,
             a.created_at,
             a.updated_at
         FROM appuntamenti a
@@ -146,9 +150,9 @@ pub async fn create_appuntamento(
         INSERT INTO appuntamenti (
             id, cliente_id, operatrice_id, cabina_id, trattamento_id,
             data_ora_inizio, data_ora_fine, note_prenotazione, prezzo_applicato,
-            stato, prenotato_da
+            stato, prenotato_da, omaggio
         )
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, 'operatrice')
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, 'operatrice', ?11)
         "#
     )
     .bind(&id)
@@ -161,6 +165,7 @@ pub async fn create_appuntamento(
     .bind(&input.note_prenotazione)
     .bind(&input.prezzo_applicato)
     .bind(stato)
+    .bind(input.omaggio.unwrap_or(false))
     .execute(&state.db.pool)
     .await?;
 
@@ -249,8 +254,9 @@ pub async fn update_appuntamento(
            note_prenotazione = ?7,
            note_trattamento = ?8,
            prezzo_applicato = ?9,
+           omaggio = COALESCE(?10, omaggio),
            updated_at = datetime('now')
-           WHERE id = ?10"#
+           WHERE id = ?11"#
     )
     .bind(&input.cliente_id)
     .bind(&input.operatrice_id)
@@ -261,6 +267,7 @@ pub async fn update_appuntamento(
     .bind(&input.note_prenotazione)
     .bind(&input.note_trattamento)
     .bind(&input.prezzo_applicato)
+    .bind(&input.omaggio)
     .bind(&id)
     .execute(&state.db.pool)
     .await?;
@@ -302,7 +309,7 @@ pub async fn aggiorna_stati_automatici(
     db: tauri::State<'_, Arc<Mutex<crate::AppState>>>,
 ) -> AppResult<(i64, i64)> {
     let state = db.lock().await;
-    let now = Utc::now();
+    let now = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
 
     // Aggiorna "prenotato" → "in_corso" se l'ora di inizio è passata
     let iniziati = sqlx::query(
@@ -310,8 +317,8 @@ pub async fn aggiorna_stati_automatici(
         UPDATE appuntamenti
         SET stato = 'in_corso', updated_at = datetime('now')
         WHERE stato = 'prenotato'
-          AND data_ora_inizio <= ?1
-          AND data_ora_fine > ?1
+          AND datetime(data_ora_inizio) <= datetime(?1)
+          AND datetime(data_ora_fine) > datetime(?1)
         "#
     )
     .bind(&now)
@@ -324,7 +331,7 @@ pub async fn aggiorna_stati_automatici(
         UPDATE appuntamenti
         SET stato = 'completato', updated_at = datetime('now')
         WHERE stato = 'in_corso'
-          AND data_ora_fine <= ?1
+          AND datetime(data_ora_fine) <= datetime(?1)
         "#
     )
     .bind(&now)
@@ -337,18 +344,15 @@ pub async fn aggiorna_stati_automatici(
 #[tauri::command]
 pub async fn get_appuntamenti_giorno(
     db: tauri::State<'_, Arc<Mutex<crate::AppState>>>,
-    data: DateTime<Utc>,
+    data: String,
 ) -> AppResult<Vec<AppuntamentoWithDetails>> {
     let state = db.lock().await;
 
-    // Calcola inizio e fine giornata
-    let data_inizio = data.date_naive().and_hms_opt(0, 0, 0)
-        .ok_or_else(|| AppError::InvalidInput("Data non valida: impossibile calcolare inizio giornata".to_string()))?;
-    let data_fine = data.date_naive().and_hms_opt(23, 59, 59)
-        .ok_or_else(|| AppError::InvalidInput("Data non valida: impossibile calcolare fine giornata".to_string()))?;
-
-    let data_inizio_utc = DateTime::<Utc>::from_naive_utc_and_offset(data_inizio, Utc);
-    let data_fine_utc = DateTime::<Utc>::from_naive_utc_and_offset(data_fine, Utc);
+    // Normalizza e calcola inizio e fine giornata
+    let normalized = normalize_date(&data);
+    let date_part = &normalized[..10]; // "YYYY-MM-DD"
+    let di = format!("{} 00:00:00", date_part);
+    let df = format!("{} 23:59:59", date_part);
 
     let appuntamenti = sqlx::query_as::<_, AppuntamentoWithDetails>(
         r#"
@@ -371,19 +375,20 @@ pub async fn get_appuntamenti_giorno(
             a.note_prenotazione,
             a.note_trattamento,
             a.prezzo_applicato,
+            a.omaggio,
             a.created_at,
             a.updated_at
         FROM appuntamenti a
         INNER JOIN clienti c ON a.cliente_id = c.id
         INNER JOIN operatrici o ON a.operatrice_id = o.id
         INNER JOIN trattamenti t ON a.trattamento_id = t.id
-        WHERE a.data_ora_inizio >= ?1
-          AND a.data_ora_inizio <= ?2
+        WHERE datetime(a.data_ora_inizio) >= datetime(?1)
+          AND datetime(a.data_ora_inizio) <= datetime(?2)
         ORDER BY a.data_ora_inizio ASC
         "#
     )
-    .bind(data_inizio_utc)
-    .bind(data_fine_utc)
+    .bind(&di)
+    .bind(&df)
     .fetch_all(&state.db.pool)
     .await?;
 

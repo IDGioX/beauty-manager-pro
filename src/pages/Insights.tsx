@@ -1,35 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Lightbulb,
   Users,
   BarChart3,
   TrendingUp,
   AlertTriangle,
-  Package,
   Crown,
   UserMinus,
   UserPlus,
   UserCheck,
   Clock,
-  Euro,
   RefreshCw,
   ChevronRight,
   ChevronDown,
-  Sparkles,
-  Target,
   Info,
+  Target,
 } from 'lucide-react';
-import { insightsService, InsightsData, InsightMessage, ClienteSegmentato } from '../services/insights';
+import { insightsService, InsightsData, ClienteSegmentato } from '../services/insights';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
 
-type TabId = 'insights' | 'clienti' | 'performance' | 'previsioni';
+type TabId = 'clienti' | 'performance';
 
 const TABS: { id: TabId; label: string; icon: React.ElementType }[] = [
-  { id: 'insights', label: 'Insight', icon: Lightbulb },
   { id: 'clienti', label: 'Clienti', icon: Users },
   { id: 'performance', label: 'Performance', icon: BarChart3 },
-  { id: 'previsioni', label: 'Previsioni', icon: TrendingUp },
 ];
 
 // ============================================
@@ -37,7 +31,7 @@ const TABS: { id: TabId; label: string; icon: React.ElementType }[] = [
 // ============================================
 
 export function Insights() {
-  const [activeTab, setActiveTab] = useState<TabId>('insights');
+  const [activeTab, setActiveTab] = useState<TabId>('clienti');
   const [data, setData] = useState<InsightsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -116,145 +110,10 @@ export function Insights() {
         <ErrorState message={error} onRetry={loadData} />
       ) : data ? (
         <>
-          {activeTab === 'insights' && <TabInsights data={data} />}
           {activeTab === 'clienti' && <TabClienti data={data} />}
           {activeTab === 'performance' && <TabPerformance data={data} />}
-          {activeTab === 'previsioni' && <TabPrevisioni data={data} />}
         </>
       ) : null}
-    </div>
-  );
-}
-
-// ============================================
-// TAB: INSIGHTS
-// ============================================
-
-function TabInsights({ data }: { data: InsightsData }) {
-  if (data.messaggi.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20" style={{ color: 'var(--color-text-muted)' }}>
-        <Sparkles size={40} className="mb-4 opacity-30" />
-        <p className="text-lg font-medium">Tutto sotto controllo</p>
-        <p className="text-sm mt-1">Non ci sono insight da segnalare al momento</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-3">
-      {data.messaggi.map((msg, i) => (
-        <InsightCard key={i} message={msg} />
-      ))}
-    </div>
-  );
-}
-
-const insightExplanations: Record<string, Record<string, string>> = {
-  clienti: {
-    default: 'Questo dato analizza il comportamento dei clienti in base alla frequenza delle visite e al tempo trascorso dall\'ultima visita. I clienti vengono classificati automaticamente: "a rischio" se assenti da 60-120 giorni, "persi" se assenti da oltre 120 giorni.',
-    'Tasso di ritorno': 'Il tasso di ritorno indica la percentuale di clienti che tornano almeno una seconda volta dopo la prima visita. È il principale indicatore di fidelizzazione: sotto il 50% significa che più della metà dei nuovi clienti non torna. Sopra il 70% è un ottimo risultato.',
-  },
-  revenue: {
-    default: 'Il fatturato viene calcolato sommando i prezzi degli appuntamenti completati. Il confronto è tra il mese corrente e quello precedente. Variazioni superiori al 5% vengono segnalate.',
-    'margini': 'Il margine di un trattamento è: ricavo incassato meno il costo dei prodotti effettivamente utilizzati (scaricati dal magazzino durante l\'appuntamento). Un margine alto significa che il trattamento è redditizio rispetto ai materiali consumati.',
-  },
-  operativita: {
-    default: 'L\'occupazione viene calcolata contando gli appuntamenti per fascia oraria e giorno della settimana negli ultimi 90 giorni. I giorni con meno appuntamenti sono opportunità per promozioni mirate.',
-  },
-  magazzino: {
-    default: 'La previsione di esaurimento scorte si basa sul consumo medio giornaliero degli ultimi 90 giorni. Se un prodotto viene usato in media 2 unità al giorno e ne restano 10, finirà in circa 5 giorni.',
-  },
-};
-
-function getInsightExplanation(msg: InsightMessage): string {
-  const tipoMap = insightExplanations[msg.tipo] || {};
-  // Try to match a specific title keyword
-  for (const [key, val] of Object.entries(tipoMap)) {
-    if (key !== 'default' && msg.titolo.toLowerCase().includes(key.toLowerCase())) return val;
-  }
-  return tipoMap.default || '';
-}
-
-function InsightCard({ message }: { message: InsightMessage }) {
-  const [expanded, setExpanded] = useState(false);
-  const priorityConfig = {
-    alta: { color: 'var(--color-danger)', bg: 'color-mix(in srgb, var(--color-danger) 8%, var(--card-bg))' },
-    media: { color: 'var(--color-warning)', bg: 'color-mix(in srgb, var(--color-warning) 8%, var(--card-bg))' },
-    bassa: { color: 'var(--color-success)', bg: 'color-mix(in srgb, var(--color-success) 8%, var(--card-bg))' },
-  };
-
-  const tipoIcons: Record<string, React.ElementType> = {
-    clienti: Users,
-    revenue: Euro,
-    operativita: Clock,
-    magazzino: Package,
-  };
-
-  const config = priorityConfig[message.priorita];
-  const Icon = tipoIcons[message.tipo] || Lightbulb;
-  const explanation = getInsightExplanation(message);
-
-  return (
-    <div
-      className="rounded-2xl transition-all"
-      style={{
-        background: config.bg,
-        border: `1px solid color-mix(in srgb, ${config.color} 15%, transparent)`,
-      }}
-    >
-      <div className="flex items-start gap-4 p-5">
-        <div
-          className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-          style={{ background: `color-mix(in srgb, ${config.color} 12%, transparent)`, color: config.color }}
-        >
-          <Icon size={20} />
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-3">
-            <h3 className="font-semibold text-sm" style={{ color: 'var(--color-text-primary)' }}>
-              {message.titolo}
-            </h3>
-            {message.valore && (
-              <span
-                className="text-xs font-bold px-2 py-0.5 rounded-full"
-                style={{ background: `color-mix(in srgb, ${config.color} 15%, transparent)`, color: config.color }}
-              >
-                {message.valore}
-              </span>
-            )}
-          </div>
-          <p className="text-sm mt-1" style={{ color: 'var(--color-text-secondary)' }}>
-            {message.messaggio}
-          </p>
-          {explanation && (
-            <button
-              onClick={() => setExpanded(!expanded)}
-              className="flex items-center gap-1 mt-2 text-xs font-medium transition-colors"
-              style={{ color: 'var(--color-text-muted)' }}
-              onMouseEnter={e => { e.currentTarget.style.color = config.color; }}
-              onMouseLeave={e => { e.currentTarget.style.color = 'var(--color-text-muted)'; }}
-            >
-              <Info size={12} />
-              {expanded ? 'Nascondi' : 'Approfondisci'}
-              <ChevronDown size={12} style={{ transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
-            </button>
-          )}
-        </div>
-      </div>
-      {expanded && explanation && (
-        <div
-          className="px-5 pb-4 -mt-1 text-xs leading-relaxed"
-          style={{ color: 'var(--color-text-secondary)' }}
-        >
-          <div
-            className="p-3 rounded-xl"
-            style={{ background: 'color-mix(in srgb, var(--card-bg) 60%, transparent)', border: '1px solid var(--glass-border)' }}
-          >
-            {explanation}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -694,116 +553,6 @@ function MonthlyChart({ months }: { months: InsightsData['confronto_mesi'] }) {
             </>
           );
         })()}
-      </div>
-    </div>
-  );
-}
-
-// ============================================
-// TAB: PREVISIONI
-// ============================================
-
-function TabPrevisioni({ data }: { data: InsightsData }) {
-  return (
-    <div className="space-y-6">
-      {/* FORECAST FATTURATO */}
-      <div className="rounded-2xl p-6" style={{ background: 'var(--card-bg)', border: '1px solid var(--glass-border)' }}>
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: 'color-mix(in srgb, var(--color-primary) 10%, transparent)', color: 'var(--color-primary)' }}>
-            <TrendingUp size={18} />
-          </div>
-          <div>
-            <h3 className="font-semibold text-sm" style={{ color: 'var(--color-text-primary)' }}>Previsione Fatturato</h3>
-            <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Stima basata sulla media degli ultimi 3 mesi</p>
-          </div>
-        </div>
-        <div className="flex items-baseline gap-2">
-          <span className="text-4xl font-bold" style={{ color: 'var(--color-primary)' }}>
-            {data.previsione_fatturato.toFixed(0)}€
-          </span>
-          <span className="text-sm" style={{ color: 'var(--color-text-muted)' }}>previsti per il prossimo mese</span>
-        </div>
-
-        {data.confronto_mesi.length >= 3 && (
-          <div className="grid grid-cols-3 gap-3 mt-5 pt-4" style={{ borderTop: '1px solid var(--glass-border)' }}>
-            {data.confronto_mesi.slice(-3).map(m => {
-              const formatMonth = (ms: string) => {
-                try {
-                  const [y, mo] = ms.split('-');
-                  return format(new Date(parseInt(y), parseInt(mo) - 1, 1), 'MMMM', { locale: it });
-                } catch { return ms; }
-              };
-              return (
-                <div key={m.mese} className="text-center">
-                  <p className="text-xs capitalize" style={{ color: 'var(--color-text-muted)' }}>{formatMonth(m.mese)}</p>
-                  <p className="text-lg font-semibold mt-1" style={{ color: 'var(--color-text-primary)' }}>{m.ricavo.toFixed(0)}€</p>
-                </div>
-              );
-            })}
-          </div>
-        )}
-        <InfoExpander>
-          <p><strong>Come viene calcolato:</strong> La previsione è la media del fatturato degli ultimi 3 mesi. È una stima conservativa: se i tuoi ultimi 3 mesi hanno avuto un fatturato crescente, la realtà potrebbe essere migliore.</p>
-          <p><strong>A cosa serve:</strong> Avere un'aspettativa ragionevole per il mese prossimo, utile per pianificare spese, ordini di prodotti e turni del personale.</p>
-          <p><strong>Limiti:</strong> Non tiene conto di stagionalità, festività o promozioni. Va usato come indicazione, non come certezza.</p>
-        </InfoExpander>
-      </div>
-
-      {/* SCORTE IN ESAURIMENTO */}
-      <div className="rounded-2xl p-6" style={{ background: 'var(--card-bg)', border: '1px solid var(--glass-border)' }}>
-        <div className="flex items-center gap-3 mb-5">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: 'color-mix(in srgb, var(--color-warning) 10%, transparent)', color: 'var(--color-warning)' }}>
-            <Package size={18} />
-          </div>
-          <div>
-            <h3 className="font-semibold text-sm" style={{ color: 'var(--color-text-primary)' }}>Previsione Esaurimento Scorte</h3>
-            <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Prodotti che finiranno entro 30 giorni al ritmo attuale</p>
-          </div>
-        </div>
-
-        {data.giorni_esaurimento_scorte.length === 0 ? (
-          <p className="text-sm text-center py-6" style={{ color: 'var(--color-text-muted)' }}>
-            Nessun prodotto a rischio esaurimento nei prossimi 30 giorni
-          </p>
-        ) : (
-          <div className="space-y-3">
-            {data.giorni_esaurimento_scorte.map(s => (
-              <div
-                key={s.prodotto_id}
-                className="flex items-center justify-between p-3 rounded-xl"
-                style={{ background: 'color-mix(in srgb, var(--glass-border) 50%, transparent)' }}
-              >
-                <div>
-                  <p className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
-                    {s.prodotto_nome}
-                  </p>
-                  <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                    Giacenza: {s.giacenza.toFixed(1)} — Consumo: {s.consumo_medio_giorno.toFixed(2)}/giorno
-                  </p>
-                </div>
-                <div className="text-right">
-                  <span
-                    className="text-sm font-bold"
-                    style={{
-                      color: (s.giorni_rimanenti ?? 0) <= 7
-                        ? 'var(--color-danger)'
-                        : (s.giorni_rimanenti ?? 0) <= 14
-                        ? 'var(--color-warning)'
-                        : 'var(--color-text-primary)',
-                    }}
-                  >
-                    {s.giorni_rimanenti != null ? `${Math.round(s.giorni_rimanenti)} giorni` : '-'}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-        <InfoExpander>
-          <p><strong>Come viene calcolato:</strong> Per ogni prodotto si calcola il consumo medio giornaliero degli ultimi 90 giorni (scarichi per uso e vendita). La giacenza attuale viene divisa per il consumo giornaliero per ottenere i giorni rimanenti.</p>
-          <p><strong>Colori:</strong> Rosso = meno di 7 giorni (urgente, ordina subito). Arancione = 7-14 giorni (pianifica il riordino). Nero = 14-30 giorni (sotto controllo).</p>
-          <p><strong>A cosa serve:</strong> Evitare di restare senza prodotti essenziali nel bel mezzo di una settimana lavorativa. Ti dà il tempo di ordinare prima che sia troppo tardi.</p>
-        </InfoExpander>
       </div>
     </div>
   );

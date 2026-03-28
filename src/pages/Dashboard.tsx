@@ -663,9 +663,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate, onOpenAppuntam
                       }}
                     />
                   </div>
-                  <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
-                    {Math.round(pctMonth)}% del mese trascorso
-                  </p>
+                  <div className="flex items-center justify-between mt-1">
+                    <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                      {Math.round(pctMonth)}% del mese trascorso
+                    </p>
+                    {(data?.fatturato_previsione ?? 0) > 0 && (
+                      <p className="text-xs font-medium" style={{ color: 'var(--color-primary)' }}>
+                        Prev: {new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(data?.fatturato_previsione ?? 0)}
+                      </p>
+                    )}
+                  </div>
                 </div>
               );
             })()}

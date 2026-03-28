@@ -1,12 +1,11 @@
 // Modelli per l'esportazione dell'agenda
 
 use serde::{Deserialize, Serialize};
-use chrono::{DateTime, Utc};
 
 #[derive(Debug, Deserialize)]
 pub struct ExportAgendaInput {
-    pub data_inizio: DateTime<Utc>,
-    pub data_fine: DateTime<Utc>,
+    pub data_inizio: String,
+    pub data_fine: String,
     pub operatrici_ids: Vec<String>,
     pub file_path: String,
 }

@@ -461,7 +461,7 @@ const OperatriceDetailPanel: React.FC<DetailPanelProps> = ({
   return (
     <div className="flex flex-col h-full">
       {/* Panel Header */}
-      <div className="p-5 pb-4">
+      <div className="p-4 pb-3">
         <div className="max-w-2xl">
         <div className="flex items-start justify-between mb-4">
           <button onClick={onClose} className="p-1.5 rounded-lg transition-colors" style={{ color: 'var(--color-text-muted)' }}
@@ -471,7 +471,7 @@ const OperatriceDetailPanel: React.FC<DetailPanelProps> = ({
           </button>
           <div className="flex items-center gap-1">
             {!isEditing && (
-              <button onClick={onStartEdit} className="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors" style={{ color: 'var(--color-primary)', background: 'color-mix(in srgb, var(--color-primary) 8%, transparent)' }}>
+              <button onClick={onStartEdit} className="px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors" style={{ color: 'var(--color-primary)', background: 'color-mix(in srgb, var(--color-primary) 8%, transparent)' }}>
                 <Edit2 size={13} className="inline mr-1" />Modifica
               </button>
             )}
@@ -484,7 +484,7 @@ const OperatriceDetailPanel: React.FC<DetailPanelProps> = ({
               {showActions && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setShowActions(false)} />
-                  <div className="absolute right-0 top-full mt-1 w-44 rounded-xl shadow-lg py-1 z-50" style={{ background: 'var(--card-bg)', border: '1px solid var(--glass-border)' }}>
+                  <div className="absolute right-0 top-full mt-1 w-48 rounded-xl shadow-lg py-1 z-50" style={{ background: 'var(--card-bg)', border: '1px solid var(--glass-border)' }}>
                     {operatrice.attiva ? (
                       <button onClick={() => { setShowActions(false); onDeactivate(); }} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left transition-colors" style={{ color: '#f59e0b' }}
                         onMouseEnter={e => { e.currentTarget.style.background = 'var(--glass-border)'; }}
@@ -655,7 +655,7 @@ const AnagraficaTab: React.FC<{
 
   // Edit mode
   return (
-    <form onSubmit={onSave} className="space-y-4">
+    <form onSubmit={onSave} className="space-y-3">
       <div className="grid grid-cols-2 gap-3">
         <Input label="Nome *" value={formData.nome} onChange={e => setFormData({ ...formData, nome: e.target.value })} required disabled={loading} />
         <Input label="Cognome *" value={formData.cognome} onChange={e => setFormData({ ...formData, cognome: e.target.value })} required disabled={loading} />

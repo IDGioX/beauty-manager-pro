@@ -28,6 +28,7 @@ export interface Appuntamento {
   note_prenotazione: string | null;
   note_trattamento: string | null;
   prezzo_applicato: number | null;
+  omaggio: boolean;
   prenotato_da: string;
   created_at: string;
   updated_at: string;
@@ -60,6 +61,7 @@ export interface AppuntamentoWithDetails {
   note_trattamento: string | null;
   note?: string | null;
   prezzo_applicato: number | null;
+  omaggio: boolean;
   prezzo_finale?: number | null;
   reminder_inviato?: boolean;
   reminder_inviato_at?: string | null;
@@ -77,6 +79,7 @@ export interface CreateAppuntamentoInput {
   stato?: 'prenotato' | 'in_corso' | 'completato' | 'annullato' | 'no_show';
   note_prenotazione?: string;
   prezzo_applicato?: number;
+  omaggio?: boolean;
 }
 
 export interface UpdateAppuntamentoInput {
@@ -91,4 +94,5 @@ export interface UpdateAppuntamentoInput {
   note_prenotazione?: string;
   note_trattamento?: string;
   prezzo_applicato?: number;
+  omaggio?: boolean;
 }

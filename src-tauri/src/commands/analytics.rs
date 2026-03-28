@@ -5,7 +5,33 @@ use crate::models::analytics::*;
 use crate::models::{AppuntamentoWithDetails, Cliente};
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use chrono::{Utc, DateTime, FixedOffset};
+
+/// Normalizza una stringa data ISO (con millisecondi, Z, T, offset) in formato SQLite-compatibile.
+/// "2026-03-01T00:00:00.000Z" → "2026-03-01 00:00:00"
+/// "2026-03-01 00:00:00" → "2026-03-01 00:00:00" (invariato)
+pub fn normalize_date(s: &str) -> String {
+    // Strip trailing Z or timezone offset
+    let s = s.trim();
+    let s = s.strip_suffix('Z').unwrap_or(s);
+    // Remove timezone offset like +00:00
+    let s = if let Some(idx) = s.rfind('+') {
+        if idx > 10 { &s[..idx] } else { s }
+    } else if let Some(idx) = s.rfind('-') {
+        // Don't strip the date separator (position 4 or 7)
+        if idx > 10 { &s[..idx] } else { s }
+    } else {
+        s
+    };
+    // Replace T with space
+    let s = s.replace('T', " ");
+    // Strip fractional seconds (.000, .000000, etc.)
+    if let Some(dot_idx) = s.rfind('.') {
+        if dot_idx > 10 {
+            return s[..dot_idx].to_string();
+        }
+    }
+    s
+}
 
 // ============================================
 // GENERAL REPORTS COMMANDS
@@ -33,16 +59,16 @@ pub async fn get_trattamenti_piu_usati(
         FROM appuntamenti a
         INNER JOIN trattamenti t ON a.trattamento_id = t.id
         LEFT JOIN categorie_trattamenti ct ON t.categoria_id = ct.id
-        WHERE a.data_ora_inizio >= ?1
-          AND a.data_ora_inizio < ?2
+        WHERE datetime(a.data_ora_inizio) >= datetime(?1)
+          AND datetime(a.data_ora_inizio) < datetime(?2)
           AND a.stato IN ('completato', 'in_corso')
         GROUP BY t.id, t.nome, ct.nome
         ORDER BY totale_appuntamenti DESC
         LIMIT ?3
         "#
     )
-    .bind(&filter.data_inizio)
-    .bind(&filter.data_fine)
+    .bind(normalize_date(&filter.data_inizio))
+    .bind(normalize_date(&filter.data_fine))
     .bind(limit)
     .fetch_all(&state.db.pool)
     .await?;
@@ -72,8 +98,8 @@ pub async fn get_clienti_top_frequenza(
             MAX(a.data_ora_inizio) as ultimo_appuntamento
         FROM clienti c
         INNER JOIN appuntamenti a ON c.id = a.cliente_id
-        WHERE a.data_ora_inizio >= ?1
-          AND a.data_ora_inizio < ?2
+        WHERE datetime(a.data_ora_inizio) >= datetime(?1)
+          AND datetime(a.data_ora_inizio) < datetime(?2)
           AND a.stato IN ('completato', 'in_corso')
           AND c.attivo = 1
         GROUP BY c.id, c.nome, c.cognome, c.email, c.cellulare
@@ -81,8 +107,8 @@ pub async fn get_clienti_top_frequenza(
         LIMIT ?3
         "#
     )
-    .bind(&filter.data_inizio)
-    .bind(&filter.data_fine)
+    .bind(normalize_date(&filter.data_inizio))
+    .bind(normalize_date(&filter.data_fine))
     .bind(limit)
     .fetch_all(&state.db.pool)
     .await?;
@@ -112,8 +138,8 @@ pub async fn get_clienti_top_ricavo(
             COALESCE(AVG(a.prezzo_applicato), 0.0) as ricavo_medio
         FROM clienti c
         INNER JOIN appuntamenti a ON c.id = a.cliente_id
-        WHERE a.data_ora_inizio >= ?1
-          AND a.data_ora_inizio < ?2
+        WHERE datetime(a.data_ora_inizio) >= datetime(?1)
+          AND datetime(a.data_ora_inizio) < datetime(?2)
           AND a.stato IN ('completato', 'in_corso')
           AND c.attivo = 1
           AND a.prezzo_applicato IS NOT NULL
@@ -122,8 +148,8 @@ pub async fn get_clienti_top_ricavo(
         LIMIT ?3
         "#
     )
-    .bind(&filter.data_inizio)
-    .bind(&filter.data_fine)
+    .bind(normalize_date(&filter.data_inizio))
+    .bind(normalize_date(&filter.data_fine))
     .bind(limit)
     .fetch_all(&state.db.pool)
     .await?;
@@ -148,16 +174,28 @@ pub async fn get_period_analytics(
             COALESCE(SUM(CASE WHEN stato = 'no_show' THEN 1 ELSE 0 END), 0) as no_show,
             COALESCE(SUM(CASE WHEN stato IN ('completato', 'in_corso') THEN prezzo_applicato ELSE 0 END), 0.0) as ricavo
         FROM appuntamenti
-        WHERE data_ora_inizio >= ?1
-          AND data_ora_inizio < ?2
+        WHERE datetime(data_ora_inizio) >= datetime(?1)
+          AND datetime(data_ora_inizio) < datetime(?2)
         "#
     )
-    .bind(&filter.data_inizio)
-    .bind(&filter.data_fine)
+    .bind(normalize_date(&filter.data_inizio))
+    .bind(normalize_date(&filter.data_fine))
     .fetch_one(&state.db.pool)
     .await?;
 
-    let (totale, completati, annullati, no_show, ricavo_totale) = stats;
+    let (totale, completati, annullati, no_show, ricavo_app) = stats;
+
+    // Aggiungi ricavo pacchetti nel periodo
+    let ricavo_pacchetti: f64 = sqlx::query_scalar(
+        "SELECT COALESCE(SUM(importo), 0.0) FROM pacchetto_pagamenti WHERE datetime(created_at) >= datetime(?1) AND datetime(created_at) < datetime(?2)"
+    )
+    .bind(normalize_date(&filter.data_inizio))
+    .bind(normalize_date(&filter.data_fine))
+    .fetch_one(&state.db.pool)
+    .await
+    .unwrap_or(0.0);
+
+    let ricavo_totale = ricavo_app + ricavo_pacchetti;
 
     // Get unique and new clients
     let clienti_stats = sqlx::query_as::<_, (i64, i64)>(
@@ -171,12 +209,12 @@ pub async fn get_period_analytics(
             END) as nuovi_clienti
         FROM appuntamenti a
         INNER JOIN clienti c ON a.cliente_id = c.id
-        WHERE a.data_ora_inizio >= ?1
-          AND a.data_ora_inizio < ?2
+        WHERE datetime(a.data_ora_inizio) >= datetime(?1)
+          AND datetime(a.data_ora_inizio) < datetime(?2)
         "#
     )
-    .bind(&filter.data_inizio)
-    .bind(&filter.data_fine)
+    .bind(normalize_date(&filter.data_inizio))
+    .bind(normalize_date(&filter.data_fine))
     .fetch_one(&state.db.pool)
     .await?;
 
@@ -188,13 +226,13 @@ pub async fn get_period_analytics(
         SELECT COALESCE(AVG(t.durata_minuti), 0.0)
         FROM appuntamenti a
         INNER JOIN trattamenti t ON a.trattamento_id = t.id
-        WHERE a.data_ora_inizio >= ?1
-          AND a.data_ora_inizio < ?2
+        WHERE datetime(a.data_ora_inizio) >= datetime(?1)
+          AND datetime(a.data_ora_inizio) < datetime(?2)
           AND a.stato IN ('completato', 'in_corso')
         "#
     )
-    .bind(&filter.data_inizio)
-    .bind(&filter.data_fine)
+    .bind(normalize_date(&filter.data_inizio))
+    .bind(normalize_date(&filter.data_fine))
     .fetch_one(&state.db.pool)
     .await?;
 
@@ -244,10 +282,10 @@ pub async fn get_report_filtrato(
 ) -> AppResult<ReportFiltratoResult> {
     let state = db.lock().await;
 
-    // Build dynamic WHERE clauses
+    // Build dynamic WHERE clauses (use datetime() to normalize mixed date formats)
     let mut where_clauses = vec![
-        "a.data_ora_inizio >= ?1".to_string(),
-        "a.data_ora_inizio < ?2".to_string(),
+        "datetime(a.data_ora_inizio) >= datetime(?1)".to_string(),
+        "datetime(a.data_ora_inizio) < datetime(?2)".to_string(),
     ];
 
     let has_clienti = filtro.cliente_ids.as_ref().map_or(false, |v| !v.is_empty());
@@ -289,8 +327,8 @@ pub async fn get_report_filtrato(
     );
 
     let mut query_kpi = sqlx::query_as::<_, (i64, i64, i64, i64, f64)>(&kpi_sql)
-        .bind(&filtro.data_inizio)
-        .bind(&filtro.data_fine);
+        .bind(normalize_date(&filtro.data_inizio))
+        .bind(normalize_date(&filtro.data_fine));
     if has_clienti {
         for id in cliente_ids_ref {
             query_kpi = query_kpi.bind(id);
@@ -301,9 +339,21 @@ pub async fn get_report_filtrato(
             query_kpi = query_kpi.bind(id);
         }
     }
-    let (totale, completati, annullati, no_show, ricavo_totale) = query_kpi
+    let (totale, completati, annullati, no_show, ricavo_app) = query_kpi
         .fetch_one(&state.db.pool)
         .await?;
+
+    // Aggiungi ricavo pacchetti nel periodo del report
+    let ricavo_pacchetti_report: f64 = sqlx::query_scalar(
+        "SELECT COALESCE(SUM(importo), 0.0) FROM pacchetto_pagamenti WHERE datetime(created_at) >= datetime(?1) AND datetime(created_at) < datetime(?2)"
+    )
+    .bind(normalize_date(&filtro.data_inizio))
+    .bind(normalize_date(&filtro.data_fine))
+    .fetch_one(&state.db.pool)
+    .await
+    .unwrap_or(0.0);
+
+    let ricavo_totale = ricavo_app + ricavo_pacchetti_report;
 
     // Unique clients
     let clienti_sql = format!(
@@ -319,8 +369,8 @@ pub async fn get_report_filtrato(
         where_sql
     );
     let mut query_clienti = sqlx::query_as::<_, (i64, i64)>(&clienti_sql)
-        .bind(&filtro.data_inizio)
-        .bind(&filtro.data_fine);
+        .bind(normalize_date(&filtro.data_inizio))
+        .bind(normalize_date(&filtro.data_fine));
     if has_clienti {
         for id in cliente_ids_ref {
             query_clienti = query_clienti.bind(id);
@@ -342,8 +392,8 @@ pub async fn get_report_filtrato(
         where_sql
     );
     let mut query_durata = sqlx::query_as::<_, (f64,)>(&durata_sql)
-        .bind(&filtro.data_inizio)
-        .bind(&filtro.data_fine);
+        .bind(normalize_date(&filtro.data_inizio))
+        .bind(normalize_date(&filtro.data_fine));
     if has_clienti {
         for id in cliente_ids_ref {
             query_durata = query_durata.bind(id);
@@ -394,8 +444,8 @@ pub async fn get_report_filtrato(
         where_sql
     );
     let mut query_tratt = sqlx::query_as::<_, TrattamentoStats>(&tratt_sql)
-        .bind(&filtro.data_inizio)
-        .bind(&filtro.data_fine);
+        .bind(normalize_date(&filtro.data_inizio))
+        .bind(normalize_date(&filtro.data_fine));
     if has_clienti {
         for id in cliente_ids_ref {
             query_tratt = query_tratt.bind(id);
@@ -428,8 +478,8 @@ pub async fn get_report_filtrato(
         where_sql
     );
     let mut query_cli = sqlx::query_as::<_, ClienteTopRicavo>(&cli_sql)
-        .bind(&filtro.data_inizio)
-        .bind(&filtro.data_fine);
+        .bind(normalize_date(&filtro.data_inizio))
+        .bind(normalize_date(&filtro.data_fine));
     if has_clienti {
         for id in cliente_ids_ref {
             query_cli = query_cli.bind(id);
@@ -462,8 +512,8 @@ pub async fn get_report_filtrato(
         where_sql
     );
     let mut query_op = sqlx::query_as::<_, OperatriceProduttivita>(&op_sql)
-        .bind(&filtro.data_inizio)
-        .bind(&filtro.data_fine);
+        .bind(normalize_date(&filtro.data_inizio))
+        .bind(normalize_date(&filtro.data_fine));
     if has_clienti {
         for id in cliente_ids_ref {
             query_op = query_op.bind(id);
@@ -492,8 +542,8 @@ pub async fn get_report_filtrato(
         where_sql
     );
     let mut query_cat = sqlx::query_as::<_, RicavoCategoria>(&cat_sql)
-        .bind(&filtro.data_inizio)
-        .bind(&filtro.data_fine);
+        .bind(normalize_date(&filtro.data_inizio))
+        .bind(normalize_date(&filtro.data_fine));
     if has_clienti {
         for id in cliente_ids_ref {
             query_cat = query_cat.bind(id);
@@ -538,8 +588,8 @@ pub async fn get_report_filtrato(
         where_sql
     );
     let mut query_det = sqlx::query_as::<_, ReportAppuntamentoRow>(&det_sql)
-        .bind(&filtro.data_inizio)
-        .bind(&filtro.data_fine);
+        .bind(normalize_date(&filtro.data_inizio))
+        .bind(normalize_date(&filtro.data_fine));
     if has_clienti {
         for id in cliente_ids_ref {
             query_det = query_det.bind(id);
@@ -643,19 +693,16 @@ pub async fn get_cliente_complete_profile(
     let (totale, completati, annullati, no_show, spesa_totale, spesa_media, primo, ultimo) = stats_raw;
 
     let giorni_da_ultimo = if let Some(ultimo_str) = &ultimo {
-        if let Ok(dt) = DateTime::parse_from_rfc3339(ultimo_str) {
-            let now = Utc::now();
-            let dt_utc = dt.with_timezone(&Utc);
-            Some((now.signed_duration_since(dt_utc)).num_days())
-        } else {
-            None
-        }
+        chrono::NaiveDateTime::parse_from_str(ultimo_str, "%Y-%m-%d %H:%M:%S")
+            .or_else(|_| chrono::NaiveDateTime::parse_from_str(ultimo_str, "%Y-%m-%dT%H:%M:%S"))
+            .ok()
+            .map(|dt| {
+                let now = chrono::Local::now().naive_local();
+                now.signed_duration_since(dt).num_days()
+            })
     } else {
         None
     };
-
-    let primo_app = primo.and_then(|s| DateTime::parse_from_rfc3339(&s).ok().map(|dt: DateTime<FixedOffset>| dt.with_timezone(&Utc)));
-    let ultimo_app = ultimo.and_then(|s| DateTime::parse_from_rfc3339(&s).ok().map(|dt: DateTime<FixedOffset>| dt.with_timezone(&Utc)));
 
     let statistiche = ClienteStatistiche {
         totale_appuntamenti: totale,
@@ -664,8 +711,8 @@ pub async fn get_cliente_complete_profile(
         appuntamenti_no_show: no_show,
         spesa_totale,
         spesa_media,
-        primo_appuntamento: primo_app,
-        ultimo_appuntamento: ultimo_app,
+        primo_appuntamento: primo,
+        ultimo_appuntamento: ultimo,
         giorni_da_ultimo_appuntamento: giorni_da_ultimo,
     };
 
@@ -691,6 +738,7 @@ pub async fn get_cliente_complete_profile(
             a.note_prenotazione,
             a.note_trattamento,
             a.prezzo_applicato,
+            a.omaggio,
             a.created_at,
             a.updated_at
         FROM appuntamenti a

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Package, Plus, Trash2, Search, Undo2, AlertCircle, X } from 'lucide-react';
+import { Package, ShoppingBag, Plus, Trash2, Search, Undo2, AlertCircle, X } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { magazzinoService } from '../../services/magazzino';
@@ -22,6 +22,7 @@ interface ProdottiUsatiSectionProps {
   operatriceId?: string;
   onProdottiChange: (prodotti: ProdottoUsato[]) => void;
   disabled?: boolean;
+  mode?: 'uso' | 'vendita';
 }
 
 export function ProdottiUsatiSection({
@@ -29,7 +30,12 @@ export function ProdottiUsatiSection({
   operatriceId: _operatriceId,
   onProdottiChange,
   disabled = false,
+  mode = 'uso',
 }: ProdottiUsatiSectionProps) {
+  const isVendita = mode === 'vendita';
+  const sectionTitle = isVendita ? 'Articoli Acquistati' : 'Prodotti Usati';
+  const SectionIcon = isVendita ? ShoppingBag : Package;
+  const tipoMovimento = isVendita ? 'scarico_vendita' : 'scarico_uso';
   const [prodottiDisponibili, setProdottiDisponibili] = useState<Prodotto[]>([]);
   const [prodottiUsati, setProdottiUsati] = useState<ProdottoUsato[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -37,38 +43,32 @@ export function ProdottiUsatiSection({
   const [loadedAppuntamentoId, setLoadedAppuntamentoId] = useState<string | null>(null);
   const [avviso, setAvviso] = useState<string | null>(null);
 
-  // Carica prodotti già registrati per questo appuntamento
+  // Carica prodotti già registrati per questo appuntamento (filtrati per tipo)
   useEffect(() => {
     const loadProdottiAppuntamento = async () => {
-      console.log('DEBUG ProdottiUsatiSection: appuntamentoId=', appuntamentoId, 'loadedAppuntamentoId=', loadedAppuntamentoId);
       if (appuntamentoId && appuntamentoId !== loadedAppuntamentoId) {
         try {
-          console.log('DEBUG: Calling getMovimentiAppuntamento with ID:', appuntamentoId);
           const movimenti = await magazzinoService.getMovimentiAppuntamento(appuntamentoId);
-          console.log('DEBUG: getMovimentiAppuntamento returned:', movimenti);
-          if (movimenti.length > 0) {
-            // Converti movimenti in ProdottoUsato (sono già stati scaricati, quindi li mostriamo come già registrati)
-            const prodottiCaricati: ProdottoUsato[] = movimenti.map((m) => ({
+          // Filtra per tipo: uso o vendita
+          const movimentiFiltrati = movimenti.filter(m => m.tipo === tipoMovimento);
+          if (movimentiFiltrati.length > 0) {
+            const prodottiCaricati: ProdottoUsato[] = movimentiFiltrati.map((m) => ({
               prodotto_id: m.prodotto_id,
               prodotto_nome: m.prodotto_nome || 'Prodotto',
               prodotto_codice: m.prodotto_codice || '',
               quantita: m.quantita,
               unita_misura: 'pz',
-              giacenza_disponibile: m.quantita + 100, // Permetti di aumentare la quantità
-              gia_registrato: true, // Marca come già scaricato
-              quantita_originale: m.quantita, // Salva quantità originale per rettifiche
+              giacenza_disponibile: m.quantita + 100,
+              gia_registrato: true,
+              quantita_originale: m.quantita,
             }));
-            console.log('DEBUG: Setting prodottiUsati to:', prodottiCaricati);
             setProdottiUsati(prodottiCaricati);
-          } else {
-            console.log('DEBUG: No movimenti found for this appointment');
           }
           setLoadedAppuntamentoId(appuntamentoId);
         } catch (error) {
           console.error('Errore caricamento prodotti appuntamento:', error);
         }
       } else {
-        console.log('DEBUG: Skipping load - condition not met');
       }
     };
 
@@ -81,10 +81,10 @@ export function ProdottiUsatiSection({
         search: searchTerm || undefined,
         attivoOnly: true,
       });
-      // Filtra solo prodotti per uso interno o entrambi
-      const filteredData = data.filter(
-        (p) => p.uso === 'interno' || p.uso === 'entrambi' || !p.uso
-      );
+      // Filtra in base al mode: uso interno o vendita
+      const filteredData = isVendita
+        ? data.filter((p) => p.uso === 'vendita' || p.uso === 'entrambi' || !p.uso)
+        : data.filter((p) => p.uso === 'interno' || p.uso === 'entrambi' || !p.uso);
       setProdottiDisponibili(filteredData);
     } catch (error) {
       console.error('Errore caricamento prodotti:', error);
@@ -187,9 +187,9 @@ export function ProdottiUsatiSection({
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Package size={16} className="text-gray-400" />
+          <SectionIcon size={16} className="text-gray-400" />
           <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-            Prodotti Usati
+            {sectionTitle}
           </span>
         </div>
         {!disabled && !showSearch && (

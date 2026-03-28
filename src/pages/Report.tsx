@@ -467,8 +467,8 @@ const InterrogazioneTab: React.FC = () => {
     setError(null);
     try {
       const data = await analyticsService.getReportFiltrato({
-        data_inizio: startOfDay(parseISO(dataInizio)).toISOString(),
-        data_fine: endOfDay(parseISO(dataFine)).toISOString(),
+        data_inizio: format(startOfDay(parseISO(dataInizio)), 'yyyy-MM-dd HH:mm:ss'),
+        data_fine: format(endOfDay(parseISO(dataFine)), 'yyyy-MM-dd HH:mm:ss'),
         cliente_ids: selectedClienti.length > 0 ? selectedClienti.map(c => c.id) : undefined,
         trattamento_ids: selectedTrattamenti.length > 0 ? selectedTrattamenti.map(t => t.id) : undefined,
       });

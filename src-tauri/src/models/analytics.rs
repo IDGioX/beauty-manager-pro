@@ -2,16 +2,14 @@
 
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
-use chrono::{DateTime, Utc};
-
 // ============================================
 // INPUT FILTERS
 // ============================================
 
 #[derive(Debug, Deserialize)]
 pub struct DateRangeFilter {
-    pub data_inizio: DateTime<Utc>,
-    pub data_fine: DateTime<Utc>,
+    pub data_inizio: String,
+    pub data_fine: String,
 }
 
 // ============================================
@@ -38,7 +36,7 @@ pub struct ClienteTopFrequenza {
     pub cellulare: Option<String>,
     pub totale_appuntamenti: i64,
     pub ricavo_totale: f64,
-    pub ultimo_appuntamento: Option<DateTime<Utc>>,
+    pub ultimo_appuntamento: Option<String>,
 }
 
 #[derive(Debug, Serialize, FromRow)]
@@ -74,8 +72,8 @@ pub struct PeriodAnalytics {
 
 #[derive(Debug, Deserialize)]
 pub struct ReportFiltrato {
-    pub data_inizio: DateTime<Utc>,
-    pub data_fine: DateTime<Utc>,
+    pub data_inizio: String,
+    pub data_fine: String,
     pub cliente_ids: Option<Vec<String>>,
     pub trattamento_ids: Option<Vec<String>>,
 }
@@ -136,7 +134,7 @@ pub struct ClienteSearchResult {
     pub cognome: String,
     pub email: Option<String>,
     pub cellulare: Option<String>,
-    pub ultimo_appuntamento: Option<DateTime<Utc>>,
+    pub ultimo_appuntamento: Option<String>,
     pub totale_appuntamenti: i64,
 }
 
@@ -157,8 +155,8 @@ pub struct ClienteStatistiche {
     pub appuntamenti_no_show: i64,
     pub spesa_totale: f64,
     pub spesa_media: f64,
-    pub primo_appuntamento: Option<DateTime<Utc>>,
-    pub ultimo_appuntamento: Option<DateTime<Utc>>,
+    pub primo_appuntamento: Option<String>,
+    pub ultimo_appuntamento: Option<String>,
     pub giorni_da_ultimo_appuntamento: Option<i64>,
 }
 

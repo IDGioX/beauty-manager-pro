@@ -3,6 +3,7 @@
 use crate::error::AppResult;
 use crate::models::{ExportAgendaInput, ExportResult, AppuntamentoWithDetails};
 use crate::services::export;
+use super::analytics::normalize_date;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use std::path::Path;
@@ -40,8 +41,8 @@ pub async fn export_agenda_excel(
     let file_path = Path::new(&input.file_path);
     export::generate_excel_agenda(
         appuntamenti,
-        input.data_inizio,
-        input.data_fine,
+        &input.data_inizio,
+        &input.data_fine,
         file_path,
     )?;
 
@@ -89,8 +90,8 @@ pub async fn export_agenda_pdf(
     let file_path = Path::new(&input.file_path);
     export::generate_pdf_agenda(
         appuntamenti,
-        input.data_inizio,
-        input.data_fine,
+        &input.data_inizio,
+        &input.data_fine,
         file_path,
     )?;
 
@@ -108,8 +109,8 @@ pub async fn export_agenda_pdf(
 // Helper per query con filtro operatrici
 async fn get_appuntamenti_filtered(
     state: &crate::AppState,
-    data_inizio: &chrono::DateTime<chrono::Utc>,
-    data_fine: &chrono::DateTime<chrono::Utc>,
+    data_inizio: &str,
+    data_fine: &str,
     operatrici_ids: &[String],
 ) -> AppResult<Vec<AppuntamentoWithDetails>> {
     // Costruisci query con filtro operatrici
@@ -145,14 +146,15 @@ async fn get_appuntamenti_filtered(
             a.note_prenotazione,
             a.note_trattamento,
             a.prezzo_applicato,
+            a.omaggio,
             a.created_at,
             a.updated_at
         FROM appuntamenti a
         INNER JOIN clienti c ON a.cliente_id = c.id
         INNER JOIN operatrici o ON a.operatrice_id = o.id
         INNER JOIN trattamenti t ON a.trattamento_id = t.id
-        WHERE a.data_ora_inizio >= ?
-          AND a.data_ora_inizio < ?
+        WHERE datetime(a.data_ora_inizio) >= datetime(?)
+          AND datetime(a.data_ora_inizio) < datetime(?)
           AND a.stato NOT IN ('annullato', 'no_show')
           {}
         ORDER BY a.data_ora_inizio ASC
@@ -160,9 +162,11 @@ async fn get_appuntamenti_filtered(
         filter_clause
     );
 
+    let di = normalize_date(data_inizio);
+    let df = normalize_date(data_fine);
     let mut query_builder = sqlx::query_as::<_, AppuntamentoWithDetails>(&query)
-        .bind(data_inizio)
-        .bind(data_fine);
+        .bind(&di)
+        .bind(&df);
 
     // Bind operatrici_ids se presente
     for id in operatrici_ids {

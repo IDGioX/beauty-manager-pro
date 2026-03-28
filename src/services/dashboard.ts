@@ -67,6 +67,7 @@ export interface DashboardCompleto {
   scontrino_medio_oggi: number;
   scontrino_medio_mese: number;
   fatturato_mese: number;
+  fatturato_previsione: number;
   trattamenti_top_oggi: TrattamentoTopOggi[];
   vendita_prodotti_oggi: number;
 

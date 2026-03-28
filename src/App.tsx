@@ -17,8 +17,9 @@ const Comunicazioni = lazy(() => import("./pages/Comunicazioni").then(m => ({ de
 const Settings = lazy(() => import("./pages/Settings").then(m => ({ default: m.Settings })));
 const Report = lazy(() => import("./pages/Report").then(m => ({ default: m.Report })));
 const Insights = lazy(() => import("./pages/Insights").then(m => ({ default: m.Insights })));
+const Pacchetti = lazy(() => import("./pages/Pacchetti").then(m => ({ default: m.Pacchetti })));
 
-type PageType = 'dashboard' | 'agenda' | 'clienti' | 'operatrici' | 'trattamenti' | 'magazzino' | 'comunicazioni' | 'report' | 'insights' | 'settings';
+type PageType = 'dashboard' | 'agenda' | 'clienti' | 'operatrici' | 'trattamenti' | 'magazzino' | 'comunicazioni' | 'report' | 'insights' | 'pacchetti' | 'settings';
 
 const pageTitles: Record<PageType, string> = {
   dashboard: 'Dashboard',
@@ -30,6 +31,7 @@ const pageTitles: Record<PageType, string> = {
   comunicazioni: 'Comunicazioni',
   report: 'Report e Analytics',
   insights: 'Insights',
+  pacchetti: 'Pacchetti Trattamenti',
   settings: 'Impostazioni',
 };
 
@@ -46,6 +48,7 @@ function App() {
   const [currentPage, setCurrentPage] = useState<PageType>('dashboard');
   const [pendingAppuntamentoId, setPendingAppuntamentoId] = useState<string | null>(null);
   const [pendingClienteId, setPendingClienteId] = useState<string | null>(null);
+  const [pendingPacchettiClienteId, setPendingPacchettiClienteId] = useState<string | null>(null);
   const [backToAppuntamentoId, setBackToAppuntamentoId] = useState<string | null>(null);
   const setAgendaDate = useAgendaStore(s => s.setSelectedDate);
 
@@ -80,7 +83,10 @@ function App() {
         setBackToAppuntamentoId(fromAppuntamentoId);
       }
 
-      if (clienteId) {
+      if (page === 'pacchetti' && clienteId) {
+        setPendingPacchettiClienteId(clienteId);
+        setCurrentPage('pacchetti');
+      } else if (clienteId) {
         setPendingClienteId(clienteId);
         setCurrentPage('clienti');
       } else if (appuntamentoId) {
@@ -124,6 +130,8 @@ function App() {
         return <Report />;
       case 'insights':
         return <Insights />;
+      case 'pacchetti':
+        return <Pacchetti openClienteId={pendingPacchettiClienteId} onClienteOpened={() => setPendingPacchettiClienteId(null)} onGoBack={backToAppuntamentoId ? handleGoBackToAppuntamento : undefined} />;
       case 'settings':
         return <Settings />;
       default:

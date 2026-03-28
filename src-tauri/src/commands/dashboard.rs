@@ -78,6 +78,7 @@ pub struct DashboardCompleto {
     pub scontrino_medio_oggi: f64,
     pub scontrino_medio_mese: f64,
     pub fatturato_mese: f64,
+    pub fatturato_previsione: f64,
     pub trattamenti_top_oggi: Vec<TrattamentoTopOggi>,
     pub vendita_prodotti_oggi: f64,
 
@@ -159,6 +160,7 @@ pub async fn get_prossimi_appuntamenti(
             a.note_prenotazione,
             a.note_trattamento,
             a.prezzo_applicato,
+            a.omaggio,
             a.created_at,
             a.updated_at
         FROM appuntamenti a
@@ -282,7 +284,7 @@ pub async fn get_dashboard_completo(
         SELECT COUNT(*) FROM appuntamenti
         WHERE DATE(data_ora_inizio) = ?1
           AND stato IN ('prenotato', 'confermato')
-          AND data_ora_inizio < ?2
+          AND datetime(data_ora_inizio) < datetime(?2)
         "#,
     )
     .bind(&oggi)
@@ -314,9 +316,9 @@ pub async fn get_dashboard_completo(
         LEFT JOIN clienti c ON a.cliente_id = c.id
         LEFT JOIN trattamenti t ON a.trattamento_id = t.id
         LEFT JOIN operatrici o ON a.operatrice_id = o.id
-        WHERE a.data_ora_inizio > ?1
+        WHERE datetime(a.data_ora_inizio) > datetime(?1)
           AND a.stato IN ('prenotato', 'confermato')
-        ORDER BY a.data_ora_inizio ASC
+        ORDER BY datetime(a.data_ora_inizio) ASC
         LIMIT 1
         "#,
     )
@@ -387,7 +389,7 @@ pub async fn get_dashboard_completo(
         FROM appuntamenti a
         JOIN trattamenti t ON a.trattamento_id = t.id
         WHERE DATE(a.data_ora_inizio) = ?1
-          AND a.data_ora_inizio >= ?2
+          AND datetime(a.data_ora_inizio) >= datetime(?2)
           AND a.stato NOT IN ('annullato', 'no_show', 'completato')
         "#,
     )
@@ -514,42 +516,58 @@ pub async fn get_dashboard_completo(
         WHERE DATE(data_ora_inizio) = ?1
           AND stato IN ('completato', 'in_corso')
           AND prezzo_applicato IS NOT NULL
+          AND (omaggio IS NULL OR omaggio = 0)
         "#,
     )
     .bind(&oggi)
     .fetch_one(&state.db.pool)
     .await?;
 
-    let fatturato_oggi = fatturato_oggi_row.0;
+    // Pagamenti pacchetti del giorno (anticipo/dilazionato)
+    let pacchetti_oggi: f64 = sqlx::query_scalar(
+        "SELECT COALESCE(SUM(importo), 0.0) FROM pacchetto_pagamenti WHERE DATE(created_at) = ?"
+    ).bind(&oggi).fetch_one(&state.db.pool).await.unwrap_or(0.0);
+
+    let fatturato_oggi = fatturato_oggi_row.0 + pacchetti_oggi;
     let scontrino_medio_oggi = fatturato_oggi_row.1;
 
     // --- FATTURATO IERI ---
-    let fatturato_ieri = sqlx::query_scalar::<_, f64>(
+    let fatturato_ieri_app = sqlx::query_scalar::<_, f64>(
         r#"
         SELECT COALESCE(SUM(prezzo_applicato), 0.0)
         FROM appuntamenti
         WHERE DATE(data_ora_inizio) = ?1
           AND stato IN ('completato', 'in_corso')
           AND prezzo_applicato IS NOT NULL
+          AND (omaggio IS NULL OR omaggio = 0)
         "#,
     )
     .bind(&ieri)
     .fetch_one(&state.db.pool)
     .await?;
+    let pacchetti_ieri: f64 = sqlx::query_scalar(
+        "SELECT COALESCE(SUM(importo), 0.0) FROM pacchetto_pagamenti WHERE DATE(created_at) = ?"
+    ).bind(&ieri).fetch_one(&state.db.pool).await.unwrap_or(0.0);
+    let fatturato_ieri = fatturato_ieri_app + pacchetti_ieri;
 
     // --- FATTURATO STESSO GIORNO SETTIMANA SCORSA ---
-    let fatturato_settimana_scorsa = sqlx::query_scalar::<_, f64>(
+    let fatturato_sett_app = sqlx::query_scalar::<_, f64>(
         r#"
         SELECT COALESCE(SUM(prezzo_applicato), 0.0)
         FROM appuntamenti
         WHERE DATE(data_ora_inizio) = ?1
           AND stato IN ('completato', 'in_corso')
           AND prezzo_applicato IS NOT NULL
+          AND (omaggio IS NULL OR omaggio = 0)
         "#,
     )
     .bind(&settimana_scorsa)
     .fetch_one(&state.db.pool)
     .await?;
+    let pacchetti_sett: f64 = sqlx::query_scalar(
+        "SELECT COALESCE(SUM(importo), 0.0) FROM pacchetto_pagamenti WHERE DATE(created_at) = ?"
+    ).bind(&settimana_scorsa).fetch_one(&state.db.pool).await.unwrap_or(0.0);
+    let fatturato_settimana_scorsa = fatturato_sett_app + pacchetti_sett;
 
     // --- FATTURATO e SCONTRINO MEDIO MESE ---
     let mese_row = sqlx::query_as::<_, (f64, f64)>(
@@ -561,14 +579,38 @@ pub async fn get_dashboard_completo(
         WHERE DATE(data_ora_inizio) >= ?1
           AND stato IN ('completato', 'in_corso')
           AND prezzo_applicato IS NOT NULL
+          AND (omaggio IS NULL OR omaggio = 0)
         "#,
     )
     .bind(&primo_mese)
     .fetch_one(&state.db.pool)
     .await?;
+    let pacchetti_mese: f64 = sqlx::query_scalar(
+        "SELECT COALESCE(SUM(importo), 0.0) FROM pacchetto_pagamenti WHERE DATE(created_at) >= ?"
+    ).bind(&primo_mese).fetch_one(&state.db.pool).await.unwrap_or(0.0);
 
-    let fatturato_mese = mese_row.0;
+    let fatturato_mese = mese_row.0 + pacchetti_mese;
     let scontrino_medio_mese = mese_row.1;
+
+    // --- FATTURATO PREVISIONE ---
+    let fatturato_prev_app = sqlx::query_scalar::<_, f64>(
+        r#"
+        SELECT COALESCE(SUM(prezzo_applicato), 0.0)
+        FROM appuntamenti
+        WHERE DATE(data_ora_inizio) >= ?1
+          AND stato IN ('prenotato', 'confermato', 'in_corso', 'completato')
+          AND (omaggio IS NULL OR omaggio = 0)
+        "#,
+    )
+    .bind(&primo_mese)
+    .fetch_one(&state.db.pool)
+    .await
+    .unwrap_or(0.0);
+    // Previsione include anche il rimanente da incassare dai pacchetti attivi
+    let pacchetti_prev: f64 = sqlx::query_scalar(
+        "SELECT COALESCE(SUM(importo_totale - importo_pagato), 0.0) FROM pacchetti_cliente WHERE stato = 'attivo'"
+    ).fetch_one(&state.db.pool).await.unwrap_or(0.0);
+    let fatturato_previsione = fatturato_prev_app + pacchetti_mese + pacchetti_prev;
 
     // --- TRATTAMENTI TOP OGGI ---
     let top_trattamenti = sqlx::query_as::<_, (String, i64, f64)>(
@@ -730,15 +772,16 @@ pub async fn get_dashboard_completo(
             a.note_prenotazione,
             a.note_trattamento,
             a.prezzo_applicato,
+            a.omaggio,
             a.created_at,
             a.updated_at
         FROM appuntamenti a
         LEFT JOIN clienti c ON a.cliente_id = c.id
         LEFT JOIN operatrici o ON a.operatrice_id = o.id
         LEFT JOIN trattamenti t ON a.trattamento_id = t.id
-        WHERE a.data_ora_inizio > ?1
+        WHERE datetime(a.data_ora_inizio) > datetime(?1)
           AND a.stato IN ('prenotato', 'confermato')
-        ORDER BY a.data_ora_inizio ASC
+        ORDER BY datetime(a.data_ora_inizio) ASC
         LIMIT 5
         "#,
     )
@@ -759,6 +802,7 @@ pub async fn get_dashboard_completo(
         scontrino_medio_oggi,
         scontrino_medio_mese,
         fatturato_mese,
+        fatturato_previsione,
         trattamenti_top_oggi,
         vendita_prodotti_oggi,
         nuovi_clienti_mese,

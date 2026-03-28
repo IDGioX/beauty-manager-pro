@@ -743,6 +743,19 @@
   border-radius: 0 0 4px 4px !important;
 }
 
+/* Omaggio events — diagonal stripes pattern */
+.fc .fc-event.fc-event-omaggio {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 4px,
+    rgba(255, 255, 255, 0.12) 4px,
+    rgba(255, 255, 255, 0.12) 8px
+  ) !important;
+  border-style: dashed !important;
+  border-width: 1.5px !important;
+}
+
 /* Current time indicator */
 .fc .fc-timegrid-now-indicator-line {
   border-color: var(--color-primary) !important;

@@ -10,6 +10,7 @@ import { AppuntamentoModal } from '../components/agenda/AppuntamentoModal';
 import { ExportModal } from '../components/agenda/ExportModal';
 import { WeekViewCalendar } from '../components/agenda/WeekViewCalendar';
 import { Button } from '../components/ui/Button';
+import { pacchettiService, type SedutaConPacchetto } from '../services/pacchetti';
 import type { AppuntamentoWithDetails } from '../types/agenda';
 import type { EventClickArg, DateSelectArg, EventDropArg } from '@fullcalendar/core';
 
@@ -126,43 +127,62 @@ export const Agenda: React.FC<AgendaProps> = ({ openAppuntamentoId, onAppuntamen
     }
   }, [viewMode]);
 
-  // Controlla appuntamenti passati non risolti (prenotato/in_corso in giorni passati)
+  // Controlla appuntamenti non risolti (recap fine giornata)
   const wasLoadingRef = useRef(false);
+  const [recapPrezzi, setRecapPrezzi] = useState<Map<string, string>>(new Map());
+  const [recapSedute, setRecapSedute] = useState<Map<string, SedutaConPacchetto>>(new Map());
+  const [showCompletati, setShowCompletati] = useState(false);
+
   useEffect(() => {
-    // Intercetta la transizione isLoading: true → false (caricamento appena completato)
-    if (isLoading) {
-      wasLoadingRef.current = true;
-      return;
-    }
+    if (isLoading) { wasLoadingRef.current = true; return; }
     if (!wasLoadingRef.current) return;
     wasLoadingRef.current = false;
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const selDay = new Date(selectedDate);
-    selDay.setHours(0, 0, 0, 0);
+    const now = new Date();
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const selDay = new Date(selectedDate); selDay.setHours(0, 0, 0, 0);
     const dayKey = selDay.toISOString().slice(0, 10);
 
-    // Solo per giorni passati, non già controllati, in vista giorno
-    if (selDay >= today || checkedDaysRef.current.has(dayKey) || viewMode !== 'day') return;
+    if (checkedDaysRef.current.has(dayKey) || viewMode !== 'day') return;
 
-    const nonRisolti = appuntamenti.filter(
-      a => a.stato === 'prenotato' || a.stato === 'in_corso'
-    );
+    const isPast = selDay < today;
+    const isToday = selDay.getTime() === today.getTime();
+    const isAfterClosing = isToday && now.getHours() >= 19;
 
+    if (!isPast && !isAfterClosing) return;
+
+    const nonRisolti = appuntamenti.filter(a => a.stato === 'prenotato' || a.stato === 'in_corso');
     checkedDaysRef.current.add(dayKey);
 
     if (nonRisolti.length > 0) {
       setPendingAppuntamenti(nonRisolti);
       setShowPendingPopup(true);
+      // Pre-compila i prezzi
+      const prezziMap = new Map<string, string>();
+      nonRisolti.forEach(a => { prezziMap.set(a.id, a.prezzo_applicato?.toString() || ''); });
+      setRecapPrezzi(prezziMap);
+      // Carica info pacchetto per ogni appuntamento
+      const seduteMap = new Map<string, SedutaConPacchetto>();
+      Promise.all(nonRisolti.map(a =>
+        pacchettiService.getSedutaByAppuntamento(a.id).then(s => { if (s) seduteMap.set(a.id, s); }).catch(() => {})
+      )).then(() => setRecapSedute(new Map(seduteMap)));
     }
   }, [appuntamenti, selectedDate, viewMode, isLoading]);
 
-  // Aggiorna stato di un appuntamento dal popup
   const handleResolvePending = async (appId: string, nuovoStato: 'completato' | 'annullato' | 'no_show') => {
     setUpdatingAppId(appId);
     try {
-      await updateAppuntamento(appId, { stato: nuovoStato });
+      // Aggiorna prezzo se modificato
+      const prezzoStr = recapPrezzi.get(appId);
+      const prezzo = prezzoStr ? parseFloat(prezzoStr) : undefined;
+      await updateAppuntamento(appId, { stato: nuovoStato, prezzo_applicato: prezzo });
+      // Completa seduta pacchetto se collegata e stato = completato
+      if (nuovoStato === 'completato') {
+        const seduta = recapSedute.get(appId);
+        if (seduta && seduta.stato_seduta === 'pianificata') {
+          await pacchettiService.completaSedutaById(seduta.seduta_id, appId);
+        }
+      }
       setPendingAppuntamenti(prev => {
         const remaining = prev.filter(a => a.id !== appId);
         if (remaining.length === 0) setShowPendingPopup(false);
@@ -172,6 +192,37 @@ export const Agenda: React.FC<AgendaProps> = ({ openAppuntamentoId, onAppuntamen
       console.error('Errore aggiornamento stato:', err);
     } finally {
       setUpdatingAppId(null);
+    }
+  };
+
+  const handleResolveAllPending = async () => {
+    setUpdatingAppId('bulk');
+    try {
+      for (const app of pendingAppuntamenti) {
+        const prezzoStr = recapPrezzi.get(app.id);
+        const prezzo = prezzoStr ? parseFloat(prezzoStr) : undefined;
+        await updateAppuntamento(app.id, { stato: 'completato', prezzo_applicato: prezzo });
+        const seduta = recapSedute.get(app.id);
+        if (seduta && seduta.stato_seduta === 'pianificata') {
+          await pacchettiService.completaSedutaById(seduta.seduta_id, app.id);
+        }
+      }
+      setPendingAppuntamenti([]);
+      setShowPendingPopup(false);
+    } catch (err) {
+      console.error('Errore bulk completamento:', err);
+    } finally {
+      setUpdatingAppId(null);
+    }
+  };
+
+  const closeRecapPopup = () => {
+    setShowPendingPopup(false);
+    // Se ci sono ancora appuntamenti non risolti, rimuovi il giorno dal cache
+    // cosi' il popup si rimostra quando l'utente torna
+    if (pendingAppuntamenti.length > 0) {
+      const dayKey = new Date(selectedDate).toISOString().slice(0, 10);
+      checkedDaysRef.current.delete(dayKey);
     }
   };
 
@@ -224,6 +275,7 @@ export const Agenda: React.FC<AgendaProps> = ({ openAppuntamentoId, onAppuntamen
     id: app.id,
     resourceId: app.operatrice_id,
     title: `${app.cliente_nome} ${app.cliente_cognome} - ${app.trattamento_nome}`,
+    classNames: app.omaggio ? ['fc-event-omaggio'] : [],
     start: new Date(app.data_ora_inizio),
     end: new Date(app.data_ora_fine),
     backgroundColor: app.operatrice_colore,
@@ -380,148 +432,202 @@ export const Agenda: React.FC<AgendaProps> = ({ openAppuntamentoId, onAppuntamen
     <>
       <AppuntamentoModal />
 
-      {/* Popup appuntamenti passati non risolti */}
-      {showPendingPopup && pendingAppuntamenti.length > 0 && (
-        <>
-          <div
-            className="fixed inset-0 z-[100]"
-            style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
-            onClick={() => setShowPendingPopup(false)}
-          />
-          <div className="fixed inset-0 z-[101] overflow-y-auto pointer-events-none">
-            <div className="min-h-full flex items-start justify-center p-4 pt-[10vh]">
-              <div
-                className="pointer-events-auto relative w-full max-w-lg rounded-2xl shadow-2xl"
-                style={{ background: 'var(--card-bg)', border: '1px solid var(--glass-border)' }}
-                onClick={e => e.stopPropagation()}
-              >
-                {/* Header */}
-                <div
-                  className="flex items-center gap-3 px-6 py-4 rounded-t-2xl"
-                  style={{ background: 'color-mix(in srgb, var(--color-warning) 15%, var(--card-bg))', borderBottom: '1px solid var(--glass-border)' }}
-                >
-                  <AlertTriangle size={20} style={{ color: 'var(--color-warning)' }} />
-                  <div className="flex-1">
-                    <h3 className="text-[15px] font-semibold" style={{ color: 'var(--color-text-primary)' }}>
-                      Appuntamenti da confermare
-                    </h3>
-                    <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>
-                      {pendingAppuntamenti.length} appuntament{pendingAppuntamenti.length === 1 ? 'o' : 'i'} del {new Date(selectedDate).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })} senza esito
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setShowPendingPopup(false)}
-                    className="p-1.5 rounded-lg transition-colors"
-                    style={{ color: 'var(--color-text-muted)' }}
-                    onMouseEnter={e => { e.currentTarget.style.background = 'var(--glass-border)'; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
+      {/* Recap fine giornata */}
+      {showPendingPopup && pendingAppuntamenti.length > 0 && (() => {
+        const completati = appuntamenti.filter(a => a.stato === 'completato');
+        const annullati = appuntamenti.filter(a => a.stato === 'annullato' || a.stato === 'no_show');
+        const totalGiornata = appuntamenti.length;
+        const isBulkUpdating = updatingAppId === 'bulk';
 
-                {/* Lista appuntamenti */}
-                <div className="px-6 py-4 space-y-3 max-h-[50vh] overflow-y-auto">
-                  {pendingAppuntamenti.map(app => {
-                    const ora = new Date(app.data_ora_inizio).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
-                    const isUpdating = updatingAppId === app.id;
-                    return (
-                      <div
-                        key={app.id}
-                        className="rounded-xl p-3"
-                        style={{ background: 'var(--glass-border)', border: '1px solid var(--glass-border)' }}
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <div>
-                            <p className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
-                              {app.cliente_nome} {app.cliente_cognome}
-                            </p>
-                            <p className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
-                              {ora} • {app.trattamento_nome} • {app.operatrice_nome} {app.operatrice_cognome}
-                            </p>
-                          </div>
-                          <span
-                            className="text-xs px-2 py-0.5 rounded-full font-medium"
-                            style={{
-                              background: 'color-mix(in srgb, var(--color-warning) 15%, transparent)',
-                              color: 'var(--color-warning)',
-                            }}
-                          >
-                            {app.stato}
-                          </span>
-                        </div>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleResolvePending(app.id, 'completato')}
-                            disabled={isUpdating}
-                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors"
-                            style={{
-                              background: 'color-mix(in srgb, var(--color-success) 15%, transparent)',
-                              color: 'var(--color-success)',
-                            }}
-                            onMouseEnter={e => { e.currentTarget.style.background = 'color-mix(in srgb, var(--color-success) 25%, transparent)'; }}
-                            onMouseLeave={e => { e.currentTarget.style.background = 'color-mix(in srgb, var(--color-success) 15%, transparent)'; }}
-                          >
-                            <Check size={14} />
-                            Completato
-                          </button>
-                          <button
-                            onClick={() => handleResolvePending(app.id, 'annullato')}
-                            disabled={isUpdating}
-                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors"
-                            style={{
-                              background: 'color-mix(in srgb, var(--color-danger) 15%, transparent)',
-                              color: 'var(--color-danger)',
-                            }}
-                            onMouseEnter={e => { e.currentTarget.style.background = 'color-mix(in srgb, var(--color-danger) 25%, transparent)'; }}
-                            onMouseLeave={e => { e.currentTarget.style.background = 'color-mix(in srgb, var(--color-danger) 15%, transparent)'; }}
-                          >
-                            <XCircle size={14} />
-                            Annullato
-                          </button>
-                          <button
-                            onClick={() => handleResolvePending(app.id, 'no_show')}
-                            disabled={isUpdating}
-                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors"
-                            style={{
-                              background: 'var(--glass-border)',
-                              color: 'var(--color-text-secondary)',
-                            }}
-                            onMouseEnter={e => { e.currentTarget.style.background = 'color-mix(in srgb, var(--color-text-muted) 20%, transparent)'; }}
-                            onMouseLeave={e => { e.currentTarget.style.background = 'var(--glass-border)'; }}
-                          >
-                            <UserX size={14} />
-                            No Show
-                          </button>
-                          {isUpdating && (
-                            <div className="flex items-center ml-2">
-                              <div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: 'var(--glass-border)', borderTopColor: 'var(--color-primary)' }} />
+        return (
+          <>
+            <div className="fixed inset-0 z-[100]" style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }} onClick={closeRecapPopup} />
+            <div className="fixed inset-0 z-[101] overflow-y-auto pointer-events-none">
+              <div className="min-h-full flex items-start justify-center p-4 pt-[6vh]">
+                <div className="pointer-events-auto relative w-full max-w-xl rounded-2xl shadow-2xl" style={{ background: 'var(--card-bg)', border: '1px solid var(--glass-border)' }} onClick={e => e.stopPropagation()}>
+
+                  {/* Header */}
+                  <div className="flex items-center gap-3 px-6 py-4 rounded-t-2xl" style={{ background: 'color-mix(in srgb, var(--color-warning) 12%, var(--card-bg))', borderBottom: '1px solid var(--glass-border)' }}>
+                    <CalendarIcon size={20} style={{ color: 'var(--color-primary)' }} />
+                    <div className="flex-1">
+                      <h3 className="text-[15px] font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+                        Recap Giornata
+                      </h3>
+                      <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>
+                        {new Date(selectedDate).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} — {totalGiornata} appuntament{totalGiornata === 1 ? 'o' : 'i'} · {completati.length} completat{completati.length === 1 ? 'o' : 'i'} · <span style={{ color: 'var(--color-warning)' }}>{pendingAppuntamenti.length} da risolvere</span>
+                      </p>
+                    </div>
+                    <button onClick={closeRecapPopup} className="p-1.5 rounded-lg transition-colors" style={{ color: 'var(--color-text-muted)' }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'var(--glass-border)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
+                      <X size={16} />
+                    </button>
+                  </div>
+
+                  <div className="max-h-[60vh] overflow-y-auto">
+                    {/* Da risolvere */}
+                    <div className="px-6 py-4">
+                      <p className="text-[10px] font-semibold uppercase tracking-wider mb-3 flex items-center gap-2" style={{ color: 'var(--color-warning)' }}>
+                        <AlertTriangle size={12} /> Da risolvere ({pendingAppuntamenti.length})
+                      </p>
+                      <div className="space-y-3">
+                        {pendingAppuntamenti.map(app => {
+                          const ora = new Date(app.data_ora_inizio).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+                          const isUpdating = updatingAppId === app.id || isBulkUpdating;
+                          const sedutaInfo = recapSedute.get(app.id);
+                          const prezzoVal = recapPrezzi.get(app.id) || '';
+
+                          return (
+                            <div key={app.id} className="rounded-xl p-3 space-y-2.5" style={{ background: 'color-mix(in srgb, var(--glass-border) 50%, transparent)', border: '1px solid var(--glass-border)' }}>
+                              {/* Info appuntamento */}
+                              <div className="flex items-start justify-between">
+                                <div>
+                                  <p className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
+                                    {app.omaggio && <span className="text-[8px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded mr-1.5" style={{ background: 'color-mix(in srgb, var(--color-success) 15%, transparent)', color: 'var(--color-success)' }}>OMG</span>}
+                                    {app.cliente_nome} {app.cliente_cognome}
+                                  </p>
+                                  <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>
+                                    {ora} · {app.trattamento_nome} · {app.operatrice_nome} {app.operatrice_cognome}
+                                  </p>
+                                </div>
+                                <span className="text-[9px] px-1.5 py-0.5 rounded font-medium shrink-0" style={{ background: 'color-mix(in srgb, var(--color-warning) 15%, transparent)', color: 'var(--color-warning)' }}>
+                                  {app.stato}
+                                </span>
+                              </div>
+
+                              {/* Badge pacchetto */}
+                              {sedutaInfo && (
+                                <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg" style={{ background: 'color-mix(in srgb, var(--color-primary) 6%, transparent)' }}>
+                                  <span className="text-[10px] font-semibold" style={{ color: 'var(--color-primary)' }}>📦</span>
+                                  <span className="text-[11px]" style={{ color: 'var(--color-text-primary)' }}>
+                                    Seduta {sedutaInfo.numero_seduta}/{sedutaInfo.sedute_totali} — {sedutaInfo.pacchetto_nome}
+                                  </span>
+                                </div>
+                              )}
+
+                              {/* Prezzo */}
+                              <div className="flex items-center gap-2">
+                                <span className="text-[10px] shrink-0" style={{ color: 'var(--color-text-muted)' }}>Prezzo €</span>
+                                {sedutaInfo ? (
+                                  <span className="text-xs font-medium" style={{ color: 'var(--color-success)' }}>€0 — pacchetto</span>
+                                ) : (
+                                  <>
+                                    <input type="number" step="0.01" min="0" value={prezzoVal}
+                                      onChange={e => setRecapPrezzi(prev => { const m = new Map(prev); m.set(app.id, e.target.value); return m; })}
+                                      className="flex-1 px-2.5 py-1 rounded-lg text-xs"
+                                      style={{ background: 'var(--input-bg, var(--card-bg))', border: prezzoVal ? '1px solid var(--glass-border)' : '1px solid color-mix(in srgb, var(--color-warning) 40%, transparent)', color: 'var(--color-text-primary)', outline: 'none', maxWidth: 120 }}
+                                      placeholder="Da inserire" />
+                                    {!prezzoVal && (
+                                      <span className="text-[9px] font-medium" style={{ color: 'var(--color-warning)' }}>mancante</span>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+
+                              {/* Bottoni azione */}
+                              <div className="flex gap-2">
+                                <button onClick={() => handleResolvePending(app.id, 'completato')} disabled={isUpdating}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors"
+                                  style={{ background: 'color-mix(in srgb, var(--color-success) 15%, transparent)', color: 'var(--color-success)' }}
+                                  onMouseEnter={e => { e.currentTarget.style.background = 'color-mix(in srgb, var(--color-success) 25%, transparent)'; }}
+                                  onMouseLeave={e => { e.currentTarget.style.background = 'color-mix(in srgb, var(--color-success) 15%, transparent)'; }}>
+                                  <Check size={14} />Completato
+                                </button>
+                                <button onClick={() => handleResolvePending(app.id, 'annullato')} disabled={isUpdating}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors"
+                                  style={{ background: 'color-mix(in srgb, var(--color-danger) 15%, transparent)', color: 'var(--color-danger)' }}
+                                  onMouseEnter={e => { e.currentTarget.style.background = 'color-mix(in srgb, var(--color-danger) 25%, transparent)'; }}
+                                  onMouseLeave={e => { e.currentTarget.style.background = 'color-mix(in srgb, var(--color-danger) 15%, transparent)'; }}>
+                                  <XCircle size={14} />Annullato
+                                </button>
+                                <button onClick={() => handleResolvePending(app.id, 'no_show')} disabled={isUpdating}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors"
+                                  style={{ background: 'var(--glass-border)', color: 'var(--color-text-secondary)' }}
+                                  onMouseEnter={e => { e.currentTarget.style.background = 'color-mix(in srgb, var(--color-text-muted) 20%, transparent)'; }}
+                                  onMouseLeave={e => { e.currentTarget.style.background = 'var(--glass-border)'; }}>
+                                  <UserX size={14} />No Show
+                                </button>
+                                {(updatingAppId === app.id) && (
+                                  <div className="flex items-center ml-2">
+                                    <div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: 'var(--glass-border)', borderTopColor: 'var(--color-primary)' }} />
+                                  </div>
+                                )}
+                              </div>
                             </div>
-                          )}
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Completati (collassabile) */}
+                    {completati.length > 0 && (
+                      <div className="px-6 pb-4">
+                        <button onClick={() => setShowCompletati(!showCompletati)}
+                          className="w-full flex items-center justify-between py-2 text-left" style={{ borderTop: '1px solid var(--glass-border)' }}>
+                          <span className="text-[10px] font-semibold uppercase tracking-wider flex items-center gap-2 pt-2" style={{ color: 'var(--color-success)' }}>
+                            <Check size={12} /> Completati ({completati.length})
+                          </span>
+                          <span className="text-[10px] pt-2" style={{ color: 'var(--color-text-muted)' }}>{showCompletati ? 'nascondi' : 'mostra'}</span>
+                        </button>
+                        {showCompletati && (
+                          <div className="space-y-1 mt-2">
+                            {completati.map(app => {
+                              const ora = new Date(app.data_ora_inizio).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+                              return (
+                                <div key={app.id} className="flex items-center gap-3 px-3 py-1.5 rounded-lg text-xs" style={{ background: 'color-mix(in srgb, var(--color-success) 4%, transparent)' }}>
+                                  <span style={{ color: 'var(--color-text-muted)' }}>{ora}</span>
+                                  <span className="font-medium flex-1" style={{ color: 'var(--color-text-primary)' }}>{app.cliente_nome} {app.cliente_cognome}</span>
+                                  <span style={{ color: 'var(--color-text-secondary)' }}>{app.trattamento_nome}</span>
+                                  {app.prezzo_applicato != null && <span style={{ color: 'var(--color-text-muted)' }}>€{app.prezzo_applicato.toFixed(2)}</span>}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Annullati/No Show */}
+                    {annullati.length > 0 && (
+                      <div className="px-6 pb-4">
+                        <p className="text-[10px] font-semibold uppercase tracking-wider mb-2 flex items-center gap-2" style={{ color: 'var(--color-text-muted)' }}>
+                          <XCircle size={12} /> Annullati / No Show ({annullati.length})
+                        </p>
+                        <div className="space-y-1">
+                          {annullati.map(app => {
+                            const ora = new Date(app.data_ora_inizio).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+                            return (
+                              <div key={app.id} className="flex items-center gap-3 px-3 py-1.5 rounded-lg text-xs" style={{ opacity: 0.6 }}>
+                                <span style={{ color: 'var(--color-text-muted)' }}>{ora}</span>
+                                <span className="font-medium flex-1" style={{ color: 'var(--color-text-primary)' }}>{app.cliente_nome} {app.cliente_cognome}</span>
+                                <span className="text-[9px] px-1.5 py-0.5 rounded font-medium" style={{ background: 'color-mix(in srgb, var(--color-danger) 15%, transparent)', color: 'var(--color-danger)' }}>{app.stato}</span>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
+                    )}
+                  </div>
 
-                {/* Footer */}
-                <div
-                  className="px-6 py-3 flex justify-end rounded-b-2xl"
-                  style={{ borderTop: '1px solid var(--glass-border)' }}
-                >
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => setShowPendingPopup(false)}
-                  >
-                    Chiudi
-                  </Button>
+                  {/* Footer */}
+                  <div className="px-6 py-3 flex items-center justify-between rounded-b-2xl" style={{ borderTop: '1px solid var(--glass-border)' }}>
+                    {pendingAppuntamenti.length > 1 && (
+                      <button onClick={handleResolveAllPending} disabled={isBulkUpdating}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors"
+                        style={{ background: 'color-mix(in srgb, var(--color-success) 12%, transparent)', color: 'var(--color-success)' }}
+                        onMouseEnter={e => { e.currentTarget.style.background = 'color-mix(in srgb, var(--color-success) 22%, transparent)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'color-mix(in srgb, var(--color-success) 12%, transparent)'; }}>
+                        <Check size={14} />Completa tutti
+                        {isBulkUpdating && <div className="w-3 h-3 border-2 rounded-full animate-spin ml-1" style={{ borderColor: 'transparent', borderTopColor: 'var(--color-success)' }} />}
+                      </button>
+                    )}
+                    <Button variant="secondary" size="sm" onClick={closeRecapPopup}>Chiudi</Button>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        </>
-      )}
+          </>
+        );
+      })()}
 
       {showExportModal && (
         <ExportModal
@@ -860,6 +966,26 @@ export const Agenda: React.FC<AgendaProps> = ({ openAppuntamentoId, onAppuntamen
                 hour: '2-digit',
                 minute: '2-digit',
                 hour12: false,
+              }}
+              eventContent={(arg) => {
+                const app = arg.event.extendedProps.appuntamento;
+                const isOmaggio = app?.omaggio;
+                return (
+                  <div className="fc-event-main-frame" style={{ overflow: 'hidden', height: '100%', padding: '2px 4px', position: 'relative' }}>
+                    <div className="fc-event-time" style={{ fontSize: '10px', fontWeight: 600, opacity: 0.85 }}>{arg.timeText}</div>
+                    <div className="fc-event-title" style={{ fontSize: '11px', lineHeight: 1.2 }}>
+                      {arg.event.title}
+                    </div>
+                    {isOmaggio && (
+                      <span style={{
+                        position: 'absolute', top: 2, right: 3,
+                        fontSize: '8px', fontWeight: 800, letterSpacing: '0.5px',
+                        padding: '1px 4px', borderRadius: '3px',
+                        background: 'rgba(255,255,255,0.3)', color: 'rgba(255,255,255,0.9)',
+                      }}>OMG</span>
+                    )}
+                  </div>
+                );
               }}
             />
           ) : (

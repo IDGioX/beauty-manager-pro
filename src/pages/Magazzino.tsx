@@ -2,9 +2,8 @@ import { useState, useEffect } from 'react';
 import {
   Package, TrendingUp, TrendingDown, History, AlertTriangle, X,
   Search, Plus, Edit2, Trash2, Clock, Eye, EyeOff, Settings, Filter,
-  Euro, ShieldAlert, MoreHorizontal, Save
+  Euro, MoreHorizontal, Save
 } from 'lucide-react';
-import { InfoTooltip } from '../components/ui/InfoTooltip';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
@@ -361,7 +360,6 @@ function ProdottoDetailPanel({
 export function Magazzino({ onNavigateToAgenda }: MagazzinoProps) {
   const [activeTab, setActiveTab] = useState<TabType>('articoli');
   const [alertCount, setAlertCount] = useState<AlertCount | null>(null);
-  const [showAlertBanner, setShowAlertBanner] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
 
   // Articoli state
@@ -446,67 +444,28 @@ export function Magazzino({ onNavigateToAgenda }: MagazzinoProps) {
     <div className="flex flex-col" style={{ height: 'calc(100vh - 80px)' }}>
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
-      {/* ═══════════════ TOP BAR: Alert + Filter Chip Tabs ═══════════════ */}
+      {/* ═══════════════ HEADER ═══════════════ */}
       <div className="px-5 pt-4 pb-0 space-y-3 shrink-0">
-        {/* Alert Banner */}
-        {showAlertBanner && totalAlerts > 0 && (
-          <div
-            className="rounded-xl p-3.5 animate-fade-in-up"
-            style={{
-              background: 'color-mix(in srgb, var(--color-warning, #f59e0b) 8%, var(--card-bg))',
-              border: '1px solid color-mix(in srgb, var(--color-warning, #f59e0b) 25%, transparent)',
-            }}
-          >
-            <div className="flex items-start justify-between">
-              <div className="flex items-start gap-3">
-                <AlertTriangle className="mt-0.5 shrink-0" size={18} style={{ color: 'var(--color-warning, #f59e0b)' }} />
-                <div>
-                  <h3 className="font-medium text-sm flex items-center gap-1" style={{ color: 'var(--color-text-primary)' }}>
-                    {totalAlerts} prodott{totalAlerts === 1 ? 'o' : 'i'} richied{totalAlerts === 1 ? 'e' : 'ono'} attenzione
-                    <InfoTooltip text="'Sotto scorta' = quantita' inferiore al minimo impostato. 'In scadenza' = scade entro 30 giorni. 'Scaduto' = data di scadenza superata." size={13} />
-                  </h3>
-                  <div className="mt-1 text-xs space-x-3" style={{ color: 'var(--color-text-secondary)' }}>
-                    {alertCount && alertCount.sotto_scorta > 0 && <span>{alertCount.sotto_scorta} sotto scorta</span>}
-                    {alertCount && alertCount.in_scadenza > 0 && <span>{alertCount.in_scadenza} in scadenza</span>}
-                    {alertCount && alertCount.scaduti > 0 && (
-                      <span className="font-medium" style={{ color: 'var(--color-danger)' }}>{alertCount.scaduti} scadut{alertCount.scaduti === 1 ? 'o' : 'i'}</span>
-                    )}
-                  </div>
-                </div>
-              </div>
-              <button onClick={() => setShowAlertBanner(false)} className="shrink-0 transition-colors" style={{ color: 'var(--color-text-muted)' }}>
-                <X size={16} />
-              </button>
-            </div>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-bold" style={{ color: 'var(--color-text-primary)' }}>Magazzino</h1>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>{prodotti.length} prodott{prodotti.length === 1 ? 'o' : 'i'}</p>
           </div>
-        )}
+        </div>
 
-        {/* Segmented Control Tabs */}
-        <div
-          className="flex gap-1 p-1 rounded-xl animate-fade-in-up"
-          style={{ background: 'var(--glass-border)', animationDelay: '50ms' }}
-        >
+        {/* Tab chips */}
+        <div className="filter-chips">
           {tabs.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all"
+            <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all"
               style={{
-                background: activeTab === tab.id ? 'var(--card-bg)' : 'transparent',
-                color: activeTab === tab.id ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
-                boxShadow: activeTab === tab.id ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-              }}
-            >
+                background: activeTab === tab.id ? 'var(--color-primary)' : 'var(--glass-border)',
+                color: activeTab === tab.id ? 'white' : 'var(--color-text-secondary)',
+              }}>
               {tab.icon}
               {tab.label}
               {tab.id === 'articoli' && totalAlerts > 0 && (
-                <span className="text-xs px-1.5 py-0.5 rounded-full font-medium"
-                  style={{
-                    background: activeTab === 'articoli' ? 'rgba(245, 158, 11, 0.15)' : 'var(--glass-border)',
-                    color: '#f59e0b',
-                  }}>
-                  {totalAlerts}
-                </span>
+                <span className="text-[10px] px-1 py-0.5 rounded-full font-medium" style={{ background: 'rgba(255,255,255,0.25)', color: activeTab === 'articoli' ? 'white' : '#f59e0b' }}>{totalAlerts}</span>
               )}
             </button>
           ))}
@@ -519,34 +478,26 @@ export function Magazzino({ onNavigateToAgenda }: MagazzinoProps) {
           <div className="flex h-full">
             {/* ═══════════════ LEFT: PRODUCT LIST ═══════════════ */}
             <div className={`flex flex-col min-w-0 master-panel ${selectedProdotto ? 'w-[420px] shrink-0' : 'flex-1'}`}>
-              {/* Stats bar */}
-              <div className="flex items-center gap-3 px-5 py-3 shrink-0" style={{ borderBottom: '1px solid var(--glass-border)' }}>
-                {[
-                  { icon: <Package size={14} style={{ color: '#6366f1' }} />, value: prodotti.length, label: 'Prodotti' },
-                  { icon: <ShieldAlert size={14} style={{ color: '#ef4444' }} />, value: sottoScortaCount, label: 'Sotto scorta' },
-                  { icon: <Clock size={14} style={{ color: '#f59e0b' }} />, value: inScadenzaCount, label: 'In scadenza' },
-                  { icon: <Euro size={14} style={{ color: '#10b981' }} />, value: `€${valoreInventario.toFixed(0)}`, label: 'Valore' },
-                ].map((s, i) => (
-                  <div key={i} className="flex items-center gap-1.5">
-                    {s.icon}
-                    <span className="text-xs font-semibold" style={{ color: 'var(--color-text-primary)' }}>{s.value}</span>
-                    <span className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>{s.label}</span>
-                    {i < 3 && <div className="w-px h-3 ml-1.5" style={{ background: 'var(--glass-border)' }} />}
-                  </div>
-                ))}
+              {/* Header */}
+              <div className="flex items-center justify-between gap-2 px-5 py-3 shrink-0">
+                <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                  {prodotti.length} prodott{prodotti.length === 1 ? 'o' : 'i'} · {sottoScortaCount > 0 && <span style={{ color: '#ef4444' }}>{sottoScortaCount} sotto scorta</span>}
+                  {inScadenzaCount > 0 && <span style={{ color: '#f59e0b' }}> · {inScadenzaCount} in scadenza</span>}
+                </span>
+                <Button variant="primary" size="sm" onClick={() => setIsModalOpen(true)} className="shrink-0 whitespace-nowrap"><Plus size={15} className="mr-1" />Nuovo</Button>
               </div>
 
-              {/* Search + filters */}
-              <div className="px-5 py-3 space-y-2 shrink-0" style={{ borderBottom: '1px solid var(--glass-border)' }}>
-                <div className="flex items-center gap-2">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2" size={15} style={{ color: 'var(--color-text-muted)' }} />
-                    <input type="text" placeholder="Cerca prodotto..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
-                      className="w-full pl-9 pr-3 py-2 rounded-xl text-sm" style={{ background: 'var(--input-bg, var(--glass-border))', border: '1px solid var(--glass-border)', color: 'var(--color-text-primary)', outline: 'none' }} />
-                  </div>
-                  <Button variant="primary" size="sm" onClick={() => setIsModalOpen(true)} className="shrink-0 whitespace-nowrap"><Plus size={15} className="mr-1" />Nuovo</Button>
+              {/* Search */}
+              <div className="px-5 pb-3">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2" size={15} style={{ color: 'var(--color-text-muted)' }} />
+                  <input type="text" placeholder="Cerca prodotto..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2 rounded-xl text-sm" style={{ background: 'var(--glass-border)', border: 'none', color: 'var(--color-text-primary)', outline: 'none' }} />
                 </div>
-                <div className="flex items-center gap-1.5 flex-wrap">
+              </div>
+
+              {/* Filters */}
+              <div className="filter-chips">
                   <button onClick={() => setFilterSottoScorta(!filterSottoScorta)}
                     className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-colors"
                     style={{ background: filterSottoScorta ? '#ef4444' : 'var(--glass-border)', color: filterSottoScorta ? 'white' : 'var(--color-text-secondary)' }}>
@@ -606,7 +557,6 @@ export function Magazzino({ onNavigateToAgenda }: MagazzinoProps) {
                       </>
                     )}
                   </div>
-                </div>
               </div>
 
               {/* Product list */}

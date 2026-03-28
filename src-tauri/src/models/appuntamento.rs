@@ -24,6 +24,7 @@ pub struct Appuntamento {
     pub ricorrenza_pattern: Option<String>,
     pub prenotato_da: String,
     pub prezzo_applicato: Option<f64>,
+    pub omaggio: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -40,6 +41,7 @@ pub struct CreateAppuntamentoInput {
     pub stato: Option<String>,
     pub note_prenotazione: Option<String>,
     pub prezzo_applicato: Option<f64>,
+    pub omaggio: Option<bool>,
 }
 
 // Input per aggiornare un appuntamento esistente
@@ -56,6 +58,7 @@ pub struct UpdateAppuntamentoInput {
     pub note_prenotazione: Option<String>,
     pub note_trattamento: Option<String>,
     pub prezzo_applicato: Option<f64>,
+    pub omaggio: Option<bool>,
 }
 
 // Appuntamento con dettagli completi (per la vista calendario)
@@ -79,6 +82,7 @@ pub struct AppuntamentoWithDetails {
     pub note_prenotazione: Option<String>,
     pub note_trattamento: Option<String>,
     pub prezzo_applicato: Option<f64>,
+    pub omaggio: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }

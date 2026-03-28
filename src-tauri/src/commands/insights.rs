@@ -166,6 +166,7 @@ pub async fn get_insights_data(
         ) costi ON costi.appuntamento_id = a.id
         WHERE a.data_ora_inizio >= datetime('now', '-12 months')
           AND a.stato IN ('completato', 'in_corso')
+          AND (a.omaggio IS NULL OR a.omaggio = 0)
         GROUP BY t.id, t.nome, ct.nome
         HAVING COUNT(a.id) >= 3
         ORDER BY margine DESC
@@ -189,6 +190,7 @@ pub async fn get_insights_data(
         FROM appuntamenti
         WHERE data_ora_inizio >= datetime('now', '-12 months')
           AND stato IN ('completato', 'in_corso')
+          AND (omaggio IS NULL OR omaggio = 0)
         GROUP BY mese
         ORDER BY mese ASC
         "#
@@ -196,8 +198,32 @@ pub async fn get_insights_data(
     .fetch_all(pool)
     .await?;
 
+    // 4b. Aggiungi pagamenti pacchetti al confronto mensile
+    let pagamenti_mese: Vec<(String, f64)> = sqlx::query_as(
+        r#"
+        SELECT strftime('%Y-%m', created_at) as mese, COALESCE(SUM(importo), 0.0) as ricavo
+        FROM pacchetto_pagamenti
+        WHERE created_at >= datetime('now', '-12 months')
+        GROUP BY mese
+        "#
+    )
+    .fetch_all(pool)
+    .await
+    .unwrap_or_default();
+
+    // Merge pagamenti pacchetti nel confronto mensile
+    let mut confronto_mesi: Vec<ConfrontoPeriodo> = confronto_mesi;
+    for (mese_pkg, ricavo_pkg) in &pagamenti_mese {
+        if let Some(m) = confronto_mesi.iter_mut().find(|c| &c.mese == mese_pkg) {
+            m.ricavo += ricavo_pkg;
+            if m.appuntamenti > 0 {
+                m.ticket_medio = m.ricavo / m.appuntamenti as f64;
+            }
+        }
+    }
+
     // 5. Revenue forecast (simple: avg of last 3 months projected)
-    let previsione_fatturato: f64 = sqlx::query_scalar::<_, f64>(
+    let previsione_app: f64 = sqlx::query_scalar::<_, f64>(
         r#"
         SELECT COALESCE(AVG(ricavo_mese), 0.0)
         FROM (
@@ -205,6 +231,7 @@ pub async fn get_insights_data(
             FROM appuntamenti
             WHERE data_ora_inizio >= datetime('now', '-3 months')
               AND stato IN ('completato', 'in_corso')
+              AND (omaggio IS NULL OR omaggio = 0)
             GROUP BY strftime('%Y-%m', data_ora_inizio)
         )
         "#
@@ -212,6 +239,10 @@ pub async fn get_insights_data(
     .fetch_one(pool)
     .await
     .unwrap_or(0.0);
+    let previsione_pkg: f64 = sqlx::query_scalar::<_, f64>(
+        "SELECT COALESCE(AVG(ricavo_mese), 0.0) FROM (SELECT SUM(importo) as ricavo_mese FROM pacchetto_pagamenti WHERE created_at >= datetime('now', '-3 months') GROUP BY strftime('%Y-%m', created_at))"
+    ).fetch_one(pool).await.unwrap_or(0.0);
+    let previsione_fatturato = previsione_app + previsione_pkg;
 
     // 6. Stock depletion forecast
     let giorni_esaurimento_scorte = sqlx::query_as::<_, ScortaPrevisione>(
@@ -274,12 +305,18 @@ async fn build_segmentazione(pool: &sqlx::SqlitePool) -> AppResult<Segmentazione
             c.cognome,
             c.cellulare,
             COUNT(a.id) as totale_appuntamenti,
-            COALESCE(SUM(a.prezzo_applicato), 0.0) as spesa_totale,
+            COALESCE(SUM(a.prezzo_applicato), 0.0) + COALESCE(pkg.spesa_pacchetti, 0.0) as spesa_totale,
             MAX(a.data_ora_inizio) as ultimo_appuntamento,
             CAST(julianday('now') - julianday(MAX(a.data_ora_inizio)) AS INTEGER) as giorni_assenza,
             MIN(a.data_ora_inizio) as primo_appuntamento
         FROM clienti c
         INNER JOIN appuntamenti a ON c.id = a.cliente_id
+        LEFT JOIN (
+            SELECT pc.cliente_id, SUM(pp.importo) as spesa_pacchetti
+            FROM pacchetto_pagamenti pp
+            JOIN pacchetti_cliente pc ON pc.id = pp.pacchetto_cliente_id
+            GROUP BY pc.cliente_id
+        ) pkg ON pkg.cliente_id = c.id
         WHERE c.attivo = 1
           AND a.stato IN ('completato', 'in_corso')
         GROUP BY c.id, c.nome, c.cognome, c.cellulare

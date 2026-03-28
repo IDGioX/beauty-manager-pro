@@ -5,6 +5,7 @@ import {
   Users,
   Scissors,
   Package,
+  PackageCheck,
   MessageSquare,
   BarChart3,
   Lightbulb,
@@ -23,16 +24,45 @@ interface SidebarProps {
   onNavigate: (page: string) => void;
 }
 
-const menuItems = [
-  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { id: 'agenda', label: 'Agenda', icon: Calendar },
-  { id: 'clienti', label: 'Clienti', icon: Users },
-  { id: 'operatrici', label: 'Operatori', icon: Users },
-  { id: 'trattamenti', label: 'Trattamenti', icon: Scissors },
-  { id: 'magazzino', label: 'Magazzino', icon: Package },
-  { id: 'comunicazioni', label: 'Comunicazioni', icon: MessageSquare },
-  { id: 'report', label: 'Report', icon: BarChart3 },
-  { id: 'insights', label: 'Insights', icon: Lightbulb },
+type MenuItem = { id: string; label: string; icon: React.ElementType };
+type MenuSection = { section: string; items: MenuItem[] };
+
+const menuSections: MenuSection[] = [
+  {
+    section: 'Operatività',
+    items: [
+      { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+      { id: 'agenda', label: 'Agenda', icon: Calendar },
+    ],
+  },
+  {
+    section: 'Anagrafica',
+    items: [
+      { id: 'clienti', label: 'Clienti', icon: Users },
+      { id: 'operatrici', label: 'Operatori', icon: Users },
+    ],
+  },
+  {
+    section: 'Servizi',
+    items: [
+      { id: 'trattamenti', label: 'Trattamenti', icon: Scissors },
+      { id: 'pacchetti', label: 'Pacchetti', icon: PackageCheck },
+    ],
+  },
+  {
+    section: 'Gestione',
+    items: [
+      { id: 'magazzino', label: 'Magazzino', icon: Package },
+      { id: 'comunicazioni', label: 'Comunicazioni', icon: MessageSquare },
+    ],
+  },
+  {
+    section: 'Analisi',
+    items: [
+      { id: 'report', label: 'Report', icon: BarChart3 },
+      { id: 'insights', label: 'Insights', icon: Lightbulb },
+    ],
+  },
 ];
 
 export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate }) => {
@@ -100,62 +130,66 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate }) => 
       <div className="mx-6 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
 
       {/* Menu Section */}
-      <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto scrollbar-hidden">
-        <p className="px-4 mb-3 text-xs font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.35)' }}>
-          Menu
-        </p>
-        {menuItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = currentPage === item.id;
+      <nav className="flex-1 px-4 py-4 overflow-y-auto scrollbar-hidden">
+        {menuSections.map((section, sIdx) => (
+          <div key={section.section} className={sIdx > 0 ? 'mt-4' : ''}>
+            <p className="px-4 mb-2 text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.30)' }}>
+              {section.section}
+            </p>
+            <div className="space-y-0.5">
+              {section.items.map((item) => {
+                const Icon = item.icon;
+                const isActive = currentPage === item.id;
 
-          return (
-            <button
-              key={item.id}
-              onClick={() => onNavigate(item.id)}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-left group relative"
-              style={{
-                background: isActive
-                  ? `linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%)`
-                  : 'transparent',
-                boxShadow: isActive ? `0 4px 16px color-mix(in srgb, var(--color-primary) 30%, transparent)` : 'none',
-              }}
-            >
-              {/* Hover background */}
-              {!isActive && (
-                <div
-                  className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-                  style={{ background: 'var(--sidebar-hover)' }}
-                />
-              )}
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => onNavigate(item.id)}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 text-left group relative"
+                    style={{
+                      background: isActive
+                        ? `linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%)`
+                        : 'transparent',
+                      boxShadow: isActive ? `0 4px 16px color-mix(in srgb, var(--color-primary) 30%, transparent)` : 'none',
+                    }}
+                  >
+                    {!isActive && (
+                      <div
+                        className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                        style={{ background: 'var(--sidebar-hover)' }}
+                      />
+                    )}
 
-              <div
-                className="w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-200 relative z-10"
-                style={{
-                  background: isActive
-                    ? 'rgba(255, 255, 255, 0.2)'
-                    : 'rgba(255, 255, 255, 0.05)',
-                }}
-              >
-                <Icon
-                  size={18}
-                  className={isActive ? 'text-white' : ''}
-                  style={{ color: isActive ? 'white' : 'var(--sidebar-text)' }}
-                />
-              </div>
+                    <div
+                      className="w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200 relative z-10"
+                      style={{
+                        background: isActive
+                          ? 'rgba(255, 255, 255, 0.2)'
+                          : 'rgba(255, 255, 255, 0.05)',
+                      }}
+                    >
+                      <Icon
+                        size={16}
+                        style={{ color: isActive ? 'white' : 'var(--sidebar-text)' }}
+                      />
+                    </div>
 
-              <span
-                className="flex-1 font-medium text-sm transition-colors duration-200 relative z-10"
-                style={{ color: isActive ? 'var(--sidebar-text-active)' : 'var(--sidebar-text)' }}
-              >
-                {item.label}
-              </span>
+                    <span
+                      className="flex-1 font-medium text-sm transition-colors duration-200 relative z-10"
+                      style={{ color: isActive ? 'var(--sidebar-text-active)' : 'var(--sidebar-text)' }}
+                    >
+                      {item.label}
+                    </span>
 
-              {isActive && (
-                <ChevronRight size={16} className="text-white/80 relative z-10" />
-              )}
-            </button>
-          );
-        })}
+                    {isActive && (
+                      <ChevronRight size={16} className="text-white/80 relative z-10" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
 
       {/* Bottom Section - User Menu */}

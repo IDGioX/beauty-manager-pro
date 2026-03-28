@@ -514,7 +514,7 @@ pub async fn process_template(
             r#"SELECT
                a.id, a.cliente_id, a.operatrice_id, a.trattamento_id,
                a.data_ora_inizio, a.data_ora_fine, a.stato,
-               a.note_prenotazione, a.note_trattamento, a.prezzo_applicato,
+               a.note_prenotazione, a.note_trattamento, a.prezzo_applicato, a.omaggio,
                a.created_at, a.updated_at,
                c.nome as cliente_nome,
                c.cognome as cliente_cognome,
@@ -570,7 +570,7 @@ pub async fn send_reminder(
         r#"SELECT
            a.id, a.cliente_id, a.operatrice_id, a.trattamento_id,
            a.data_ora_inizio, a.data_ora_fine, a.stato,
-           a.note_prenotazione, a.note_trattamento, a.prezzo_applicato,
+           a.note_prenotazione, a.note_trattamento, a.prezzo_applicato, a.omaggio,
            a.created_at, a.updated_at,
            c.nome as cliente_nome,
            c.cognome as cliente_cognome,
@@ -1181,6 +1181,7 @@ pub async fn get_appuntamenti_pending_reminder(
            a.note_prenotazione,
            a.note_trattamento,
            a.prezzo_applicato,
+           a.omaggio,
            a.created_at,
            a.updated_at
            FROM appuntamenti a

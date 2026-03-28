@@ -223,6 +223,29 @@ pub fn run() {
                 commands::messaggistica::get_appuntamenti_pending_reminder,
                 // Insights
                 commands::insights::get_insights_data,
+                // Pacchetti
+                commands::pacchetti::get_pacchetti,
+                commands::pacchetti::get_pacchetto_by_id,
+                commands::pacchetti::create_pacchetto,
+                commands::pacchetti::update_pacchetto,
+                commands::pacchetti::delete_pacchetto,
+                commands::pacchetti::get_pacchetti_cliente,
+                commands::pacchetti::assegna_pacchetto_cliente,
+                commands::pacchetti::registra_seduta,
+                commands::pacchetti::registra_pagamento,
+                commands::pacchetti::get_dashboard_pacchetti,
+                commands::pacchetti::get_sedute_pacchetto,
+                commands::pacchetti::annulla_pacchetto_cliente,
+                commands::pacchetti::update_pacchetto_cliente,
+                commands::pacchetti::get_seduta_by_appuntamento,
+                commands::pacchetti::collega_seduta_appuntamento,
+                commands::pacchetti::scollega_seduta_appuntamento,
+                commands::pacchetti::completa_seduta_by_id,
+                commands::pacchetti::registra_pagamento_seduta,
+                commands::pacchetti::elimina_pacchetto_cliente,
+                commands::pacchetti::aggiungi_pagamento_pacchetto,
+                commands::pacchetti::get_pagamenti_pacchetto,
+                commands::pacchetti::aggiorna_data_prevista_seduta,
             ])
             .run(tauri::generate_context!())
             .expect("error while running tauri application");

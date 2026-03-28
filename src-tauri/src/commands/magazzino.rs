@@ -1658,20 +1658,15 @@ pub async fn get_movimenti_appuntamento(
 ) -> AppResult<Vec<MovimentoWithDetails>> {
     let state = db.lock().await;
 
-    // Query che calcola la quantità NETTA per prodotto:
-    // - Scarichi (scarico_uso, scarico_vendita) sono positivi
-    // - Resi sono negativi (da sottrarre)
-    // Restituisce solo prodotti con quantità netta > 0
+    // Query che calcola la quantità NETTA per prodotto, separando uso da vendita.
+    // Ogni prodotto può comparire come scarico_uso O scarico_vendita (o entrambi se raro).
+    // I resi vengono sottratti dal tipo originale corrispondente.
     let result = sqlx::query_as::<_, MovimentoWithDetails>(
         "SELECT
             MIN(m.id) as id,
             m.prodotto_id,
-            'scarico_uso' as tipo,
-            SUM(CASE
-                WHEN m.tipo IN ('scarico_uso', 'scarico_vendita') THEN m.quantita
-                WHEN m.tipo = 'reso' THEN -m.quantita
-                ELSE 0
-            END) as quantita,
+            m.tipo as tipo,
+            SUM(m.quantita) as quantita,
             0.0 as giacenza_risultante,
             m.appuntamento_id,
             MAX(m.operatrice_id) as operatrice_id,
@@ -1692,13 +1687,9 @@ pub async fn get_movimenti_appuntamento(
          LEFT JOIN operatrici o ON m.operatrice_id = o.id
          LEFT JOIN clienti cl ON m.cliente_id = cl.id
          WHERE m.appuntamento_id = ?
-           AND m.tipo IN ('scarico_uso', 'scarico_vendita', 'reso')
-         GROUP BY m.prodotto_id, m.appuntamento_id, p.nome, p.codice
-         HAVING SUM(CASE
-                WHEN m.tipo IN ('scarico_uso', 'scarico_vendita') THEN m.quantita
-                WHEN m.tipo = 'reso' THEN -m.quantita
-                ELSE 0
-            END) > 0
+           AND m.tipo IN ('scarico_uso', 'scarico_vendita')
+         GROUP BY m.prodotto_id, m.tipo, m.appuntamento_id, p.nome, p.codice
+         HAVING SUM(m.quantita) > 0
          ORDER BY MAX(m.created_at) DESC"
     )
     .bind(&appuntamento_id)

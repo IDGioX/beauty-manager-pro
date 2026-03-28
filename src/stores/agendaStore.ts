@@ -26,7 +26,7 @@ interface AgendaState {
   loadOperatrici: () => Promise<void>;
   loadAppuntamenti: (dataInizio: Date, dataFine: Date) => Promise<void>;
   aggiornaStatiAutomatici: () => Promise<void>;
-  createAppuntamento: (input: CreateAppuntamentoInput) => Promise<void>;
+  createAppuntamento: (input: CreateAppuntamentoInput) => Promise<string>;
   updateAppuntamento: (id: string, input: UpdateAppuntamentoInput) => Promise<void>;
   deleteAppuntamento: (id: string) => Promise<void>;
   setSelectedDate: (date: Date) => void;
@@ -115,7 +115,7 @@ export const useAgendaStore = create<AgendaState>((set, get) => ({
   createAppuntamento: async (input: CreateAppuntamentoInput) => {
     set({ isLoading: true, error: null });
     try {
-      await invoke('create_appuntamento', { input });
+      const created = await invoke<{ id: string }>('create_appuntamento', { input });
 
       // Ricarica gli appuntamenti dopo la creazione, rispettando la vista corrente
       const { selectedDate, viewMode, loadAppuntamenti } = get();
@@ -136,6 +136,7 @@ export const useAgendaStore = create<AgendaState>((set, get) => ({
       }
 
       set({ isLoading: false, isModalOpen: false, modalMode: null, modalInitialTime: null });
+      return created.id;
     } catch (error: any) {
       const errorMessage = error?.message || 'Errore nella creazione dell\'appuntamento';
       set({ error: errorMessage, isLoading: false });

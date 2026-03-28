@@ -12,8 +12,8 @@ use std::io::BufWriter;
 /// Genera un file Excel con gli appuntamenti dell'agenda
 pub fn generate_excel_agenda(
     appuntamenti: Vec<AppuntamentoWithDetails>,
-    data_inizio: DateTime<Utc>,
-    data_fine: DateTime<Utc>,
+    data_inizio: &str,
+    data_fine: &str,
     output_path: &Path,
 ) -> AppResult<()> {
     // Crea workbook
@@ -137,8 +137,8 @@ pub fn generate_excel_agenda(
 /// Genera un file PDF con gli appuntamenti dell'agenda (layout lista)
 pub fn generate_pdf_agenda(
     appuntamenti: Vec<AppuntamentoWithDetails>,
-    data_inizio: DateTime<Utc>,
-    data_fine: DateTime<Utc>,
+    data_inizio: &str,
+    data_fine: &str,
     output_path: &Path,
 ) -> AppResult<()> {
     // Ordina appuntamenti per data/ora
@@ -157,13 +157,17 @@ pub fn generate_pdf_agenda(
 
     let mut y_pos = 280.0; // Partenza dall'alto (A4 height = 297mm)
 
-    // Titolo (converti in ora locale)
-    let local_inizio = data_inizio.with_timezone(&Local);
-    let local_fine = data_fine.with_timezone(&Local);
+    // Titolo
+    let fmt_d = |s: &str| -> String {
+        s.get(..10).map(|d| {
+            let parts: Vec<&str> = d.split('-').collect();
+            if parts.len() == 3 { format!("{}/{}/{}", parts[2], parts[1], parts[0]) } else { d.to_string() }
+        }).unwrap_or_else(|| s.to_string())
+    };
     let title = format!(
         "AGENDA {} - {}",
-        local_inizio.format("%d/%m/%Y"),
-        local_fine.format("%d/%m/%Y")
+        fmt_d(data_inizio),
+        fmt_d(data_fine)
     );
     current_layer.use_text(title, 14.0, Mm(20.0), Mm(y_pos), &font_bold);
     y_pos -= 10.0;
@@ -173,8 +177,8 @@ pub fn generate_pdf_agenda(
     let mut by_day: HashMap<String, Vec<&AppuntamentoWithDetails>> = HashMap::new();
     for app in &sorted_apps {
         let local_dt = app.data_ora_inizio.with_timezone(&Local);
-        let day_key = local_dt.format("%Y-%m-%d").to_string();
-        by_day.entry(day_key).or_insert_with(Vec::new).push(app);
+        let dk = local_dt.format("%Y-%m-%d").to_string();
+        by_day.entry(dk).or_insert_with(Vec::new).push(app);
     }
 
     // Ordina giorni

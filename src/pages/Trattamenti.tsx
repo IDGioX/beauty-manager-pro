@@ -412,7 +412,7 @@ const TrattamentoDetailPanel: React.FC<{
   return (
     <div className="flex flex-col h-full">
       {/* Panel Header */}
-      <div className="p-5 pb-4">
+      <div className="p-4 pb-3">
         <div className="max-w-2xl">
         <div className="flex items-start justify-between mb-4">
           <button onClick={onClose} className="p-1.5 rounded-lg transition-colors" style={{ color: 'var(--color-text-muted)' }}
@@ -422,7 +422,7 @@ const TrattamentoDetailPanel: React.FC<{
           </button>
           <div className="flex items-center gap-1">
             {!isEditing && (
-              <button onClick={onStartEdit} className="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors" style={{ color: 'var(--color-primary)', background: 'color-mix(in srgb, var(--color-primary) 8%, transparent)' }}>
+              <button onClick={onStartEdit} className="px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors" style={{ color: 'var(--color-primary)', background: 'color-mix(in srgb, var(--color-primary) 8%, transparent)' }}>
                 <Edit2 size={13} className="inline mr-1" />Modifica
               </button>
             )}
@@ -435,7 +435,7 @@ const TrattamentoDetailPanel: React.FC<{
               {showOverflow && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setShowOverflow(false)} />
-                  <div className="absolute right-0 top-full mt-1 w-44 rounded-xl shadow-lg py-1 z-50" style={{ background: 'var(--card-bg)', border: '1px solid var(--glass-border)' }}>
+                  <div className="absolute right-0 top-full mt-1 w-48 rounded-xl shadow-lg py-1 z-50" style={{ background: 'var(--card-bg)', border: '1px solid var(--glass-border)' }}>
                     <button onClick={() => { setShowOverflow(false); onToggleAttivo(); }} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left transition-colors" style={{ color: trattamento.attivo ? '#f59e0b' : '#10b981' }}
                       onMouseEnter={e => { e.currentTarget.style.background = 'var(--glass-border)'; }}
                       onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
@@ -563,7 +563,7 @@ const AnagraficaTrattamentoTab: React.FC<{
 
   // Edit mode
   return (
-    <form onSubmit={onSave} className="space-y-4">
+    <form onSubmit={onSave} className="space-y-3">
       <Select label="Categoria *" value={formData.categoria_id} onChange={e => setFormData({ ...formData, categoria_id: e.target.value })} required>
         <option value="">Seleziona categoria</option>
         {categorie.map(cat => <option key={cat.id} value={cat.id}>{cat.nome}</option>)}
