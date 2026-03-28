@@ -236,6 +236,29 @@ export function Settings() {
     }
   };
 
+  const handleImportBackup = async () => {
+    try {
+      const { open } = await import('@tauri-apps/plugin-dialog');
+      const selected = await open({
+        title: 'Seleziona file di backup',
+        filters: [{ name: 'Database', extensions: ['db', 'sqlite', 'sqlite3', 'bak'] }],
+        multiple: false,
+      });
+      if (!selected) return;
+      const filePath = typeof selected === 'string' ? selected : (selected as any).path || String(selected);
+      if (!filePath) return;
+
+      setLoading(true);
+      await backupService.importBackupFromFile(filePath);
+      showToast('Backup importato e ripristinato! L\'app si ricaricherà.', 'success');
+      setTimeout(() => window.location.reload(), 2000);
+    } catch (error) {
+      console.error('Errore importazione backup:', error);
+      showToast('Errore durante l\'importazione del backup', 'error');
+      setLoading(false);
+    }
+  };
+
   const handleOpenBackupFolder = async () => {
     try {
       await backupService.openBackupFolder();
@@ -1261,6 +1284,14 @@ export function Settings() {
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="font-semibold" style={{ color: 'var(--color-text-primary)' }}>Backup Salvati</h3>
                     <div className="flex gap-2">
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={handleImportBackup}
+                        loading={loading}
+                      >
+                        Importa da file
+                      </Button>
                       <Button
                         variant="secondary"
                         size="sm"
