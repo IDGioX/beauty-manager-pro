@@ -1,13 +1,9 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "BeautyManagerPro",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "identifier": "com.beautymanager.pro",
-  "plugins": {
-    "updater": {
-      "active": false
-    }
-  },
+  "plugins": {},
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
