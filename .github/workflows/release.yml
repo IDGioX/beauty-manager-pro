@@ -41,6 +41,18 @@ jobs:
       - name: Install frontend dependencies
         run: npm install
 
+      - name: Generate release notes
+        id: notes
+        shell: bash
+        run: |
+          # Prende il messaggio dell'ultimo commit taggato con v* o l'ultimo commit
+          NOTES=$(git log -1 --pretty=format:"%B" | grep -v "Co-Authored-By" | head -50)
+          # Escape per multiline
+          NOTES="${NOTES//'%'/'%25'}"
+          NOTES="${NOTES//$'\n'/'%0A'}"
+          NOTES="${NOTES//$'\r'/'%0D'}"
+          echo "body=${NOTES}" >> $GITHUB_OUTPUT
+
       - name: Build the app
         uses: tauri-apps/tauri-action@v0
         env:
@@ -51,14 +63,14 @@ jobs:
           tagName: v__VERSION__
           releaseName: 'Beauty Manager Pro v__VERSION__'
           releaseBody: |
+            ${{ steps.notes.outputs.body }}
+
+            ---
             ## Download
 
-            **Windows:**
-            - `BeautyManagerPro_*_x64-setup.exe` - Installer
-
-            **macOS:**
-            - `BeautyManagerPro_*_aarch64.dmg` - Apple Silicon (M1/M2/M3)
-            - `BeautyManagerPro_*_x64.dmg` - Intel
+            **Windows:** `BeautyManagerPro_*_x64-setup.exe`
+            **macOS ARM:** `BeautyManagerPro_*_aarch64.dmg`
+            **macOS Intel:** `BeautyManagerPro_*_x64.dmg`
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
