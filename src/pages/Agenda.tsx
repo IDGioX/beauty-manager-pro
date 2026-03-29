@@ -221,11 +221,15 @@ export const Agenda: React.FC<AgendaProps> = ({ openAppuntamentoId, onAppuntamen
 
     if (checkedDaysRef.current.has(dayKey) || viewMode !== 'day') return;
 
-    const isPast = selDay < today;
+    // Solo per OGGI — non per giorni passati o futuri
     const isToday = selDay.getTime() === today.getTime();
-    const isAfterClosing = isToday && now.getHours() >= 19;
+    if (!isToday) return;
 
-    if (!isPast && !isAfterClosing) return;
+    // Controlla se siamo dopo l'orario di chiusura o dopo l'ultimo appuntamento
+    const chiusura = dayOrario?.pomeriggio_fine || dayOrario?.mattina_fine || '19:00';
+    const [ch, cm] = chiusura.split(':').map(Number);
+    const isAfterClosing = now.getHours() > ch || (now.getHours() === ch && now.getMinutes() >= cm);
+    if (!isAfterClosing) return;
 
     const nonRisolti = appuntamenti.filter(a => a.stato === 'prenotato' || a.stato === 'in_corso');
     checkedDaysRef.current.add(dayKey);
@@ -351,17 +355,26 @@ export const Agenda: React.FC<AgendaProps> = ({ openAppuntamentoId, onAppuntamen
     .filter(app => operatriciVisibiliIds.includes(app.operatrice_id)) // Filtra per operatrici visibili
     .filter(app => selectedOperatriciIds.length === 0 || selectedOperatriciIds.includes(app.operatrice_id));
 
-  const events = filteredAppuntamenti.map((app) => ({
-    id: app.id,
-    resourceId: app.operatrice_id,
-    title: `${app.cliente_nome} ${app.cliente_cognome} - ${app.trattamento_nome}`,
-    classNames: app.omaggio ? ['fc-event-omaggio'] : [],
-    start: new Date(app.data_ora_inizio),
-    end: new Date(app.data_ora_fine),
-    backgroundColor: app.operatrice_colore,
-    borderColor: app.operatrice_colore,
-    extendedProps: { appuntamento: app },
-  }));
+  const events = filteredAppuntamenti.map((app) => {
+    const isAnnullato = app.stato === 'annullato';
+    const isNoShow = app.stato === 'no_show';
+    const isCancelled = isAnnullato || isNoShow;
+    return {
+      id: app.id,
+      resourceId: app.operatrice_id,
+      title: `${isCancelled ? '✕ ' : ''}${app.cliente_nome} ${app.cliente_cognome} - ${app.trattamento_nome}`,
+      classNames: [
+        ...(app.omaggio ? ['fc-event-omaggio'] : []),
+        ...(isAnnullato ? ['fc-event-annullato'] : []),
+        ...(isNoShow ? ['fc-event-noshow'] : []),
+      ],
+      start: new Date(app.data_ora_inizio),
+      end: new Date(app.data_ora_fine),
+      backgroundColor: isCancelled ? '#999' : app.operatrice_colore,
+      borderColor: isCancelled ? '#777' : app.operatrice_colore,
+      extendedProps: { appuntamento: app },
+    };
+  });
 
   const handleEventClick = async (info: EventClickArg) => {
     // Usa openEditModalById che carica i dati freschi dal backend

@@ -756,6 +756,17 @@
   border-width: 1.5px !important;
 }
 
+/* Appuntamento annullato */
+.fc .fc-event.fc-event-annullato,
+.fc .fc-event.fc-event-noshow {
+  opacity: 0.45 !important;
+  text-decoration: line-through !important;
+}
+.fc .fc-event.fc-event-annullato .fc-event-title,
+.fc .fc-event.fc-event-noshow .fc-event-title {
+  text-decoration: line-through !important;
+}
+
 /* Current time indicator */
 .fc .fc-timegrid-now-indicator-line {
   border-color: var(--color-primary) !important;
