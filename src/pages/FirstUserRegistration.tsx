@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { useAuthStore } from '../stores/authStore';
 import { aziendaService } from '../services/azienda';
+import { backupService } from '../services/backup';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { Sparkles, Building2, User, Lock, KeyRound } from 'lucide-react';
+import { Sparkles, Building2, User, Lock, KeyRound, Upload, Loader2 } from 'lucide-react';
 
 export const FirstUserRegistration: React.FC = () => {
   const { registerFirstUser, isLoading, error, clearError } = useAuthStore();
@@ -16,6 +17,30 @@ export const FirstUserRegistration: React.FC = () => {
   });
   const [formError, setFormError] = useState('');
   const [step, setStep] = useState<1 | 2>(1);
+  const [isRestoring, setIsRestoring] = useState(false);
+  const [restoreError, setRestoreError] = useState('');
+
+  const handleRestoreFromBackup = async () => {
+    try {
+      setIsRestoring(true);
+      setRestoreError('');
+      const { open } = await import('@tauri-apps/plugin-dialog');
+      const selected = await open({
+        title: 'Seleziona file di backup',
+        filters: [{ name: 'Backup Beauty Manager', extensions: ['bmbackup'] }],
+        multiple: false,
+      });
+      if (!selected) { setIsRestoring(false); return; }
+      const filePath = typeof selected === 'string' ? selected : (selected as any).path || String(selected);
+      if (!filePath) { setIsRestoring(false); return; }
+
+      await backupService.restoreBackupFirstSetup(filePath);
+      try { const { relaunch } = await import('@tauri-apps/plugin-process'); await relaunch(); } catch { window.location.reload(); }
+    } catch (err: any) {
+      setRestoreError(typeof err === 'string' ? err : err?.message || 'Errore durante il ripristino del backup');
+      setIsRestoring(false);
+    }
+  };
 
   const handleNext = () => {
     setFormError('');
@@ -189,6 +214,31 @@ export const FirstUserRegistration: React.FC = () => {
                   >
                     Continua
                   </Button>
+
+                  {/* Divider + Restore */}
+                  <div className="flex items-center gap-3 mt-5">
+                    <div className="flex-1 h-px" style={{ background: 'var(--glass-border)' }} />
+                    <span className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>oppure</span>
+                    <div className="flex-1 h-px" style={{ background: 'var(--glass-border)' }} />
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleRestoreFromBackup}
+                    disabled={isRestoring || isLoading}
+                    className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl transition-all disabled:opacity-50"
+                    style={{
+                      background: 'color-mix(in srgb, var(--color-primary) 8%, transparent)',
+                      border: '1px solid var(--glass-border)',
+                      color: 'var(--color-text-secondary)',
+                    }}
+                  >
+                    {isRestoring ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
+                    {isRestoring ? 'Ripristino in corso...' : 'Ripristina da backup'}
+                  </button>
+                  {restoreError && (
+                    <p className="text-xs text-center" style={{ color: 'var(--color-danger)' }}>{restoreError}</p>
+                  )}
                 </>
               )}
 

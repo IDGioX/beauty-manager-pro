@@ -16,6 +16,16 @@ export interface BackupInfo {
   metadata: BackupMetadata;
 }
 
+export type RestoreMode = 'smart' | 'full';
+
+export interface RestoreResult {
+  metadata: BackupMetadata;
+  tables_restored: string[];
+  tables_skipped: string[];
+  mode: string;
+  requires_relaunch: boolean;
+}
+
 export const backupService = {
   async createBackup(description?: string): Promise<string> {
     return await invoke('create_backup', { description });
@@ -43,5 +53,13 @@ export const backupService = {
 
   async openBackupFolder(): Promise<void> {
     return await invoke('open_backup_folder');
+  },
+
+  async restoreBackupSmart(backupPath: string, restoreMode: RestoreMode): Promise<RestoreResult> {
+    return await invoke('restore_backup_smart', { backupPath, restore_mode: restoreMode });
+  },
+
+  async restoreBackupFirstSetup(backupPath: string): Promise<RestoreResult> {
+    return await invoke('restore_backup_first_setup', { backupPath });
   },
 };

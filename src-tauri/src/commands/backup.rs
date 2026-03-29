@@ -1,7 +1,9 @@
-use crate::backup::{self, BackupInfo, BackupMetadata};
+use crate::backup::{self, BackupInfo, BackupMetadata, RestoreMode, RestoreResult};
 use crate::error::AppResult;
 use std::path::PathBuf;
+use std::sync::Arc;
 use tauri::{AppHandle, Manager};
+use tokio::sync::Mutex;
 
 /// Ottiene il percorso del database
 pub(crate) fn get_db_path(app: &AppHandle) -> AppResult<PathBuf> {
@@ -78,6 +80,46 @@ pub async fn import_backup_from_file(app: AppHandle, source_path: String) -> App
     let metadata = backup::restore_backup(&source_file, &db_path)?;
 
     Ok(metadata)
+}
+
+/// Ripristino smart (preserva auth/config) o completo
+#[tauri::command]
+pub async fn restore_backup_smart(
+    app: AppHandle,
+    db: tauri::State<'_, Arc<Mutex<crate::AppState>>>,
+    backup_path: String,
+    restore_mode: RestoreMode,
+) -> AppResult<RestoreResult> {
+    // Clona il pool e rilascia il mutex subito per evitare deadlock
+    let pool = { db.lock().await.db.pool.clone() };
+    let app_data_dir = app.path().app_data_dir()
+        .map_err(|e| crate::error::AppError::Internal(format!("Cannot resolve app data dir: {}", e)))?;
+
+    backup::restore_backup_selective(
+        &PathBuf::from(backup_path),
+        &pool,
+        restore_mode,
+        &app_data_dir,
+    ).await
+}
+
+/// Ripristino completo per prima installazione
+#[tauri::command]
+pub async fn restore_backup_first_setup(
+    app: AppHandle,
+    db: tauri::State<'_, Arc<Mutex<crate::AppState>>>,
+    backup_path: String,
+) -> AppResult<RestoreResult> {
+    let pool = { db.lock().await.db.pool.clone() };
+    let app_data_dir = app.path().app_data_dir()
+        .map_err(|e| crate::error::AppError::Internal(format!("Cannot resolve app data dir: {}", e)))?;
+
+    backup::restore_backup_selective(
+        &PathBuf::from(backup_path),
+        &pool,
+        RestoreMode::Full,
+        &app_data_dir,
+    ).await
 }
 
 #[tauri::command]

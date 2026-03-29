@@ -202,24 +202,39 @@ export function Settings() {
   };
 
   const [confirmAction, setConfirmAction] = useState<{ type: string; path: string } | null>(null);
+  const [restoreModal, setRestoreModal] = useState<{ path: string; mode: 'smart' | 'full' } | null>(null);
 
-  const handleRestoreBackup = async (backupPath: string) => {
+  const openRestoreModal = (path: string) => {
+    setRestoreModal({ path, mode: 'smart' });
+    setConfirmAction(null);
+  };
+
+  const handleConfirmRestore = async () => {
+    if (!restoreModal) return;
+    const { path, mode } = restoreModal;
+    setRestoreModal(null);
     try {
       setLoading(true);
-      await backupService.restoreBackup(backupPath);
-      showToast('Backup ripristinato! L\'app si riavvierà.', 'success');
-      setTimeout(async () => {
-        try { const { relaunch } = await import('@tauri-apps/plugin-process'); await relaunch(); } catch { window.location.reload(); }
-      }, 2000);
-    } catch (error) {
+      const result = await backupService.restoreBackupSmart(path, mode);
+      if (mode === 'full') {
+        showToast(`Ripristino completo eseguito! (${result.tables_restored.length} tabelle) L'app si riavvierà.`, 'success');
+        setTimeout(async () => {
+          try { const { relaunch } = await import('@tauri-apps/plugin-process'); await relaunch(); } catch { window.location.reload(); }
+        }, 2000);
+      } else {
+        showToast(`Dati ripristinati con successo! (${result.tables_restored.length} tabelle) L'app si riavvierà.`, 'success');
+        setTimeout(async () => {
+          try { const { relaunch } = await import('@tauri-apps/plugin-process'); await relaunch(); } catch { window.location.reload(); }
+        }, 2000);
+      }
+    } catch (error: any) {
       console.error('Errore ripristino backup:', error);
-      showToast('Errore durante il ripristino del backup', 'error');
+      showToast(typeof error === 'string' ? error : error?.message || 'Errore durante il ripristino', 'error');
       setLoading(false);
     }
   };
 
   const handleDeleteBackup = async (backupPath: string) => {
-
     try {
       await backupService.deleteBackup(backupPath);
       showToast('Backup eliminato con successo!', 'success');
@@ -241,17 +256,11 @@ export function Settings() {
       if (!selected) return;
       const filePath = typeof selected === 'string' ? selected : (selected as any).path || String(selected);
       if (!filePath) return;
-
-      setLoading(true);
-      await backupService.importBackupFromFile(filePath);
-      showToast('Backup importato! L\'app si riavvierà.', 'success');
-      setTimeout(async () => {
-        try { const { relaunch } = await import('@tauri-apps/plugin-process'); await relaunch(); } catch { window.location.reload(); }
-      }, 2000);
+      // Apri modal scelta modalità
+      openRestoreModal(filePath);
     } catch (error) {
       console.error('Errore importazione backup:', error);
       showToast('Errore durante l\'importazione del backup', 'error');
-      setLoading(false);
     }
   };
 
@@ -421,6 +430,51 @@ export function Settings() {
           type={toast.type}
           onClose={() => setToast(null)}
         />
+      )}
+
+      {/* Modal scelta modalità restore */}
+      {restoreModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center">
+          <div className="absolute inset-0 backdrop-blur-sm" style={{ background: 'rgba(0,0,0,0.4)' }} onClick={() => setRestoreModal(null)} />
+          <div className="relative w-full max-w-md mx-4 rounded-2xl overflow-hidden shadow-2xl" style={{ background: 'var(--card-bg)', border: '1px solid var(--glass-border)' }}>
+            <div className="px-6 py-4" style={{ background: 'var(--sidebar-bg)' }}>
+              <h3 className="font-bold text-base text-white">Modalita di Ripristino</h3>
+              <p className="text-xs text-white/50 mt-0.5">Scegli cosa ripristinare dal backup</p>
+            </div>
+            <div className="px-6 py-4 space-y-3">
+              <label
+                className="flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-colors"
+                style={{
+                  background: restoreModal.mode === 'smart' ? 'color-mix(in srgb, var(--color-primary) 8%, transparent)' : 'transparent',
+                  border: `1.5px solid ${restoreModal.mode === 'smart' ? 'var(--color-primary)' : 'var(--glass-border)'}`,
+                }}
+              >
+                <input type="radio" name="restoreMode" checked={restoreModal.mode === 'smart'} onChange={() => setRestoreModal({ ...restoreModal, mode: 'smart' })} className="mt-1" />
+                <div>
+                  <p className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>Ripristina solo i dati</p>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>Clienti, appuntamenti, trattamenti, pacchetti, magazzino. Mantiene le tue credenziali, SMTP e impostazioni.</p>
+                </div>
+              </label>
+              <label
+                className="flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-colors"
+                style={{
+                  background: restoreModal.mode === 'full' ? 'color-mix(in srgb, var(--color-warning) 8%, transparent)' : 'transparent',
+                  border: `1.5px solid ${restoreModal.mode === 'full' ? 'var(--color-warning)' : 'var(--glass-border)'}`,
+                }}
+              >
+                <input type="radio" name="restoreMode" checked={restoreModal.mode === 'full'} onChange={() => setRestoreModal({ ...restoreModal, mode: 'full' })} className="mt-1" />
+                <div>
+                  <p className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>Ripristino completo</p>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>Sovrascrive tutto, incluse credenziali e configurazioni. Dovrai accedere con le credenziali del backup. L'app si riavvierà.</p>
+                </div>
+              </label>
+            </div>
+            <div className="px-6 py-4 flex justify-end gap-2" style={{ borderTop: '1px solid var(--glass-border)' }}>
+              <button onClick={() => setRestoreModal(null)} className="px-4 py-2 rounded-lg text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>Annulla</button>
+              <button onClick={handleConfirmRestore} className="px-5 py-2 rounded-lg text-xs font-medium text-white" style={{ background: 'var(--color-primary)' }}>Ripristina</button>
+            </div>
+          </div>
+        </div>
       )}
 
       <div className="space-y-6">
@@ -1365,7 +1419,7 @@ export function Settings() {
                                   </span>
                                   <button
                                     onClick={() => {
-                                      if (confirmAction.type === 'restore') handleRestoreBackup(backup.file_path);
+                                      if (confirmAction.type === 'restore') openRestoreModal(backup.file_path);
                                       else handleDeleteBackup(backup.file_path);
                                       setConfirmAction(null);
                                     }}

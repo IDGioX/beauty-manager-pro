@@ -141,6 +141,8 @@ pub fn run() {
                 commands::backup::list_backups,
                 commands::backup::delete_backup,
                 commands::backup::export_backup_to_folder,
+                commands::backup::restore_backup_smart,
+                commands::backup::restore_backup_first_setup,
                 commands::backup::import_backup_from_file,
                 commands::backup::open_backup_folder,
                 commands::azienda::get_azienda,
