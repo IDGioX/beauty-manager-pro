@@ -56,6 +56,15 @@ export const Agenda: React.FC<AgendaProps> = ({ openAppuntamentoId, onAppuntamen
     loadOperatrici();
   }, [viewMode, loadOperatrici]);
 
+  // Ridimensiona FullCalendar quando la sidebar cambia (window resize)
+  useEffect(() => {
+    const handleResize = () => {
+      calendarRef.current?.getApi()?.updateSize();
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   // Orari centro
   const [orariCentro, setOrariCentro] = useState<OrarioCentro[]>([]);
   useEffect(() => {

@@ -79,6 +79,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate }) => 
     const next = !collapsed;
     setCollapsed(next);
     try { localStorage.setItem('bmp_sidebar_collapsed', String(next)); } catch {}
+    // Notifica FullCalendar e altri componenti del cambio dimensione
+    setTimeout(() => window.dispatchEvent(new Event('resize')), 250);
   };
 
   // Click outside to close
