@@ -4,7 +4,7 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Toast } from '../components/ui/Toast';
 import { backupService, BackupInfo } from '../services/backup';
-import { aziendaService, Azienda, UpdateAziendaInput } from '../services/azienda';
+import { aziendaService, Azienda, UpdateAziendaInput, OrarioCentro, UpdateOrarioCentroInput, GIORNI_SETTIMANA } from '../services/azienda';
 import * as comunicazioniService from '../services/comunicazioni';
 import { updaterService, UpdateInfo, UpdateProgress, UpdateStatus } from '../services/updater';
 import type { ConfigSmtp, SaveSmtpConfigInput } from '../types/comunicazione';
@@ -77,6 +77,11 @@ export function Settings() {
   const [testingSmtp, setTestingSmtp] = useState(false);
   const [smtpTestResult, setSmtpTestResult] = useState<{ success: boolean; message: string } | null>(null);
 
+  // Orari centro state
+  const [_orariCentro, setOrariCentro] = useState<OrarioCentro[]>([]);
+  const [orariForm, setOrariForm] = useState<UpdateOrarioCentroInput[]>([]);
+  const [savingOrari, setSavingOrari] = useState(false);
+
   // Updates state
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>('idle');
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
@@ -112,6 +117,7 @@ export function Settings() {
     loadBackups();
     loadAzienda();
     loadSmtpConfig();
+    loadOrariCentro();
     updaterService.getCurrentVersion().then(version => {
       setUpdateInfo({ available: false, currentVersion: version });
     });
@@ -303,6 +309,41 @@ export function Settings() {
       console.error('Errore caricamento dati azienda:', error);
       showToast('Errore durante il caricamento dei dati azienda', 'error');
     }
+  };
+
+  const loadOrariCentro = async () => {
+    try {
+      const orari = await aziendaService.getOrariCentro();
+      setOrariCentro(orari);
+      setOrariForm(orari.map(o => ({
+        giorno: o.giorno,
+        attivo: o.attivo,
+        mattina_inizio: o.mattina_inizio,
+        mattina_fine: o.mattina_fine,
+        pomeriggio_inizio: o.pomeriggio_inizio,
+        pomeriggio_fine: o.pomeriggio_fine,
+      })));
+    } catch (e) {
+      console.error('Errore caricamento orari centro:', e);
+    }
+  };
+
+  const handleSaveOrari = async () => {
+    setSavingOrari(true);
+    try {
+      await aziendaService.updateOrariCentro(orariForm);
+      showToast('Orari salvati con successo', 'success');
+      loadOrariCentro();
+    } catch (e) {
+      console.error('Errore salvataggio orari:', e);
+      showToast('Errore durante il salvataggio degli orari', 'error');
+    } finally {
+      setSavingOrari(false);
+    }
+  };
+
+  const updateOrarioField = (giorno: number, field: keyof UpdateOrarioCentroInput, value: any) => {
+    setOrariForm(prev => prev.map(o => o.giorno === giorno ? { ...o, [field]: value } : o));
   };
 
   const handleUpdateAzienda = async (e: React.FormEvent) => {
@@ -1000,28 +1041,76 @@ export function Settings() {
                       onChange={(e) => setAziendaForm({ ...aziendaForm, piva: e.target.value })}
                     />
 
-                    <Input
-                      label="Orario Apertura"
-                      type="time"
-                      value={aziendaForm.orario_apertura}
-                      onChange={(e) => setAziendaForm({ ...aziendaForm, orario_apertura: e.target.value })}
-                    />
-
-                    <Input
-                      label="Orario Chiusura"
-                      type="time"
-                      value={aziendaForm.orario_chiusura}
-                      onChange={(e) => setAziendaForm({ ...aziendaForm, orario_chiusura: e.target.value })}
-                    />
-
                   </div>
 
                   <div className="flex justify-end pt-4" style={{ borderTop: '1px solid var(--glass-border)' }}>
                     <Button type="submit" variant="primary" loading={loading}>
-                      Salva Modifiche
+                      Salva Dati Azienda
                     </Button>
                   </div>
                 </form>
+
+                {/* Orari settimanali */}
+                <div className="mt-6 pt-6" style={{ borderTop: '1px solid var(--glass-border)' }}>
+                  <h3 className="text-base font-semibold mb-4" style={{ color: 'var(--color-text-primary)' }}>Orari Settimanali</h3>
+                  <div className="space-y-2">
+                    {orariForm.map(o => (
+                      <div
+                        key={o.giorno}
+                        className="flex items-center gap-3 p-3 rounded-xl transition-colors"
+                        style={{
+                          background: o.attivo ? 'color-mix(in srgb, var(--color-primary) 4%, transparent)' : 'color-mix(in srgb, var(--color-text-muted) 5%, transparent)',
+                          border: '1px solid var(--glass-border)',
+                          opacity: o.attivo ? 1 : 0.6,
+                        }}
+                      >
+                        {/* Toggle + Nome giorno */}
+                        <label className="flex items-center gap-2 w-24 shrink-0 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={o.attivo}
+                            onChange={e => updateOrarioField(o.giorno, 'attivo', e.target.checked)}
+                            className="rounded"
+                          />
+                          <span className="text-xs font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+                            {GIORNI_SETTIMANA[o.giorno]}
+                          </span>
+                        </label>
+
+                        {o.attivo && (
+                          <div className="flex items-center gap-2 flex-1 flex-wrap">
+                            {/* Mattina */}
+                            <span className="text-[9px] font-medium" style={{ color: 'var(--color-text-muted)' }}>Matt.</span>
+                            <input type="time" value={o.mattina_inizio || ''} onChange={e => updateOrarioField(o.giorno, 'mattina_inizio', e.target.value || null)}
+                              className="px-2 py-1 rounded-lg text-[11px] w-[90px]" style={{ background: 'var(--card-bg)', border: '1px solid var(--glass-border)', color: 'var(--color-text-primary)' }} />
+                            <span className="text-[9px]" style={{ color: 'var(--color-text-muted)' }}>-</span>
+                            <input type="time" value={o.mattina_fine || ''} onChange={e => updateOrarioField(o.giorno, 'mattina_fine', e.target.value || null)}
+                              className="px-2 py-1 rounded-lg text-[11px] w-[90px]" style={{ background: 'var(--card-bg)', border: '1px solid var(--glass-border)', color: 'var(--color-text-primary)' }} />
+
+                            {/* Separatore */}
+                            <div className="w-px h-4 mx-1" style={{ background: 'var(--glass-border)' }} />
+
+                            {/* Pomeriggio */}
+                            <span className="text-[9px] font-medium" style={{ color: 'var(--color-text-muted)' }}>Pom.</span>
+                            <input type="time" value={o.pomeriggio_inizio || ''} onChange={e => updateOrarioField(o.giorno, 'pomeriggio_inizio', e.target.value || null)}
+                              className="px-2 py-1 rounded-lg text-[11px] w-[90px]" style={{ background: 'var(--card-bg)', border: '1px solid var(--glass-border)', color: 'var(--color-text-primary)' }} />
+                            <span className="text-[9px]" style={{ color: 'var(--color-text-muted)' }}>-</span>
+                            <input type="time" value={o.pomeriggio_fine || ''} onChange={e => updateOrarioField(o.giorno, 'pomeriggio_fine', e.target.value || null)}
+                              className="px-2 py-1 rounded-lg text-[11px] w-[90px]" style={{ background: 'var(--card-bg)', border: '1px solid var(--glass-border)', color: 'var(--color-text-primary)' }} />
+                          </div>
+                        )}
+                        {!o.attivo && (
+                          <span className="text-xs italic" style={{ color: 'var(--color-text-muted)' }}>Chiuso</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex justify-end mt-4">
+                    <Button onClick={handleSaveOrari} variant="primary" loading={savingOrari}>
+                      Salva Orari
+                    </Button>
+                  </div>
+                </div>
               </div>
             </div>
           )}

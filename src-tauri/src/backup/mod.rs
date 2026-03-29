@@ -231,7 +231,7 @@ const DATA_TABLES: &[&str] = &[
     "campagne_marketing", "campagna_destinatari",
     "pacchetti_trattamenti", "pacchetto_trattamenti_inclusi",
     "pacchetti_cliente", "pacchetto_sedute", "pacchetto_pagamenti",
-    "client_intelligence_scores", "orari_operatrici", "chiusure", "audit_log",
+    "client_intelligence_scores", "orari_operatrici", "chiusure", "audit_log", "orari_centro",
 ];
 
 /// Tabelle auth/config (ripristinate solo in modalità Full)

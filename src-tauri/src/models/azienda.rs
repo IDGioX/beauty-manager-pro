@@ -36,3 +36,24 @@ pub struct UpdateAziendaInput {
     pub slot_durata_minuti: i64,
     pub giorni_lavorativi: String,
 }
+
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow, Clone)]
+pub struct OrarioCentro {
+    pub id: String,
+    pub giorno: i64,
+    pub attivo: bool,
+    pub mattina_inizio: Option<String>,
+    pub mattina_fine: Option<String>,
+    pub pomeriggio_inizio: Option<String>,
+    pub pomeriggio_fine: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateOrarioCentroInput {
+    pub giorno: i64,
+    pub attivo: bool,
+    pub mattina_inizio: Option<String>,
+    pub mattina_fine: Option<String>,
+    pub pomeriggio_inizio: Option<String>,
+    pub pomeriggio_fine: Option<String>,
+}

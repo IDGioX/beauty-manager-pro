@@ -460,34 +460,38 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate, onOpenAppuntam
           </div>
         )}
 
-        {/* SLOT LIBERI */}
-        {loading ? <SkeletonCard /> : (
-          <div
-            className="relative overflow-hidden rounded-2xl p-5 animate-fade-in-up cursor-pointer group card-hover-lift"
-            style={{ ...cardStyle, animationDelay: '250ms' }}
-            onClick={() => onNavigate?.('agenda')}
-          >
-            <div className="absolute top-0 left-0 right-0 h-1" style={{ background: `linear-gradient(90deg, var(--color-warning), color-mix(in srgb, var(--color-warning) 70%, black))` }} />
-            <div className="flex items-start justify-between mb-3">
-              <p className="text-sm font-medium flex items-center gap-1" style={{ color: 'var(--color-text-secondary)' }}>
-                Slot Liberi
-                <InfoTooltip text="Slot disponibili oggi. Calcolato come: (ore lavorative / durata slot) x operatrici attive, meno gli appuntamenti occupati (esclusi annullati e no-show)." />
+        {/* ORE LIBERE + SATURAZIONE */}
+        {loading ? <SkeletonCard /> : (() => {
+          const satPct = data?.saturazione_oggi_percentuale ?? 0;
+          return (
+            <div
+              className="relative overflow-hidden rounded-2xl p-5 animate-fade-in-up cursor-pointer group card-hover-lift"
+              style={{ ...cardStyle, animationDelay: '250ms' }}
+              onClick={() => onNavigate?.('agenda')}
+            >
+              <div className="absolute top-0 left-0 right-0 h-1" style={{ background: `linear-gradient(90deg, var(--color-warning), color-mix(in srgb, var(--color-warning) 70%, black))` }} />
+              <div className="flex items-start justify-between mb-3">
+                <p className="text-sm font-medium flex items-center gap-1" style={{ color: 'var(--color-text-secondary)' }}>
+                  Saturazione
+                  <InfoTooltip text="Percentuale di occupazione dell'agenda oggi, basata sugli orari del centro e le operatrici attive." />
+                </p>
+                <div
+                  className="w-10 h-10 rounded-xl flex items-center justify-center"
+                  style={{ background: 'linear-gradient(135deg, var(--color-warning), color-mix(in srgb, var(--color-warning) 70%, black))', boxShadow: '0 4px 12px color-mix(in srgb, var(--color-warning) 30%, transparent)' }}
+                >
+                  <Target size={20} className="text-white" />
+                </div>
+              </div>
+              <p className="text-4xl font-bold tracking-tight mb-2" style={{ color: 'var(--color-text-primary)' }}>
+                {Math.round(satPct)}%
               </p>
-              <div
-                className="w-10 h-10 rounded-xl flex items-center justify-center"
-                style={{ background: 'linear-gradient(135deg, var(--color-warning), color-mix(in srgb, var(--color-warning) 70%, black))', boxShadow: '0 4px 12px color-mix(in srgb, var(--color-warning) 30%, transparent)' }}
-              >
-                <Target size={20} className="text-white" />
+              {/* Barra saturazione */}
+              <div className="h-1.5 rounded-full overflow-hidden mt-1" style={{ background: 'var(--glass-border)' }}>
+                <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(100, satPct)}%`, background: satPct > 80 ? 'var(--color-danger)' : satPct > 50 ? 'var(--color-warning)' : 'var(--color-success)' }} />
               </div>
             </div>
-            <p className="text-4xl font-bold tracking-tight mb-2" style={{ color: 'var(--color-text-primary)' }}>
-              <AnimatedNumber value={data?.slot_liberi_oggi ?? 0} delay={200} />
-            </p>
-            <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-              disponibili oggi
-            </p>
-          </div>
-        )}
+          );
+        })()}
       </div>
     </div>
   );

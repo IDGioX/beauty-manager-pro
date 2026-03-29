@@ -33,6 +33,27 @@ export interface UpdateAziendaInput {
   giorni_lavorativi: string;
 }
 
+export interface OrarioCentro {
+  id: string;
+  giorno: number; // 0=Lun, 6=Dom
+  attivo: boolean;
+  mattina_inizio: string | null;
+  mattina_fine: string | null;
+  pomeriggio_inizio: string | null;
+  pomeriggio_fine: string | null;
+}
+
+export interface UpdateOrarioCentroInput {
+  giorno: number;
+  attivo: boolean;
+  mattina_inizio: string | null;
+  mattina_fine: string | null;
+  pomeriggio_inizio: string | null;
+  pomeriggio_fine: string | null;
+}
+
+export const GIORNI_SETTIMANA = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
+
 export const aziendaService = {
   async getAzienda(): Promise<Azienda> {
     return await invoke('get_azienda');
@@ -40,5 +61,13 @@ export const aziendaService = {
 
   async updateAzienda(data: UpdateAziendaInput): Promise<Azienda> {
     return await invoke('update_azienda', { data });
+  },
+
+  async getOrariCentro(): Promise<OrarioCentro[]> {
+    return await invoke('get_orari_centro');
+  },
+
+  async updateOrariCentro(orari: UpdateOrarioCentroInput[]): Promise<OrarioCentro[]> {
+    return await invoke('update_orari_centro', { orari });
   },
 };

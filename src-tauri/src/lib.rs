@@ -147,6 +147,8 @@ pub fn run() {
                 commands::backup::open_backup_folder,
                 commands::azienda::get_azienda,
                 commands::azienda::update_azienda,
+                commands::azienda::get_orari_centro,
+                commands::azienda::update_orari_centro,
                 commands::license::activate_license,
                 commands::license::validate_license,
                 commands::license::get_license_info,

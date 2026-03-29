@@ -11,6 +11,7 @@ import { ExportModal } from '../components/agenda/ExportModal';
 import { WeekViewCalendar } from '../components/agenda/WeekViewCalendar';
 import { Button } from '../components/ui/Button';
 import { pacchettiService, type SedutaConPacchetto } from '../services/pacchetti';
+import { aziendaService, type OrarioCentro } from '../services/azienda';
 import type { AppuntamentoWithDetails } from '../types/agenda';
 import type { EventClickArg, DateSelectArg, EventDropArg } from '@fullcalendar/core';
 
@@ -54,6 +55,39 @@ export const Agenda: React.FC<AgendaProps> = ({ openAppuntamentoId, onAppuntamen
   useEffect(() => {
     loadOperatrici();
   }, [viewMode, loadOperatrici]);
+
+  // Orari centro
+  const [orariCentro, setOrariCentro] = useState<OrarioCentro[]>([]);
+  useEffect(() => {
+    aziendaService.getOrariCentro().then(setOrariCentro).catch(() => {});
+  }, []);
+
+  // Calcola orari per il giorno selezionato (0=Lun in JS: getDay() 1=Lun, 0=Dom→6)
+  const getDayOrario = () => {
+    const jsDay = selectedDate.getDay(); // 0=Dom, 1=Lun...6=Sab
+    const giorno = jsDay === 0 ? 6 : jsDay - 1; // 0=Lun...6=Dom
+    return orariCentro.find(o => o.giorno === giorno);
+  };
+  const dayOrario = getDayOrario();
+  const isCentroClosed = dayOrario && !dayOrario.attivo;
+
+  const slotMinTime = dayOrario?.attivo && dayOrario.mattina_inizio
+    ? (() => { const [h, m] = dayOrario.mattina_inizio.split(':').map(Number); return `${String(Math.max(0, h - 1)).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`; })()
+    : '08:00:00';
+  const slotMaxTime = dayOrario?.attivo && (dayOrario.pomeriggio_fine || dayOrario.mattina_fine)
+    ? (() => { const t = dayOrario.pomeriggio_fine || dayOrario.mattina_fine!; const [h, m] = t.split(':').map(Number); return `${String(Math.min(23, h + 1)).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`; })()
+    : '20:00:00';
+
+  // Background events per pausa pranzo
+  const pausaEvents = dayOrario?.attivo && dayOrario.mattina_fine && dayOrario.pomeriggio_inizio
+    ? [{
+        start: `${selectedDate.toISOString().slice(0, 10)}T${dayOrario.mattina_fine}:00`,
+        end: `${selectedDate.toISOString().slice(0, 10)}T${dayOrario.pomeriggio_inizio}:00`,
+        display: 'background' as const,
+        backgroundColor: 'color-mix(in srgb, var(--color-text-muted) 15%, transparent)',
+        classNames: ['fc-pausa-pranzo'],
+      }]
+    : [];
 
   // Pulisce i filtri operatrici non più validi (es. operatore disattivato)
   useEffect(() => {
@@ -896,6 +930,13 @@ export const Agenda: React.FC<AgendaProps> = ({ openAppuntamentoId, onAppuntamen
             border: '1px solid var(--glass-border)',
           }}
         >
+          {/* Avviso centro chiuso */}
+          {isCentroClosed && viewMode === 'day' && (
+            <div className="px-4 py-3 mb-2 rounded-xl flex items-center gap-2" style={{ background: 'color-mix(in srgb, var(--color-warning) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--color-warning) 25%, transparent)' }}>
+              <AlertTriangle size={16} style={{ color: 'var(--color-warning)' }} />
+              <span className="text-xs font-medium" style={{ color: 'var(--color-warning)' }}>Centro chiuso in questa giornata</span>
+            </div>
+          )}
           {isLoading ? (
             <div className="h-full flex items-center justify-center">
               <div className="text-center">
@@ -928,7 +969,7 @@ export const Agenda: React.FC<AgendaProps> = ({ openAppuntamentoId, onAppuntamen
               locale={itLocale}
               height="100%"
               headerToolbar={false}
-              events={events}
+              events={[...events, ...pausaEvents]}
               editable={false}
               selectable={false}
               dayMaxEvents={3}
@@ -954,8 +995,8 @@ export const Agenda: React.FC<AgendaProps> = ({ openAppuntamentoId, onAppuntamen
               locale={itLocale}
               height="100%"
               headerToolbar={false}
-              slotMinTime="08:00:00"
-              slotMaxTime="20:00:00"
+              slotMinTime={slotMinTime}
+              slotMaxTime={slotMaxTime}
               slotDuration="00:15:00"
               snapDuration="00:05:00"
               slotLabelInterval="01:00"
@@ -966,7 +1007,7 @@ export const Agenda: React.FC<AgendaProps> = ({ openAppuntamentoId, onAppuntamen
               }}
               allDaySlot={false}
               resources={resources}
-              events={events}
+              events={[...events, ...pausaEvents]}
               editable={true}
               selectable={true}
               selectMirror={true}
