@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, lazy, Suspense } from "react";
+import React, { useState, useEffect, useCallback, lazy, Suspense } from "react";
 import { MainLayout } from "./components/layout/MainLayout";
 import { ThemeProvider } from "./components/theme/ThemeProvider";
 import { AuthGuard } from "./components/auth/AuthGuard";
@@ -7,6 +7,31 @@ import { ToastContainer } from "./components/ui/Toast";
 import { WhatsNewModal } from "./components/WhatsNewModal";
 import { changelogService, type ReleaseInfo } from "./services/changelog";
 import { useAgendaStore } from "./stores/agendaStore";
+
+// Error Boundary per catturare crash React
+class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { error: Error | null }> {
+  state = { error: null as Error | null };
+  static getDerivedStateFromError(error: Error) { return { error }; }
+  componentDidCatch(error: Error, info: React.ErrorInfo) { console.error('React crash:', error, info); }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{ padding: 40, fontFamily: 'monospace', background: '#1a1a2e', color: '#e94560', minHeight: '100vh' }}>
+          <h1 style={{ fontSize: 24, marginBottom: 16 }}>Errore nell'applicazione</h1>
+          <pre style={{ whiteSpace: 'pre-wrap', fontSize: 14, background: '#16213e', padding: 20, borderRadius: 8, color: '#fff' }}>
+            {this.state.error.message}
+            {'\n\n'}
+            {this.state.error.stack}
+          </pre>
+          <button onClick={() => window.location.reload()} style={{ marginTop: 20, padding: '10px 20px', background: '#e94560', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14 }}>
+            Ricarica App
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 // Lazy load all pages — each becomes a separate chunk
 const Dashboard = lazy(() => import("./pages/Dashboard").then(m => ({ default: m.Dashboard })));
@@ -168,6 +193,7 @@ function App() {
   };
 
   return (
+    <ErrorBoundary>
     <LicenseGuard>
       <ThemeProvider>
         <AuthGuard>
@@ -193,6 +219,7 @@ function App() {
         </AuthGuard>
       </ThemeProvider>
     </LicenseGuard>
+    </ErrorBoundary>
   );
 }
 
