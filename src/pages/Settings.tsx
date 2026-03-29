@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -373,15 +373,21 @@ export function Settings() {
     showToast('Keyword aggiornata con successo!', 'success');
   };
 
-  const tabs = [
-    { id: 'account' as SettingsTab, label: 'Il Mio Account', icon: UserCircle },
-    { id: 'aspetto' as SettingsTab, label: 'Aspetto', icon: Palette },
-    { id: 'azienda' as SettingsTab, label: 'Dati Azienda', icon: Building2 },
-    { id: 'smtp' as SettingsTab, label: 'Email SMTP', icon: Mail },
-    { id: 'license' as SettingsTab, label: 'Licenza', icon: Key },
-    { id: 'users' as SettingsTab, label: 'Gestione Utenti', icon: Users },
-    { id: 'backup' as SettingsTab, label: 'Backup & Ripristino', icon: Database },
-    { id: 'updates' as SettingsTab, label: 'Aggiornamenti', icon: RefreshCw },
+  const tabGroups = [
+    { label: 'Personale', tabs: [
+      { id: 'account' as SettingsTab, label: 'Account', icon: UserCircle },
+      { id: 'aspetto' as SettingsTab, label: 'Aspetto', icon: Palette },
+    ]},
+    { label: 'Amministrazione', tabs: [
+      { id: 'azienda' as SettingsTab, label: 'Azienda', icon: Building2 },
+      { id: 'smtp' as SettingsTab, label: 'SMTP', icon: Mail },
+      { id: 'users' as SettingsTab, label: 'Utenti', icon: Users },
+      { id: 'license' as SettingsTab, label: 'Licenza', icon: Key },
+    ]},
+    { label: 'Sistema', tabs: [
+      { id: 'backup' as SettingsTab, label: 'Backup', icon: Database },
+      { id: 'updates' as SettingsTab, label: 'Aggiornamenti', icon: RefreshCw },
+    ]},
   ];
 
   // Funzioni per gli aggiornamenti
@@ -491,30 +497,33 @@ export function Settings() {
           <p style={{ color: 'var(--color-text-secondary)' }}>Gestisci backup, ripristini e configurazioni dell'applicazione</p>
         </div>
 
-        {/* Tabs Navigation */}
+        {/* Tabs Navigation — raggruppate */}
         <div className="animate-fade-in-up" style={{ borderBottom: '1px solid var(--glass-border)', animationDelay: '100ms' }}>
-          <nav className="-mb-px flex space-x-6 overflow-x-auto pb-px">
-            {tabs.map((tab) => {
-              const Icon = tab.icon;
-              const isActive = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className="group inline-flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors whitespace-nowrap"
-                  style={{
-                    borderColor: isActive ? 'var(--color-primary)' : 'transparent',
-                    color: isActive ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-                  }}
-                >
-                  <Icon
-                    className="w-5 h-5"
-                    style={{ color: isActive ? 'var(--color-primary)' : 'var(--color-text-muted)' }}
-                  />
-                  {tab.label}
-                </button>
-              );
-            })}
+          <nav className="-mb-px flex items-center overflow-x-auto pb-px gap-1">
+            {tabGroups.map((group, gi) => (
+              <React.Fragment key={group.label}>
+                {gi > 0 && <div className="w-px h-5 mx-2 shrink-0" style={{ background: 'var(--glass-border)' }} />}
+                <span className="text-[9px] uppercase tracking-wider font-semibold px-1 shrink-0" style={{ color: 'var(--color-text-muted)' }}>{group.label}</span>
+                {group.tabs.map(tab => {
+                  const Icon = tab.icon;
+                  const isActive = activeTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      className="inline-flex items-center gap-1.5 py-3 px-2 border-b-2 text-xs font-medium transition-colors whitespace-nowrap"
+                      style={{
+                        borderColor: isActive ? 'var(--color-primary)' : 'transparent',
+                        color: isActive ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+                      }}
+                    >
+                      <Icon className="w-4 h-4" style={{ color: isActive ? 'var(--color-primary)' : 'var(--color-text-muted)' }} />
+                      {tab.label}
+                    </button>
+                  );
+                })}
+              </React.Fragment>
+            ))}
           </nav>
         </div>
 

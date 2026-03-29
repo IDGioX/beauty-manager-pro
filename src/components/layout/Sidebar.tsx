@@ -15,6 +15,8 @@ import {
   LogOut,
   ChevronUp,
   User,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react';
 import { useThemeStore } from '../../stores/themeStore';
 import { useAuthStore } from '../../stores/authStore';
@@ -70,6 +72,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate }) => 
   const { user, logout } = useAuthStore();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
+  const [collapsed, setCollapsed] = useState(() => {
+    try { return localStorage.getItem('bmp_sidebar_collapsed') === 'true'; } catch { return false; }
+  });
+  const toggleCollapse = () => {
+    const next = !collapsed;
+    setCollapsed(next);
+    try { localStorage.setItem('bmp_sidebar_collapsed', String(next)); } catch {}
+  };
 
   // Click outside to close
   useEffect(() => {
@@ -88,7 +98,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate }) => 
 
   return (
     <div
-      className="w-72 flex flex-col h-screen relative overflow-hidden"
+      className={`${collapsed ? 'w-[68px]' : 'w-72'} flex flex-col h-screen relative overflow-hidden transition-all duration-200`}
       style={{
         background: `linear-gradient(180deg, var(--sidebar-bg) 0%, var(--sidebar-gradient-end) 100%)`,
       }}
@@ -100,28 +110,28 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate }) => 
       />
 
       {/* Logo Section */}
-      <div className="p-6 relative z-10">
+      <div className={`${collapsed ? 'p-3 flex justify-center' : 'p-6'} relative z-10`}>
         {config.customLogo ? (
           <img src={config.customLogo} alt="Logo" className="h-12 w-auto" />
         ) : (
-          <div className="flex items-center gap-4">
+          <div className={`flex items-center ${collapsed ? 'justify-center' : 'gap-4'}`}>
             <div
-              className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg"
+              className={`${collapsed ? 'w-10 h-10 rounded-xl' : 'w-12 h-12 rounded-2xl'} flex items-center justify-center shadow-lg shrink-0`}
               style={{
                 background: `linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%)`,
                 boxShadow: `0 8px 24px color-mix(in srgb, var(--color-primary) 40%, transparent)`,
               }}
             >
-              <Sparkles size={24} className="text-white" />
+              <Sparkles size={collapsed ? 18 : 24} className="text-white" />
             </div>
-            <div>
+            {!collapsed && <div>
               <h1 className="text-lg font-bold text-white tracking-tight">
                 Beauty Manager
               </h1>
               <p className="text-xs font-medium" style={{ color: 'var(--sidebar-text)' }}>
                 Professional Suite
               </p>
-            </div>
+            </div>}
           </div>
         )}
       </div>
@@ -130,12 +140,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate }) => 
       <div className="mx-6 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
 
       {/* Menu Section */}
-      <nav className="flex-1 px-4 py-4 overflow-y-auto scrollbar-hidden">
+      <nav className={`flex-1 ${collapsed ? 'px-2' : 'px-4'} py-4 overflow-y-auto scrollbar-hidden`}>
         {menuSections.map((section, sIdx) => (
-          <div key={section.section} className={sIdx > 0 ? 'mt-4' : ''}>
-            <p className="px-4 mb-2 text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.30)' }}>
-              {section.section}
-            </p>
+          <div key={section.section} className={sIdx > 0 ? 'mt-3' : ''}>
+            {!collapsed && (
+              <p className="px-4 mb-2 text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.30)' }}>
+                {section.section}
+              </p>
+            )}
             <div className="space-y-0.5">
               {section.items.map((item) => {
                 const Icon = item.icon;
@@ -145,7 +157,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate }) => 
                   <button
                     key={item.id}
                     onClick={() => onNavigate(item.id)}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 text-left group relative"
+                    className={`w-full flex items-center ${collapsed ? 'justify-center px-2' : 'gap-3 px-4'} py-2.5 rounded-xl transition-all duration-200 text-left group relative`}
+                    title={collapsed ? item.label : undefined}
                     style={{
                       background: isActive
                         ? `linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%)`
@@ -174,14 +187,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate }) => 
                       />
                     </div>
 
-                    <span
-                      className="flex-1 font-medium text-sm transition-colors duration-200 relative z-10"
-                      style={{ color: isActive ? 'var(--sidebar-text-active)' : 'var(--sidebar-text)' }}
-                    >
-                      {item.label}
-                    </span>
+                    {!collapsed && (
+                      <span
+                        className="flex-1 font-medium text-sm transition-colors duration-200 relative z-10"
+                        style={{ color: isActive ? 'var(--sidebar-text-active)' : 'var(--sidebar-text)' }}
+                      >
+                        {item.label}
+                      </span>
+                    )}
 
-                    {isActive && (
+                    {isActive && !collapsed && (
                       <ChevronRight size={16} className="text-white/80 relative z-10" />
                     )}
                   </button>
@@ -192,16 +207,28 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate }) => 
         ))}
       </nav>
 
+      {/* Toggle collapse button */}
+      <div className={`${collapsed ? 'px-2' : 'px-4'} pb-2 relative z-10`}>
+        <button
+          onClick={toggleCollapse}
+          className="w-full flex items-center justify-center py-2 rounded-xl transition-all hover:bg-white/5"
+          title={collapsed ? 'Espandi menu' : 'Comprimi menu'}
+        >
+          {collapsed ? <PanelLeftOpen size={16} style={{ color: 'var(--sidebar-text)' }} /> : <PanelLeftClose size={16} style={{ color: 'var(--sidebar-text)' }} />}
+        </button>
+      </div>
+
       {/* Bottom Section - User Menu */}
-      <div className="p-4 relative z-10">
-        <div className="mx-2 mb-4 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+      <div className={`${collapsed ? 'p-2' : 'p-4'} relative z-10`}>
+        {!collapsed && <div className="mx-2 mb-4 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />}
 
         {user && (
           <div className="relative" ref={userMenuRef}>
             <button
-              onClick={() => setShowUserMenu(!showUserMenu)}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-left group relative"
+              onClick={() => collapsed ? onNavigate('settings') : setShowUserMenu(!showUserMenu)}
+              className={`w-full flex items-center ${collapsed ? 'justify-center px-2' : 'gap-3 px-4'} py-3 rounded-xl transition-all duration-200 text-left group relative`}
               style={{ background: showUserMenu ? 'var(--sidebar-hover)' : 'transparent' }}
+              title={collapsed ? (user.nome || 'Account') : undefined}
             >
               {!showUserMenu && (
                 <div
@@ -223,7 +250,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate }) => 
                 )}
               </div>
 
-              <div className="flex-1 min-w-0 relative z-10">
+              {!collapsed && <div className="flex-1 min-w-0 relative z-10">
                 <span
                   className="block font-medium text-sm truncate"
                   style={{ color: 'var(--sidebar-text-active)' }}
@@ -236,16 +263,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate }) => 
                 >
                   {user.role}
                 </span>
-              </div>
+              </div>}
 
-              <ChevronUp
+              {!collapsed && <ChevronUp
                 size={16}
                 className="relative z-10 transition-transform duration-200"
                 style={{
                   color: 'var(--sidebar-text)',
                   transform: showUserMenu ? 'rotate(180deg)' : 'rotate(0deg)',
                 }}
-              />
+              />}
             </button>
 
             {/* Dropdown Menu */}

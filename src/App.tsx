@@ -48,6 +48,7 @@ function PageLoader() {
 
 function App() {
   const [currentPage, setCurrentPage] = useState<PageType>('dashboard');
+  const [previousPage, setPreviousPage] = useState<PageType | null>(null);
   const [pendingAppuntamentoId, setPendingAppuntamentoId] = useState<string | null>(null);
   const [pendingClienteId, setPendingClienteId] = useState<string | null>(null);
   const [pendingPacchettiClienteId, setPendingPacchettiClienteId] = useState<string | null>(null);
@@ -173,7 +174,9 @@ function App() {
           <MainLayout
             currentPage={currentPage}
             pageTitle={pageTitles[currentPage]}
-            onNavigate={(page) => { setBackToAppuntamentoId(null); setCurrentPage(page as PageType); }}
+            previousPage={previousPage}
+            onNavigate={(page) => { setBackToAppuntamentoId(null); setPreviousPage(currentPage); setCurrentPage(page as PageType); }}
+            onGoBack={previousPage ? () => { const prev = previousPage; setPreviousPage(null); setCurrentPage(prev); } : undefined}
           >
             <Suspense fallback={<PageLoader />}>
               {renderPage()}

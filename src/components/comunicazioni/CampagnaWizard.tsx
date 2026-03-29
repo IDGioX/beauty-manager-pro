@@ -19,7 +19,7 @@ const PLACEHOLDERS = [
 ];
 
 export function CampagnaWizard({ isOpen, onClose, onCreated, templates, showToast }: CampagnaWizardProps) {
-  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [saving, setSaving] = useState(false);
 
   // Form data
@@ -35,7 +35,7 @@ export function CampagnaWizard({ isOpen, onClose, onCreated, templates, showToas
   // Reset completo quando si apre il wizard
   useEffect(() => {
     if (isOpen) {
-      setStep(1);
+      setStep(1 as 1 | 2 | 3);
       setSaving(false);
       setCanale('whatsapp');
       setUseTemplate(true);
@@ -54,10 +54,9 @@ export function CampagnaWizard({ isOpen, onClose, onCreated, templates, showToas
 
   const canGoNext = () => {
     switch (step) {
-      case 1: return true;
-      case 2: return useTemplate ? !!templateId : !!messaggioPersonalizzato.trim();
-      case 3: return selectedClientIds.length > 0;
-      case 4: return true;
+      case 1: return useTemplate ? !!templateId : !!messaggioPersonalizzato.trim();
+      case 2: return selectedClientIds.length > 0;
+      case 3: return true;
       default: return false;
     }
   };
@@ -131,7 +130,7 @@ export function CampagnaWizard({ isOpen, onClose, onCreated, templates, showToas
         <div className="px-6 py-4 flex items-center justify-between" style={{ background: 'var(--sidebar-bg)' }}>
           <div>
             <h2 className="font-bold text-base text-white">Nuova Campagna</h2>
-            <p className="text-xs text-white/50">Passo {step} di 4</p>
+            <p className="text-xs text-white/50">Passo {step} di 3</p>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10 text-white/60 hover:text-white transition-colors">
             <X size={18} />
@@ -142,55 +141,28 @@ export function CampagnaWizard({ isOpen, onClose, onCreated, templates, showToas
         <div className="h-1" style={{ background: 'var(--glass-border)' }}>
           <div
             className="h-full transition-all duration-300"
-            style={{ width: `${(step / 4) * 100}%`, background: 'var(--color-primary)' }}
+            style={{ width: `${(step / 3) * 100}%`, background: 'var(--color-primary)' }}
           />
         </div>
 
         {/* Content */}
         <div className="px-6 py-5 max-h-[60vh] overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
-          {/* STEP 1: Canale */}
+          {/* STEP 1: Canale + Messaggio */}
           {step === 1 && (
             <div className="space-y-4">
-              <p className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>Scegli il canale di invio</p>
-
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={() => setCanale('whatsapp')}
-                  className="p-4 rounded-xl text-left transition-all"
-                  style={{
-                    background: canale === 'whatsapp' ? 'color-mix(in srgb, #25D366 12%, transparent)' : 'var(--card-bg)',
-                    border: `2px solid ${canale === 'whatsapp' ? '#25D366' : 'var(--glass-border)'}`,
-                  }}
-                >
-                  <MessageCircle size={24} style={{ color: '#25D366' }} />
-                  <p className="font-semibold text-sm mt-2" style={{ color: 'var(--color-text-primary)' }}>WhatsApp</p>
-                  <p className="text-[10px] mt-1" style={{ color: 'var(--color-text-muted)' }}>
-                    Apertura link per ogni cliente
-                  </p>
+              {/* Canale selector inline */}
+              <div className="flex gap-2">
+                <button onClick={() => { setCanale('whatsapp'); setTemplateId(''); }}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-medium transition-all"
+                  style={{ background: canale === 'whatsapp' ? 'color-mix(in srgb, #25D366 12%, transparent)' : 'var(--card-bg)', border: `1.5px solid ${canale === 'whatsapp' ? '#25D366' : 'var(--glass-border)'}`, color: canale === 'whatsapp' ? '#25D366' : 'var(--color-text-muted)' }}>
+                  <MessageCircle size={15} /> WhatsApp
                 </button>
-
-                <button
-                  onClick={() => setCanale('email')}
-                  className="p-4 rounded-xl text-left transition-all"
-                  style={{
-                    background: canale === 'email' ? 'color-mix(in srgb, var(--color-primary) 12%, transparent)' : 'var(--card-bg)',
-                    border: `2px solid ${canale === 'email' ? 'var(--color-primary)' : 'var(--glass-border)'}`,
-                  }}
-                >
-                  <Mail size={24} style={{ color: 'var(--color-primary)' }} />
-                  <p className="font-semibold text-sm mt-2" style={{ color: 'var(--color-text-primary)' }}>Email</p>
-                  <p className="text-[10px] mt-1" style={{ color: 'var(--color-text-muted)' }}>
-                    Invio automatico via SMTP
-                  </p>
+                <button onClick={() => { setCanale('email'); setTemplateId(''); }}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-medium transition-all"
+                  style={{ background: canale === 'email' ? 'color-mix(in srgb, var(--color-primary) 12%, transparent)' : 'var(--card-bg)', border: `1.5px solid ${canale === 'email' ? 'var(--color-primary)' : 'var(--glass-border)'}`, color: canale === 'email' ? 'var(--color-primary)' : 'var(--color-text-muted)' }}>
+                  <Mail size={15} /> Email
                 </button>
               </div>
-            </div>
-          )}
-
-          {/* STEP 2: Messaggio */}
-          {step === 2 && (
-            <div className="space-y-4">
-              <p className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>Componi il messaggio</p>
 
               {/* Toggle template/personalizzato */}
               <div
@@ -318,8 +290,8 @@ export function CampagnaWizard({ isOpen, onClose, onCreated, templates, showToas
             </div>
           )}
 
-          {/* STEP 3: Destinatari */}
-          {step === 3 && (
+          {/* STEP 2: Destinatari */}
+          {step === 2 && (
             <div className="space-y-3">
               <p className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>Seleziona i destinatari</p>
               <ClientSelector
@@ -330,8 +302,8 @@ export function CampagnaWizard({ isOpen, onClose, onCreated, templates, showToas
             </div>
           )}
 
-          {/* STEP 4: Riepilogo */}
-          {step === 4 && (
+          {/* STEP 3: Riepilogo */}
+          {step === 3 && (
             <div className="space-y-4">
               <p className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>Riepilogo campagna</p>
 
@@ -408,7 +380,7 @@ export function CampagnaWizard({ isOpen, onClose, onCreated, templates, showToas
             <div />
           )}
 
-          {step < 4 ? (
+          {step < 3 ? (
             <button
               onClick={() => setStep((step + 1) as any)}
               disabled={!canGoNext()}

@@ -1,19 +1,24 @@
 import React, { ReactNode } from 'react';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
+import { ArrowLeft } from 'lucide-react';
 
 interface MainLayoutProps {
   children: ReactNode;
   currentPage: string;
   pageTitle: string;
+  previousPage?: string | null;
   onNavigate: (page: string) => void;
+  onGoBack?: () => void;
 }
 
 export const MainLayout: React.FC<MainLayoutProps> = ({
   children,
   currentPage,
   pageTitle,
+  previousPage,
   onNavigate,
+  onGoBack,
 }) => {
   return (
     <div
@@ -45,6 +50,19 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
 
       <div className="flex-1 flex flex-col overflow-hidden relative z-10">
         <Header title={pageTitle} onNavigate={onNavigate} />
+
+        {/* Tasto indietro globale */}
+        {onGoBack && previousPage && (
+          <div className="px-6 pt-2 pb-0">
+            <button
+              onClick={onGoBack}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors"
+              style={{ color: 'var(--color-primary)', background: 'color-mix(in srgb, var(--color-primary) 8%, transparent)' }}
+            >
+              <ArrowLeft size={13} /> Torna indietro
+            </button>
+          </div>
+        )}
 
         <main className="flex-1 flex flex-col overflow-hidden p-6">
           <div className="animate-in flex-1 flex flex-col min-h-0 overflow-y-auto">

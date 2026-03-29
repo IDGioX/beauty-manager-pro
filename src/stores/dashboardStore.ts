@@ -29,11 +29,11 @@ interface DashboardState {
 
 const DEFAULT_SECTIONS: DashboardSection[] = [
   { id: 'oggi', label: 'Oggi', visible: true },
-  { id: 'grafici', label: 'Andamento Settimanale', visible: true },
-  { id: 'azioni', label: 'Azioni', visible: true },
-  { id: 'andamento', label: 'Andamento', visible: true },
-  { id: 'trattamenti_top', label: 'Trattamenti Top', visible: true },
   { id: 'prossimi_appuntamenti', label: 'Prossimi Appuntamenti', visible: true },
+  { id: 'azioni', label: 'Azioni', visible: true },
+  { id: 'grafici', label: 'Andamento Settimanale', visible: false },
+  { id: 'andamento', label: 'Andamento', visible: false },
+  { id: 'trattamenti_top', label: 'Trattamenti Top', visible: false },
 ];
 
 // Merge stored sections with defaults (handles new sections added after user saved)

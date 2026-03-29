@@ -972,7 +972,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate, onOpenAppuntam
           <div className="relative">
             <button
               onClick={() => setCustomizing(!isCustomizing)}
-              className="p-2 rounded-xl transition-all hover:scale-105"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl transition-all hover:scale-105"
               style={{
                 background: isCustomizing
                   ? 'color-mix(in srgb, var(--color-primary) 20%, transparent)'
@@ -980,7 +980,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate, onOpenAppuntam
               }}
               title="Personalizza dashboard"
             >
-              <Settings2 size={18} style={{ color: 'var(--color-primary)' }} />
+              <Settings2 size={16} style={{ color: 'var(--color-primary)' }} />
+              <span className="text-[10px] font-medium hidden lg:inline" style={{ color: 'var(--color-primary)' }}>Personalizza</span>
             </button>
             {isCustomizing && <CustomizePanel onClose={() => setCustomizing(false)} />}
           </div>
