@@ -531,20 +531,14 @@ export function Settings() {
         </div>
       )}
 
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="animate-fade-in-up">
-          <h1 className="text-3xl font-bold mb-2" style={{ color: 'var(--color-text-primary)' }}>Impostazioni</h1>
-          <p style={{ color: 'var(--color-text-secondary)' }}>Gestisci backup, ripristini e configurazioni dell'applicazione</p>
-        </div>
-
-        {/* Tabs Navigation — raggruppate */}
-        <div className="animate-fade-in-up" style={{ borderBottom: '1px solid var(--glass-border)', animationDelay: '100ms' }}>
-          <nav className="-mb-px flex items-center overflow-x-auto pb-px gap-1">
+      <div className="flex gap-6" style={{ height: 'calc(100vh - 120px)' }}>
+        {/* Menu laterale sinistro */}
+        <div className="w-52 shrink-0">
+          <h1 className="text-lg font-bold mb-4 px-3" style={{ color: 'var(--color-text-primary)' }}>Impostazioni</h1>
+          <nav className="space-y-1">
             {tabGroups.map((group, gi) => (
-              <React.Fragment key={group.label}>
-                {gi > 0 && <div className="w-px h-5 mx-2 shrink-0" style={{ background: 'var(--glass-border)' }} />}
-                <span className="text-[9px] uppercase tracking-wider font-semibold px-1 shrink-0" style={{ color: 'var(--color-text-muted)' }}>{group.label}</span>
+              <div key={group.label} className={gi > 0 ? 'mt-4' : ''}>
+                <p className="text-[9px] uppercase tracking-wider font-semibold px-3 mb-1" style={{ color: 'var(--color-text-muted)' }}>{group.label}</p>
                 {group.tabs.map(tab => {
                   const Icon = tab.icon;
                   const isActive = activeTab === tab.id;
@@ -552,24 +546,25 @@ export function Settings() {
                     <button
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id)}
-                      className="inline-flex items-center gap-1.5 py-3 px-2 border-b-2 text-xs font-medium transition-colors whitespace-nowrap"
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-all text-left"
                       style={{
-                        borderColor: isActive ? 'var(--color-primary)' : 'transparent',
+                        background: isActive ? 'color-mix(in srgb, var(--color-primary) 12%, transparent)' : 'transparent',
                         color: isActive ? 'var(--color-primary)' : 'var(--color-text-secondary)',
                       }}
                     >
-                      <Icon className="w-4 h-4" style={{ color: isActive ? 'var(--color-primary)' : 'var(--color-text-muted)' }} />
+                      <Icon className="w-4 h-4 shrink-0" style={{ color: isActive ? 'var(--color-primary)' : 'var(--color-text-muted)' }} />
                       {tab.label}
                     </button>
                   );
                 })}
-              </React.Fragment>
+              </div>
             ))}
           </nav>
         </div>
 
-        {/* Tab Content */}
-        <div className="mt-6 animate-fade-in-up" style={{ animationDelay: '200ms' }}>
+        {/* Contenuto tab — scrollabile */}
+        <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
+          <div className="animate-fade-in-up">
           {activeTab === 'account' && (
             <div className="space-y-6">
               <div
@@ -1760,6 +1755,7 @@ export function Settings() {
             </div>
           )}
 
+          </div>
         </div>
       </div>
     </>
