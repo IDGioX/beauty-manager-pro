@@ -36,8 +36,15 @@ const DEFAULT_SECTIONS: DashboardSection[] = [
   { id: 'trattamenti_top', label: 'Trattamenti Top', visible: false },
 ];
 
+// Versione corrente dei default — incrementare per forzare reset
+const DEFAULTS_VERSION = 2;
+
 // Merge stored sections with defaults (handles new sections added after user saved)
-function migrateSections(stored: DashboardSection[]): DashboardSection[] {
+function migrateSections(stored: DashboardSection[], storedVersion?: number): DashboardSection[] {
+  // Se la versione dei default è cambiata, resetta tutto ai nuovi default
+  if (!storedVersion || storedVersion < DEFAULTS_VERSION) {
+    return DEFAULT_SECTIONS;
+  }
   const storedIds = new Set(stored.map(s => s.id));
   const merged = [...stored];
   for (const def of DEFAULT_SECTIONS) {
@@ -45,7 +52,6 @@ function migrateSections(stored: DashboardSection[]): DashboardSection[] {
       merged.push(def);
     }
   }
-  // Remove sections that no longer exist in defaults
   const validIds = new Set(DEFAULT_SECTIONS.map(s => s.id));
   return merged.filter(s => validIds.has(s.id));
 }
@@ -85,12 +91,13 @@ export const useDashboardStore = create<DashboardState>()(
       name: 'dashboard-storage',
       partialize: (state) => ({
         sections: state.sections,
+        _defaultsVersion: DEFAULTS_VERSION,
       }),
       merge: (persisted, current) => {
-        const p = persisted as Partial<DashboardState>;
+        const p = persisted as any;
         return {
           ...current,
-          sections: p.sections ? migrateSections(p.sections) : current.sections,
+          sections: p?.sections ? migrateSections(p.sections, p._defaultsVersion) : current.sections,
         };
       },
     }
