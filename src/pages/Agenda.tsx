@@ -1009,7 +1009,7 @@ export const Agenda: React.FC<AgendaProps> = ({ openAppuntamentoId, onAppuntamen
             />
           ) : resources.length > 0 ? (
             <FullCalendar
-              key={`day-${resources.length}`}
+              key={`day-${resources.length}-${slotMinTime}-${slotMaxTime}`}
               ref={calendarRef}
               plugins={[resourceTimeGridPlugin, dayGridPlugin, interactionPlugin]}
               schedulerLicenseKey="GPL-My-Project-Is-Open-Source"
