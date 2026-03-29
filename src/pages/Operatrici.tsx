@@ -8,6 +8,33 @@ import { Toast } from '../components/ui/Toast';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { useConfirm } from '../hooks/useConfirm';
 import type { Operatrice } from '../types/agenda';
+
+const SPEC_COLORS = [
+  { bg: 'rgba(139, 92, 246, 0.1)', text: '#8b5cf6' },
+  { bg: 'rgba(59, 130, 246, 0.1)', text: '#3b82f6' },
+  { bg: 'rgba(16, 185, 129, 0.1)', text: '#10b981' },
+  { bg: 'rgba(245, 158, 11, 0.1)', text: '#f59e0b' },
+  { bg: 'rgba(236, 72, 153, 0.1)', text: '#ec4899' },
+  { bg: 'rgba(6, 182, 212, 0.1)', text: '#06b6d4' },
+  { bg: 'rgba(239, 68, 68, 0.1)', text: '#ef4444' },
+  { bg: 'rgba(99, 102, 241, 0.1)', text: '#6366f1' },
+];
+const getSpecColor = (s: string) => {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = s.charCodeAt(i) + ((h << 5) - h);
+  return SPEC_COLORS[Math.abs(h) % SPEC_COLORS.length];
+};
+const SpecBadge: React.FC<{ spec: string; size?: 'sm' | 'md' }> = ({ spec, size = 'sm' }) => {
+  const c = getSpecColor(spec);
+  return (
+    <span
+      className={`inline-flex items-center font-medium ${size === 'sm' ? 'px-1.5 py-0.5 rounded text-[9px]' : 'px-2 py-0.5 rounded-md text-[10px]'}`}
+      style={{ background: c.bg, color: c.text }}
+    >
+      {spec}
+    </span>
+  );
+};
 import { operatriciService, CreateOperatriceInput, UpdateOperatriceInput } from '../services/operatrici';
 
 interface ToastState { message: string; type: 'success' | 'error'; }
@@ -324,23 +351,17 @@ export const Operatrici: React.FC<OperatriciProps> = ({ onGoBack }) => {
                         <p className="font-semibold text-sm truncate" style={{ color: 'var(--color-text-primary)' }}>
                           {op.cognome} {op.nome}
                         </p>
-                        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                        <div className="flex items-center gap-1 mt-1 flex-wrap">
                           {specs.length > 0 ? (
                             <>
-                              {specs.slice(0, 2).map((s, i) => (
-                                <span key={i} className="px-1.5 py-0.5 rounded text-[10px] font-medium" style={{ background: 'rgba(139, 92, 246, 0.1)', color: '#8b5cf6' }}>
-                                  {s}
-                                </span>
-                              ))}
-                              {specs.length > 2 && (
-                                <span className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>+{specs.length - 2}</span>
+                              {specs.slice(0, 3).map((s, i) => <SpecBadge key={i} spec={s} size="sm" />)}
+                              {specs.length > 3 && (
+                                <span className="text-[9px] font-medium" style={{ color: 'var(--color-text-muted)' }}>+{specs.length - 3}</span>
                               )}
                             </>
                           ) : op.telefono ? (
-                            <span className="text-xs truncate" style={{ color: 'var(--color-text-muted)' }}>{op.telefono}</span>
-                          ) : (
-                            <span className="text-xs italic" style={{ color: 'var(--color-text-muted)' }}>Nessun dettaglio</span>
-                          )}
+                            <span className="text-[11px] truncate" style={{ color: 'var(--color-text-muted)' }}>{op.telefono}</span>
+                          ) : null}
                         </div>
                       </div>
 
@@ -526,11 +547,7 @@ const OperatriceDetailPanel: React.FC<DetailPanelProps> = ({
               <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold font-mono" style={{ background: 'var(--glass-border)', color: 'var(--color-text-muted)' }}>
                 {operatrice.codice}
               </span>
-              {specs.map((s, i) => (
-                <span key={i} className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium" style={{ background: 'rgba(139, 92, 246, 0.1)', color: '#8b5cf6' }}>
-                  {s}
-                </span>
-              ))}
+              {specs.map((s, i) => <SpecBadge key={i} spec={s} size="md" />)}
             </div>
           </div>
         </div>
@@ -615,11 +632,7 @@ const AnagraficaTab: React.FC<{
           <label className="text-[10px] font-medium uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Specializzazioni</label>
           {specs.length > 0 ? (
             <div className="flex flex-wrap gap-1.5 mt-1.5">
-              {specs.map((s, i) => (
-                <span key={i} className="px-2.5 py-1 rounded-full text-xs font-medium" style={{ background: 'rgba(139, 92, 246, 0.1)', color: '#8b5cf6' }}>
-                  {s}
-                </span>
-              ))}
+              {specs.map((s, i) => <SpecBadge key={i} spec={s} size="md" />)}
             </div>
           ) : (
             <p className="text-sm mt-0.5" style={{ color: 'var(--color-text-muted)' }}>—</p>
