@@ -32,6 +32,10 @@ const parseSpecs = (raw: string | null | undefined): string[] => {
   } catch {}
   return raw.split(',').map(s => s.trim()).filter(Boolean);
 };
+// Converte qualsiasi formato (JSON array o stringa) in stringa leggibile per il form
+const specsToFormString = (raw: string | null | undefined): string => {
+  return parseSpecs(raw).join(', ');
+};
 const SpecBadge: React.FC<{ spec: string; size?: 'sm' | 'md' }> = ({ spec, size = 'sm' }) => {
   const c = getSpecColor(spec);
   return (
@@ -234,7 +238,7 @@ export const Operatrici: React.FC<OperatriciProps> = ({ onGoBack }) => {
       telefono: selectedOperatrice.telefono || '',
       email: selectedOperatrice.email || '',
       colore_agenda: selectedOperatrice.colore_agenda,
-      specializzazioni: selectedOperatrice.specializzazioni || '',
+      specializzazioni: specsToFormString(selectedOperatrice.specializzazioni),
       note: selectedOperatrice.note || '',
     });
     setIsEditing(true);
