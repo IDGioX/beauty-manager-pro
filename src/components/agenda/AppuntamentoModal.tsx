@@ -106,28 +106,6 @@ export const AppuntamentoModal: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [orariCentro, setOrariCentro] = useState<OrarioCentro[]>([]);
 
-  // Carica orari centro
-  useEffect(() => {
-    aziendaService.getOrariCentro().then(setOrariCentro).catch(() => {});
-  }, []);
-
-  // Warning fuori orario
-  const getOrarioWarning = (): string | null => {
-    if (!dataOraInizio || orariCentro.length === 0) return null;
-    const d = new Date(dataOraInizio);
-    const jsDay = d.getDay();
-    const giorno = jsDay === 0 ? 6 : jsDay - 1;
-    const orario = orariCentro.find(o => o.giorno === giorno);
-    if (!orario) return null;
-    if (!orario.attivo) return 'Centro chiuso in questa giornata';
-    const hhmm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-    const inMattina = orario.mattina_inizio && orario.mattina_fine && hhmm >= orario.mattina_inizio && hhmm < orario.mattina_fine;
-    const inPomeriggio = orario.pomeriggio_inizio && orario.pomeriggio_fine && hhmm >= orario.pomeriggio_inizio && hhmm < orario.pomeriggio_fine;
-    if (!inMattina && !inPomeriggio) return 'Appuntamento fuori orario del centro';
-    return null;
-  };
-  const orarioWarning = getOrarioWarning();
-
   // Quick add client state
   const [showQuickAddClient, setShowQuickAddClient] = useState(false);
   const [quickClientNome, setQuickClientNome] = useState('');
@@ -151,6 +129,30 @@ export const AppuntamentoModal: React.FC = () => {
   const [omaggio, setOmaggio] = useState(false);
   const [prodottiUsati, setProdottiUsati] = useState<ProdottoUsato[]>([]);
   const [prodottiAcquistati, setProdottiAcquistati] = useState<ProdottoUsato[]>([]);
+
+  // Carica orari centro
+  useEffect(() => {
+    aziendaService.getOrariCentro().then(setOrariCentro).catch(() => {});
+  }, []);
+
+  // Warning fuori orario (usa dataOraInizio già dichiarato sopra)
+  const orarioWarning = (() => {
+    try {
+      if (!dataOraInizio || orariCentro.length === 0) return null;
+      const d = new Date(dataOraInizio);
+      if (isNaN(d.getTime())) return null;
+      const jsDay = d.getDay();
+      const giorno = jsDay === 0 ? 6 : jsDay - 1;
+      const orario = orariCentro.find(o => o.giorno === giorno);
+      if (!orario) return null;
+      if (!orario.attivo) return 'Centro chiuso in questa giornata';
+      const hhmm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+      const inMattina = orario.mattina_inizio && orario.mattina_fine && hhmm >= orario.mattina_inizio && hhmm < orario.mattina_fine;
+      const inPomeriggio = orario.pomeriggio_inizio && orario.pomeriggio_fine && hhmm >= orario.pomeriggio_inizio && hhmm < orario.pomeriggio_fine;
+      if (!inMattina && !inPomeriggio) return 'Appuntamento fuori orario del centro';
+    } catch {}
+    return null;
+  })();
 
   // Flag per evitare il ricalcolo automatico della durata in modalità edit
   const skipAutoCalculateRef = useRef(false);
