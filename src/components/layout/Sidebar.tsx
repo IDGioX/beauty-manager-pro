@@ -3,6 +3,7 @@ import {
   LayoutDashboard,
   Calendar,
   Users,
+  UserCog,
   Scissors,
   Package,
   PackageCheck,
@@ -41,7 +42,7 @@ const menuSections: MenuSection[] = [
     section: 'Anagrafica',
     items: [
       { id: 'clienti', label: 'Clienti', icon: Users },
-      { id: 'operatrici', label: 'Operatori', icon: Users },
+      { id: 'operatrici', label: 'Operatori', icon: UserCog },
     ],
   },
   {
