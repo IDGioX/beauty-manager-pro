@@ -3,6 +3,7 @@ import { X, Play, Pause, Check, AlertCircle, Loader2, ExternalLink, Mail, ArrowR
 import { ClientSelector } from './ClientSelector';
 import * as comunicazioniService from '../../services/comunicazioni';
 import { clientiService } from '../../services/clienti';
+import { aziendaService } from '../../services/azienda';
 import type { CampagnaMarketing, CampagnaDestinatario } from '../../types/comunicazione';
 import type { Cliente } from '../../types/cliente';
 
@@ -30,6 +31,7 @@ export function CampagnaSendModal({ isOpen, onClose, campagna, onCompleted }: Ca
   const autoModeRef = useRef(false);
   const [message, setMessage] = useState('');
   const [emailSubject, setEmailSubject] = useState('');
+  const [nomeCentro, setNomeCentro] = useState('');
   const [selectedClientIds, setSelectedClientIds] = useState<string[]>([]);
   const [preparingRecipients, setPreparingRecipients] = useState(false);
 
@@ -41,6 +43,7 @@ export function CampagnaSendModal({ isOpen, onClose, campagna, onCompleted }: Ca
     setPhase('selecting');
     setStatus('loading');
     setCurrentIndex(0);
+    aziendaService.getAzienda().then(a => setNomeCentro(a.nome_centro || '')).catch(() => {});
     setAutoMode(false);
     autoModeRef.current = false;
     setResults([]);
@@ -82,14 +85,14 @@ export function CampagnaSendModal({ isOpen, onClose, campagna, onCompleted }: Ca
     return message
       .replace(/\{nome\}/g, client.nome)
       .replace(/\{cognome\}/g, client.cognome)
-      .replace(/\{nome_centro\}/g, '');
+      .replace(/\{nome_centro\}/g, nomeCentro);
   }, [message]);
 
   const resolveSubject = useCallback((client: Cliente): string => {
     return emailSubject
       .replace(/\{nome\}/g, client.nome)
       .replace(/\{cognome\}/g, client.cognome)
-      .replace(/\{nome_centro\}/g, '');
+      .replace(/\{nome_centro\}/g, nomeCentro);
   }, [emailSubject]);
 
   // Invia al prossimo cliente

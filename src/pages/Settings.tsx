@@ -112,10 +112,17 @@ export function Settings() {
     loadBackups();
     loadAzienda();
     loadSmtpConfig();
-    // Carica la versione corrente all'avvio
     updaterService.getCurrentVersion().then(version => {
       setUpdateInfo({ available: false, currentVersion: version });
     });
+
+    // Listener per quick actions dalla ricerca globale
+    const handler = (e: Event) => {
+      const tab = (e as CustomEvent).detail as SettingsTab;
+      if (tab) setActiveTab(tab);
+    };
+    window.addEventListener('settingsTabChange', handler);
+    return () => window.removeEventListener('settingsTabChange', handler);
   }, []);
 
   const loadSmtpConfig = async () => {

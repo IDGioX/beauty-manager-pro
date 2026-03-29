@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { CampagneTab } from '../components/comunicazioni/CampagneTab';
 import * as comunicazioniService from '../services/comunicazioni';
+import { aziendaService } from '../services/azienda';
 import type {
   TemplateMesaggio,
   CreateTemplateInput,
@@ -84,6 +85,7 @@ export function Comunicazioni() {
   const [birthdayTemplateId, setBirthdayTemplateId] = useState<string>('');
   const [birthdayCustomMsg, setBirthdayCustomMsg] = useState('');
   const [birthdaySending, setBirthdaySending] = useState(false);
+  const [nomeCentro, setNomeCentro] = useState('');
 
   const showToast = (message: string, type: 'success' | 'error') => {
     setToast({ message, type });
@@ -91,6 +93,17 @@ export function Comunicazioni() {
 
   useEffect(() => {
     loadData();
+    aziendaService.getAzienda().then(a => setNomeCentro(a.nome_centro || '')).catch(() => {});
+
+    // Listener per quick actions dalla ricerca globale
+    const handler = (e: Event) => {
+      const tab = (e as CustomEvent).detail;
+      if (tab === 'templates') setActiveTab('templates');
+      else if (tab === 'campagne') setActiveTab('campagne');
+      else if (tab === 'compleanni') setActiveTab('compleanni');
+    };
+    window.addEventListener('comunicazioniTabChange', handler);
+    return () => window.removeEventListener('comunicazioniTabChange', handler);
   }, []);
 
   const loadData = async () => {
@@ -257,7 +270,7 @@ export function Comunicazioni() {
       messaggio = selectedTmpl.corpo
         .replace(/\{nome\}/g, birthdayCliente.nome)
         .replace(/\{cognome\}/g, birthdayCliente.cognome)
-        .replace(/\{nome_centro\}/g, '');
+        .replace(/\{nome_centro\}/g, nomeCentro);
       oggetto = (selectedTmpl.oggetto || '')
         .replace(/\{nome\}/g, birthdayCliente.nome)
         .replace(/\{cognome\}/g, birthdayCliente.cognome);
@@ -596,7 +609,7 @@ export function Comunicazioni() {
             <div className="px-6 py-4 space-y-3 max-h-[50vh] overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
               {birthdayTemplates.length > 0 ? (
                 birthdayTemplates.map(t => {
-                  const preview = t.corpo.replace(/\{nome\}/g, birthdayCliente.nome).replace(/\{cognome\}/g, birthdayCliente.cognome).replace(/\{nome_centro\}/g, '');
+                  const preview = t.corpo.replace(/\{nome\}/g, birthdayCliente.nome).replace(/\{cognome\}/g, birthdayCliente.cognome).replace(/\{nome_centro\}/g, nomeCentro);
                   return (
                     <button
                       key={t.id}

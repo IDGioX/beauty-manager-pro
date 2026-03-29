@@ -104,6 +104,16 @@ export const Clienti: React.FC<ClientiProps> = ({ openClienteId, onClienteOpened
 
   useEffect(() => { if (openClienteId) { selectClienteById(openClienteId).then(() => onClienteOpened?.()); } }, [openClienteId]);
 
+  // Listener per quick actions dalla ricerca globale
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const action = (e as CustomEvent).detail;
+      if (action === 'nuovo') openCreateModal();
+    };
+    window.addEventListener('clientiAction', handler);
+    return () => window.removeEventListener('clientiAction', handler);
+  }, []);
+
   // Load profile when selecting a client
   useEffect(() => {
     if (selectedCliente) {

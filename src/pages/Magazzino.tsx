@@ -362,6 +362,16 @@ export function Magazzino({ onNavigateToAgenda }: MagazzinoProps) {
   const [alertCount, setAlertCount] = useState<AlertCount | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
+  // Listener per quick actions dalla ricerca globale
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const tab = (e as CustomEvent).detail as TabType;
+      if (tab) setActiveTab(tab);
+    };
+    window.addEventListener('magazzinoTabChange', handler);
+    return () => window.removeEventListener('magazzinoTabChange', handler);
+  }, []);
+
   // Articoli state
   const [prodotti, setProdotti] = useState<Prodotto[]>([]);
   const [categorie, setCategorie] = useState<CategoriaProdotto[]>([]);

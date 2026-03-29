@@ -91,6 +91,16 @@ export const Agenda: React.FC<AgendaProps> = ({ openAppuntamentoId, onAppuntamen
     return () => clearInterval(interval);
   }, []);
 
+  // Listener per quick actions dalla ricerca globale
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const action = (e as CustomEvent).detail;
+      if (action === 'nuovo') openCreateModal(new Date(), '');
+    };
+    window.addEventListener('agendaAction', handler);
+    return () => window.removeEventListener('agendaAction', handler);
+  }, []);
+
   // Carica appuntamenti quando cambia la data o la vista
   useEffect(() => {
     const loadData = async () => {
