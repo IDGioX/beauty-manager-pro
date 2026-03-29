@@ -59,34 +59,58 @@ export const Agenda: React.FC<AgendaProps> = ({ openAppuntamentoId, onAppuntamen
   // Orari centro
   const [orariCentro, setOrariCentro] = useState<OrarioCentro[]>([]);
   useEffect(() => {
-    aziendaService.getOrariCentro().then(setOrariCentro).catch(() => {});
+    aziendaService.getOrariCentro().then(setOrariCentro).catch(e => console.error('Errore orari centro:', e));
   }, []);
 
-  // Calcola orari per il giorno selezionato (0=Lun in JS: getDay() 1=Lun, 0=Dom→6)
-  const getDayOrario = () => {
-    const jsDay = selectedDate.getDay(); // 0=Dom, 1=Lun...6=Sab
-    const giorno = jsDay === 0 ? 6 : jsDay - 1; // 0=Lun...6=Dom
-    return orariCentro.find(o => o.giorno === giorno);
-  };
-  const dayOrario = getDayOrario();
-  const isCentroClosed = dayOrario && !dayOrario.attivo;
+  // Calcola orari per il giorno selezionato
+  const dayOrario = (() => {
+    try {
+      if (orariCentro.length === 0) return null;
+      const jsDay = selectedDate.getDay();
+      const giorno = jsDay === 0 ? 6 : jsDay - 1;
+      return orariCentro.find(o => o.giorno === giorno) || null;
+    } catch { return null; }
+  })();
+  const isCentroClosed = dayOrario ? !dayOrario.attivo : false;
 
-  const slotMinTime = dayOrario?.attivo && dayOrario.mattina_inizio
-    ? (() => { const [h, m] = dayOrario.mattina_inizio.split(':').map(Number); return `${String(Math.max(0, h - 1)).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`; })()
-    : '08:00:00';
-  const slotMaxTime = dayOrario?.attivo && (dayOrario.pomeriggio_fine || dayOrario.mattina_fine)
-    ? (() => { const t = dayOrario.pomeriggio_fine || dayOrario.mattina_fine!; const [h, m] = t.split(':').map(Number); return `${String(Math.min(23, h + 1)).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`; })()
-    : '20:00:00';
+  const slotMinTime = (() => {
+    try {
+      if (dayOrario?.attivo && dayOrario.mattina_inizio) {
+        const [h, m] = dayOrario.mattina_inizio.split(':').map(Number);
+        return `${String(Math.max(0, h - 1)).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`;
+      }
+    } catch {}
+    return '08:00:00';
+  })();
+
+  const slotMaxTime = (() => {
+    try {
+      if (dayOrario?.attivo) {
+        const t = dayOrario.pomeriggio_fine || dayOrario.mattina_fine;
+        if (t) {
+          const [h, m] = t.split(':').map(Number);
+          return `${String(Math.min(23, h + 1)).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`;
+        }
+      }
+    } catch {}
+    return '20:00:00';
+  })();
 
   // Background events per pausa pranzo
-  const pausaEvents: any[] = (dayOrario?.attivo && dayOrario.mattina_fine && dayOrario.pomeriggio_inizio)
-    ? [{
-        start: `${selectedDate.toISOString().slice(0, 10)}T${dayOrario.mattina_fine}:00`,
-        end: `${selectedDate.toISOString().slice(0, 10)}T${dayOrario.pomeriggio_inizio}:00`,
-        display: 'background',
-        backgroundColor: 'rgba(150,150,150,0.15)',
-      }]
-    : [];
+  const pausaEvents: any[] = (() => {
+    try {
+      if (dayOrario?.attivo && dayOrario.mattina_fine && dayOrario.pomeriggio_inizio) {
+        const dateStr = selectedDate.toISOString().slice(0, 10);
+        return [{
+          start: `${dateStr}T${dayOrario.mattina_fine}:00`,
+          end: `${dateStr}T${dayOrario.pomeriggio_inizio}:00`,
+          display: 'background',
+          backgroundColor: 'rgba(150,150,150,0.15)',
+        }];
+      }
+    } catch {}
+    return [];
+  })();
 
   // Pulisce i filtri operatrici non più validi (es. operatore disattivato)
   useEffect(() => {
