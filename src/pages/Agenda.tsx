@@ -79,13 +79,12 @@ export const Agenda: React.FC<AgendaProps> = ({ openAppuntamentoId, onAppuntamen
     : '20:00:00';
 
   // Background events per pausa pranzo
-  const pausaEvents = dayOrario?.attivo && dayOrario.mattina_fine && dayOrario.pomeriggio_inizio
+  const pausaEvents: any[] = (dayOrario?.attivo && dayOrario.mattina_fine && dayOrario.pomeriggio_inizio)
     ? [{
         start: `${selectedDate.toISOString().slice(0, 10)}T${dayOrario.mattina_fine}:00`,
         end: `${selectedDate.toISOString().slice(0, 10)}T${dayOrario.pomeriggio_inizio}:00`,
-        display: 'background' as const,
-        backgroundColor: 'color-mix(in srgb, var(--color-text-muted) 15%, transparent)',
-        classNames: ['fc-pausa-pranzo'],
+        display: 'background',
+        backgroundColor: 'rgba(150,150,150,0.15)',
       }]
     : [];
 
