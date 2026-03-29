@@ -24,6 +24,14 @@ const getSpecColor = (s: string) => {
   for (let i = 0; i < s.length; i++) h = s.charCodeAt(i) + ((h << 5) - h);
   return SPEC_COLORS[Math.abs(h) % SPEC_COLORS.length];
 };
+const parseSpecs = (raw: string | null | undefined): string[] => {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed.map(s => String(s).trim()).filter(Boolean);
+  } catch {}
+  return raw.split(',').map(s => s.trim()).filter(Boolean);
+};
 const SpecBadge: React.FC<{ spec: string; size?: 'sm' | 'md' }> = ({ spec, size = 'sm' }) => {
   const c = getSpecColor(spec);
   return (
@@ -330,7 +338,7 @@ export const Operatrici: React.FC<OperatriciProps> = ({ onGoBack }) => {
               <div className={selectedOperatrice ? 'space-y-1 pb-4' : 'grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-2 pb-4'}>
                 {filteredOperatrici.map(op => {
                   const isSelected = selectedOperatrice?.id === op.id;
-                  const specs = op.specializzazioni ? op.specializzazioni.split(',').map(s => s.trim()).filter(Boolean) : [];
+                  const specs = parseSpecs(op.specializzazioni);
 
                   return (
                     <button
@@ -471,7 +479,7 @@ const OperatriceDetailPanel: React.FC<DetailPanelProps> = ({
   onStartEdit, onSave, onCancelEdit, onClose, onDeactivate, onReactivate, onDelete, loading,
 }) => {
   const [showActions, setShowActions] = useState(false);
-  const specs = operatrice.specializzazioni ? operatrice.specializzazioni.split(',').map(s => s.trim()).filter(Boolean) : [];
+  const specs = parseSpecs(operatrice.specializzazioni);
 
   return (
     <div className="flex flex-col h-full">
@@ -601,7 +609,7 @@ const AnagraficaTab: React.FC<{
   onCancel: () => void;
   loading: boolean;
 }> = ({ operatrice, isEditing, formData, setFormData, onSave, onCancel, loading }) => {
-  const specs = operatrice.specializzazioni ? operatrice.specializzazioni.split(',').map(s => s.trim()).filter(Boolean) : [];
+  const specs = parseSpecs(operatrice.specializzazioni);
 
   if (!isEditing) {
     // View mode
