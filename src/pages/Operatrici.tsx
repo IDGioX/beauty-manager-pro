@@ -228,60 +228,54 @@ export const Operatrici: React.FC<OperatriciProps> = ({ onGoBack }) => {
         {/* ═══════════════ LEFT: OPERATOR LIST ═══════════════ */}
         <div className={`flex flex-col min-w-0 master-panel ${selectedOperatrice ? 'w-[420px] shrink-0' : 'flex-1'}`}>
           {/* Header */}
-          <div className="flex items-center justify-between gap-2 px-5 py-4">
-            <div className="flex items-center gap-3 min-w-0">
+          <div className="flex items-center justify-between gap-2 px-5 py-3">
+            <div className="flex items-center gap-2 min-w-0">
               {onGoBack && (
                 <button onClick={onGoBack} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors shrink-0" style={{ color: 'var(--color-primary)', background: 'color-mix(in srgb, var(--color-primary) 10%, transparent)' }} title="Torna all'appuntamento">
                   <ArrowLeft size={14} /><span>Appuntamento</span>
                 </button>
               )}
-              <div className="min-w-0">
-                <h1 className="text-xl font-bold truncate" style={{ color: 'var(--color-text-primary)' }}>Operatori</h1>
-                <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>{stats.attivi} attivi</p>
-              </div>
+              <h1 className="text-lg font-bold truncate" style={{ color: 'var(--color-text-primary)' }}>Operatori</h1>
             </div>
             <Button onClick={openCreateModal} variant="primary" size="sm" className="shrink-0 whitespace-nowrap">
               <Plus size={15} className="mr-1" />Nuovo
             </Button>
           </div>
 
-          {/* Search */}
-          <div className="px-5 pb-3">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2" size={15} style={{ color: 'var(--color-text-muted)' }} />
+          {/* Search + Segments inline */}
+          <div className="px-5 pb-2 flex items-center gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2" size={14} style={{ color: 'var(--color-text-muted)' }} />
               <input
                 ref={searchRef}
                 type="text"
                 placeholder="Cerca operatore..."
                 value={searchTerm}
                 onChange={e => handleSearchChange(e.target.value)}
-                className="w-full pl-9 pr-8 py-2 rounded-xl text-sm"
+                className="w-full pl-8 pr-7 py-1.5 rounded-lg text-xs"
                 style={{ background: 'var(--glass-border)', border: 'none', color: 'var(--color-text-primary)', outline: 'none' }}
               />
               {searchTerm && (
-                <button onClick={() => { setSearchTerm(''); searchRef.current?.focus(); }} className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 rounded-md" style={{ color: 'var(--color-text-muted)' }}>
-                  <X size={14} />
+                <button onClick={() => { setSearchTerm(''); searchRef.current?.focus(); }} className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded-md" style={{ color: 'var(--color-text-muted)' }}>
+                  <X size={12} />
                 </button>
               )}
             </div>
-          </div>
-
-          {/* Segments */}
-          <div className="filter-chips">
-            {segments.map(seg => (
-              <button
-                key={seg.key}
-                onClick={() => setSegment(seg.key)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all"
-                style={{
-                  background: segment === seg.key ? 'var(--color-primary)' : 'var(--glass-border)',
-                  color: segment === seg.key ? 'white' : 'var(--color-text-secondary)',
-                }}
-              >
-                {seg.label}
-                <span className="ml-0.5 opacity-70">{seg.count}</span>
-              </button>
-            ))}
+            <div className="flex gap-1 shrink-0">
+              {segments.map(seg => (
+                <button
+                  key={seg.key}
+                  onClick={() => setSegment(seg.key)}
+                  className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-[10px] font-medium whitespace-nowrap transition-all"
+                  style={{
+                    background: segment === seg.key ? 'color-mix(in srgb, var(--color-primary) 12%, transparent)' : 'transparent',
+                    color: segment === seg.key ? 'var(--color-primary)' : 'var(--color-text-muted)',
+                  }}
+                >
+                  {seg.label} {seg.count}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Operator List */}

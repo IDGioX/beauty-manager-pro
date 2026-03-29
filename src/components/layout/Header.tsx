@@ -6,7 +6,13 @@ import {
   CalendarPlus, FileText, Database, Palette, Bell, Command
 } from 'lucide-react';
 import { clientiService } from '../../services/clienti';
+import { trattamentiService } from '../../services/trattamenti';
+import { operatriciService } from '../../services/operatrici';
+import { pacchettiService } from '../../services/pacchetti';
 import { Cliente } from '../../types/cliente';
+import type { Trattamento } from '../../types/trattamento';
+import type { Operatrice } from '../../types/agenda';
+import type { PacchettoConTrattamenti } from '../../services/pacchetti';
 
 interface HeaderProps {
   title: string;
@@ -32,6 +38,28 @@ export const Header: React.FC<HeaderProps> = ({ title, onNavigate }) => {
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const searchRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Cache dati per ricerca locale
+  const [allTrattamenti, setAllTrattamenti] = useState<Trattamento[]>([]);
+  const [allOperatrici, setAllOperatrici] = useState<Operatrice[]>([]);
+  const [allPacchetti, setAllPacchetti] = useState<PacchettoConTrattamenti[]>([]);
+
+  // Carica dati per ricerca locale (una volta)
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const [t, o, p] = await Promise.all([
+          trattamentiService.getTrattamenti(),
+          operatriciService.getOperatrici(false),
+          pacchettiService.getPacchetti(),
+        ]);
+        setAllTrattamenti(t);
+        setAllOperatrici(o);
+        setAllPacchetti(p);
+      } catch (e) { console.error('Errore precaricamento dati ricerca:', e); }
+    };
+    load();
+  }, []);
 
   // Definizione comandi di ricerca globale
   const searchCommands: SearchCommand[] = useMemo(() => [
@@ -269,10 +297,29 @@ export const Header: React.FC<HeaderProps> = ({ title, onNavigate }) => {
     return { pages, actions };
   }, [filteredCommands]);
 
+  // Ricerca locale su trattamenti, operatrici, pacchetti
+  const filteredTrattamenti = useMemo(() => {
+    if (searchTerm.trim().length < 2) return [];
+    const term = searchTerm.toLowerCase();
+    return allTrattamenti.filter(t => t.nome.toLowerCase().includes(term) || (t.categoria_nome && t.categoria_nome.toLowerCase().includes(term))).slice(0, 5);
+  }, [searchTerm, allTrattamenti]);
+
+  const filteredOperatrici = useMemo(() => {
+    if (searchTerm.trim().length < 2) return [];
+    const term = searchTerm.toLowerCase();
+    return allOperatrici.filter(o => `${o.nome} ${o.cognome}`.toLowerCase().includes(term) || (o.specializzazioni && o.specializzazioni.toLowerCase().includes(term))).slice(0, 5);
+  }, [searchTerm, allOperatrici]);
+
+  const filteredPacchetti = useMemo(() => {
+    if (searchTerm.trim().length < 2) return [];
+    const term = searchTerm.toLowerCase();
+    return allPacchetti.filter(p => p.nome.toLowerCase().includes(term) || (p.descrizione && p.descrizione.toLowerCase().includes(term))).slice(0, 5);
+  }, [searchTerm, allPacchetti]);
+
   // Conta totale risultati per navigazione tastiera
   const totalResults = useMemo(() => {
-    return groupedCommands.pages.length + groupedCommands.actions.length + searchResults.length;
-  }, [groupedCommands, searchResults]);
+    return groupedCommands.pages.length + groupedCommands.actions.length + searchResults.length + filteredTrattamenti.length + filteredOperatrici.length + filteredPacchetti.length;
+  }, [groupedCommands, searchResults, filteredTrattamenti, filteredOperatrici, filteredPacchetti]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -325,18 +372,32 @@ export const Header: React.FC<HeaderProps> = ({ title, onNavigate }) => {
   }, [showResults, selectedIndex, totalResults, groupedCommands, searchResults]);
 
   const handleSelectByIndex = (index: number) => {
+    let offset = 0;
     const pagesCount = groupedCommands.pages.length;
     const actionsCount = groupedCommands.actions.length;
 
     if (index < pagesCount) {
-      handleCommandClick(groupedCommands.pages[index]);
-    } else if (index < pagesCount + actionsCount) {
-      handleCommandClick(groupedCommands.actions[index - pagesCount]);
-    } else {
-      const clienteIndex = index - pagesCount - actionsCount;
-      if (searchResults[clienteIndex]) {
-        handleClienteClick(searchResults[clienteIndex]);
-      }
+      handleCommandClick(groupedCommands.pages[index]); return;
+    }
+    offset += pagesCount;
+    if (index < offset + actionsCount) {
+      handleCommandClick(groupedCommands.actions[index - offset]); return;
+    }
+    offset += actionsCount;
+    if (index < offset + searchResults.length) {
+      handleClienteClick(searchResults[index - offset]); return;
+    }
+    offset += searchResults.length;
+    if (index < offset + filteredTrattamenti.length) {
+      handleTrattamentoClick(filteredTrattamenti[index - offset]); return;
+    }
+    offset += filteredTrattamenti.length;
+    if (index < offset + filteredOperatrici.length) {
+      handleOperatriceClick(filteredOperatrici[index - offset]); return;
+    }
+    offset += filteredOperatrici.length;
+    if (index < offset + filteredPacchetti.length) {
+      handlePacchettoClick(filteredPacchetti[index - offset]); return;
     }
   };
 
@@ -395,8 +456,36 @@ export const Header: React.FC<HeaderProps> = ({ title, onNavigate }) => {
     setSearchTerm('');
   };
 
-  const hasResults = filteredCommands.length > 0 || searchResults.length > 0 || loading;
-  const showEmptyState = searchTerm.trim().length >= 2 && !loading && filteredCommands.length === 0 && searchResults.length === 0;
+  const handleTrattamentoClick = (t: Trattamento) => {
+    onNavigate('trattamenti');
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('navigateToTrattamento', { detail: { trattamentoId: t.id } }));
+    }, 100);
+    setShowResults(false);
+    setSearchTerm('');
+  };
+
+  const handleOperatriceClick = (o: Operatrice) => {
+    onNavigate('operatrici');
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('navigateToOperatrice', { detail: { operatriceId: o.id } }));
+    }, 100);
+    setShowResults(false);
+    setSearchTerm('');
+  };
+
+  const handlePacchettoClick = (p: PacchettoConTrattamenti) => {
+    onNavigate('pacchetti');
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('navigateToPacchetto', { detail: { pacchettoId: p.id } }));
+    }, 100);
+    setShowResults(false);
+    setSearchTerm('');
+  };
+
+  const allEntityResults = searchResults.length + filteredTrattamenti.length + filteredOperatrici.length + filteredPacchetti.length;
+  const hasResults = filteredCommands.length > 0 || allEntityResults > 0 || loading;
+  const showEmptyState = searchTerm.trim().length >= 2 && !loading && filteredCommands.length === 0 && allEntityResults === 0;
 
   return (
     <header
@@ -609,6 +698,82 @@ export const Header: React.FC<HeaderProps> = ({ title, onNavigate }) => {
                         </button>
                       ))
                     )}
+                  </div>
+                )}
+
+                {/* Trattamenti */}
+                {filteredTrattamenti.length > 0 && (
+                  <div>
+                    <div className="px-4 py-2 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)', borderTop: '1px solid var(--glass-border)' }}>
+                      Trattamenti
+                    </div>
+                    {filteredTrattamenti.map((t, idx) => {
+                      const globalIdx = groupedCommands.pages.length + groupedCommands.actions.length + searchResults.length + idx;
+                      return (
+                        <button key={t.id} onClick={() => handleTrattamentoClick(t)}
+                          className={`w-full px-4 py-2.5 text-left flex items-center gap-3 transition-colors ${selectedIndex === globalIdx ? 'bg-[color-mix(in_srgb,var(--color-primary)_12%,transparent)]' : ''} hover:bg-[color-mix(in_srgb,var(--color-primary)_8%,transparent)]`}>
+                          <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)' }}>
+                            <Scissors size={16} style={{ color: 'var(--color-accent)' }} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-sm" style={{ color: 'var(--color-text-primary)' }}>{t.nome}</div>
+                            <div className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                              {t.categoria_nome || 'Senza categoria'} · {t.durata_minuti} min{t.prezzo_listino ? ` · €${t.prezzo_listino.toFixed(0)}` : ''}
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Operatrici */}
+                {filteredOperatrici.length > 0 && (
+                  <div>
+                    <div className="px-4 py-2 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)', borderTop: '1px solid var(--glass-border)' }}>
+                      Operatori
+                    </div>
+                    {filteredOperatrici.map((o, idx) => {
+                      const globalIdx = groupedCommands.pages.length + groupedCommands.actions.length + searchResults.length + filteredTrattamenti.length + idx;
+                      return (
+                        <button key={o.id} onClick={() => handleOperatriceClick(o)}
+                          className={`w-full px-4 py-2.5 text-left flex items-center gap-3 transition-colors ${selectedIndex === globalIdx ? 'bg-[color-mix(in_srgb,var(--color-primary)_12%,transparent)]' : ''} hover:bg-[color-mix(in_srgb,var(--color-primary)_8%,transparent)]`}>
+                          <div className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-semibold" style={{ background: o.colore_agenda || 'var(--color-primary)' }}>
+                            {o.nome?.charAt(0)}{o.cognome?.charAt(0)}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-sm" style={{ color: 'var(--color-text-primary)' }}>{o.nome} {o.cognome}</div>
+                            {o.specializzazioni && <div className="text-xs truncate" style={{ color: 'var(--color-text-muted)' }}>{o.specializzazioni}</div>}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Pacchetti */}
+                {filteredPacchetti.length > 0 && (
+                  <div>
+                    <div className="px-4 py-2 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)', borderTop: '1px solid var(--glass-border)' }}>
+                      Pacchetti
+                    </div>
+                    {filteredPacchetti.map((p, idx) => {
+                      const globalIdx = groupedCommands.pages.length + groupedCommands.actions.length + searchResults.length + filteredTrattamenti.length + filteredOperatrici.length + idx;
+                      return (
+                        <button key={p.id} onClick={() => handlePacchettoClick(p)}
+                          className={`w-full px-4 py-2.5 text-left flex items-center gap-3 transition-colors ${selectedIndex === globalIdx ? 'bg-[color-mix(in_srgb,var(--color-primary)_12%,transparent)]' : ''} hover:bg-[color-mix(in_srgb,var(--color-primary)_8%,transparent)]`}>
+                          <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: 'color-mix(in srgb, var(--color-primary) 15%, transparent)' }}>
+                            <Package size={16} style={{ color: 'var(--color-primary)' }} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-sm" style={{ color: 'var(--color-text-primary)' }}>{p.nome}</div>
+                            <div className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                              {p.num_sedute} sedute · €{p.prezzo_totale.toFixed(0)}
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
 

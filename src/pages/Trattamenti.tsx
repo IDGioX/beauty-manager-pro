@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { ArrowLeft, X, ChevronRight, MoreHorizontal, Plus, Search, Edit2, Trash2, Clock, Euro, Sparkles, FolderOpen, EyeOff, Eye } from 'lucide-react';
+import { ArrowLeft, X, ChevronRight, MoreHorizontal, Plus, Search, Edit2, Trash2, Clock, Euro, Sparkles, FolderOpen, EyeOff, Eye, ChevronsUpDown } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
@@ -29,7 +29,6 @@ export const Trattamenti: React.FC<TrattamentiProps> = ({ onGoBack }) => {
   const [categorie, setCategorie] = useState<CategoriaTrattamento[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategoria, setSelectedCategoria] = useState<string>('');
   const [toast, setToast] = useState<ToastState | null>(null);
 
   // Create modal (new only)
@@ -75,10 +74,9 @@ export const Trattamenti: React.FC<TrattamentiProps> = ({ onGoBack }) => {
   // Client-side filtering
   const filtered = useMemo(() => {
     return trattamenti.filter(t => {
-      const matchSearch = t.nome.toLowerCase().includes(searchTerm.toLowerCase()) || (t.descrizione && t.descrizione.toLowerCase().includes(searchTerm.toLowerCase()));
-      return matchSearch && (!selectedCategoria || t.categoria_id === selectedCategoria);
+      return t.nome.toLowerCase().includes(searchTerm.toLowerCase()) || (t.descrizione && t.descrizione.toLowerCase().includes(searchTerm.toLowerCase()));
     });
-  }, [trattamenti, searchTerm, selectedCategoria]);
+  }, [trattamenti, searchTerm]);
 
   // Create modal
   const openCreateModal = () => {
@@ -168,14 +166,53 @@ export const Trattamenti: React.FC<TrattamentiProps> = ({ onGoBack }) => {
     } catch { showToast('Errore nell\'eliminazione', 'error'); }
   };
 
-  // Category chips data
-  const categoryChips = useMemo(() => {
-    const counts = new Map<string, number>();
-    trattamenti.forEach(t => {
-      if (t.categoria_id) counts.set(t.categoria_id, (counts.get(t.categoria_id) || 0) + 1);
+  // Raggruppa trattamenti filtrati per categoria
+  const groupedFiltered = useMemo(() => {
+    const groups: { categoria: CategoriaTrattamento | null; trattamenti: Trattamento[] }[] = [];
+    const catMap = new Map<string, Trattamento[]>();
+    const senzaCat: Trattamento[] = [];
+
+    filtered.forEach(t => {
+      if (t.categoria_id) {
+        const arr = catMap.get(t.categoria_id) || [];
+        arr.push(t);
+        catMap.set(t.categoria_id, arr);
+      } else {
+        senzaCat.push(t);
+      }
     });
-    return categorie.map(c => ({ id: c.id, nome: c.nome, count: counts.get(c.id) || 0 }));
-  }, [categorie, trattamenti]);
+
+    // Mantieni ordine delle categorie
+    categorie.forEach(c => {
+      const items = catMap.get(c.id);
+      if (items && items.length > 0) {
+        groups.push({ categoria: c, trattamenti: items });
+      }
+    });
+    if (senzaCat.length > 0) {
+      groups.push({ categoria: null, trattamenti: senzaCat });
+    }
+    return groups;
+  }, [filtered, categorie]);
+
+  const STORAGE_KEY = 'bmp_trattamenti_collapsed';
+  const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch { return new Set(); }
+  });
+
+  const updateCollapsed = (next: Set<string>) => {
+    setCollapsedCategories(next);
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify([...next])); } catch {}
+  };
+
+  const toggleCategory = (catId: string) => {
+    const next = new Set(collapsedCategories);
+    if (next.has(catId)) next.delete(catId); else next.add(catId);
+    updateCollapsed(next);
+  };
 
   return (
     <>
@@ -222,39 +259,31 @@ export const Trattamenti: React.FC<TrattamentiProps> = ({ onGoBack }) => {
             </div>
           </div>
 
-          {/* Category Filter Chips */}
-          <div className="filter-chips">
-            <button
-              onClick={() => setSelectedCategoria('')}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all"
-              style={{
-                background: !selectedCategoria ? 'var(--color-primary)' : 'var(--glass-border)',
-                color: !selectedCategoria ? 'white' : 'var(--color-text-secondary)',
-              }}
-            >
-              Tutti
-              <span className="ml-0.5 opacity-70">{trattamenti.length}</span>
-            </button>
-            {categoryChips.map(cat => (
-              <button
-                key={cat.id}
-                onClick={() => setSelectedCategoria(selectedCategoria === cat.id ? '' : cat.id)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all"
-                style={{
-                  background: selectedCategoria === cat.id ? 'var(--color-primary)' : 'var(--glass-border)',
-                  color: selectedCategoria === cat.id ? 'white' : 'var(--color-text-secondary)',
-                }}
-              >
-                {cat.nome}
-                <span className="ml-0.5 opacity-70">{cat.count}</span>
-              </button>
-            ))}
+          {/* Toolbar: Gestisci categorie + Espandi/Comprimi */}
+          <div className="flex items-center justify-between px-5 pb-3">
             <button
               onClick={() => setIsCategorieModalOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all"
-              style={{ background: 'transparent', color: 'var(--color-text-muted)' }}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-colors"
+              style={{ color: 'var(--color-text-muted)', background: 'var(--glass-border)' }}
             >
-              <FolderOpen size={12} />Gestisci
+              <FolderOpen size={12} /> Categorie
+            </button>
+            <button
+              onClick={() => {
+                const allCatIds = groupedFiltered.map(g => g.categoria?.id || '_none');
+                const allCollapsed = allCatIds.every(id => collapsedCategories.has(id));
+                if (allCollapsed) {
+                  updateCollapsed(new Set());
+                } else {
+                  updateCollapsed(new Set(allCatIds));
+                }
+              }}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-colors"
+              style={{ color: 'var(--color-text-muted)', background: 'var(--glass-border)' }}
+              title={groupedFiltered.every(g => collapsedCategories.has(g.categoria?.id || '_none')) ? 'Espandi tutto' : 'Comprimi tutto'}
+            >
+              <ChevronsUpDown size={12} />
+              {groupedFiltered.every(g => collapsedCategories.has(g.categoria?.id || '_none')) ? 'Espandi tutto' : 'Comprimi tutto'}
             </button>
           </div>
 
@@ -277,50 +306,59 @@ export const Trattamenti: React.FC<TrattamentiProps> = ({ onGoBack }) => {
                 </div>
                 <p className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>Nessun trattamento trovato</p>
                 <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
-                  {searchTerm || selectedCategoria ? 'Prova a modificare i filtri' : 'Inizia creando il primo trattamento'}
+                  {searchTerm ? 'Prova a modificare la ricerca' : 'Inizia creando il primo trattamento'}
                 </p>
               </div>
             ) : (
-              <div className={selectedTrattamento ? 'space-y-1 pb-4' : 'grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-2 pb-4'}>
-                {filtered.map(t => {
-                  const cc = getCatColor(t.categoria_nome || 'N/A');
-                  const isSelected = selectedTrattamento?.id === t.id;
+              /* Lista raggruppata per categoria */
+              <div className="space-y-2 pb-4">
+                {groupedFiltered.map(group => {
+                  const catId = group.categoria?.id || '_none';
+                  const catName = group.categoria?.nome || 'Senza categoria';
+                  const cc = getCatColor(catName);
+                  const isCollapsed = collapsedCategories.has(catId);
 
                   return (
-                    <button
-                      key={t.id}
-                      onClick={() => selectTrattamento(t)}
-                      className={`w-full flex items-center gap-3 p-3 rounded-xl text-left group list-card ${isSelected ? 'list-card-selected' : ''}`}
-                      style={{ opacity: t.attivo ? 1 : 0.5 }}
-                    >
-                      {/* Category color dot */}
-                      <div className="shrink-0">
-                        <div className="w-3 h-3 rounded-full" style={{ background: cc.text }} />
-                      </div>
+                    <div key={catId}>
+                      {/* Category header */}
+                      <button
+                        onClick={() => toggleCategory(catId)}
+                        className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left transition-colors hover:opacity-80"
+                        style={{ background: cc.bg }}
+                      >
+                        <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: cc.text }} />
+                        <span className="text-xs font-bold flex-1" style={{ color: cc.text }}>{catName}</span>
+                        <span className="text-[10px] font-medium" style={{ color: cc.text, opacity: 0.7 }}>{group.trattamenti.length}</span>
+                        <ChevronRight
+                          size={13}
+                          style={{ color: cc.text, transform: isCollapsed ? 'rotate(0deg)' : 'rotate(90deg)', transition: 'transform 150ms' }}
+                        />
+                      </button>
 
-                      {/* Info */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="font-semibold text-sm truncate" style={{ color: 'var(--color-text-primary)' }}>
-                            {t.nome}
-                          </p>
-                          <span className="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold" style={{ background: cc.bg, color: cc.text }}>
-                            {t.categoria_nome || 'N/A'}
-                          </span>
+                      {/* Treatments in category */}
+                      {!isCollapsed && (
+                        <div className="mt-1 space-y-0.5 ml-1" style={{ borderLeft: `2px solid ${cc.text}20` }}>
+                          {group.trattamenti.map(t => {
+                            const isSelected = selectedTrattamento?.id === t.id;
+                            return (
+                              <button
+                                key={t.id}
+                                onClick={() => selectTrattamento(t)}
+                                className={`w-full flex items-center gap-3 p-2.5 pl-4 rounded-r-xl text-left group list-card ${isSelected ? 'list-card-selected' : ''}`}
+                                style={{ opacity: t.attivo ? 1 : 0.5 }}
+                              >
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-medium text-sm truncate" style={{ color: 'var(--color-text-primary)' }}>{t.nome}</p>
+                                  <span className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>{t.durata_minuti} min{t.prezzo_listino ? ` · \u20AC${t.prezzo_listino.toFixed(2)}` : ''}</span>
+                                </div>
+                                {!t.attivo && <span className="text-[8px] px-1.5 py-0.5 rounded font-medium" style={{ background: 'color-mix(in srgb, var(--color-text-muted) 15%, transparent)', color: 'var(--color-text-muted)' }}>Inattivo</span>}
+                                <ChevronRight size={13} className="opacity-0 group-hover:opacity-50 transition-opacity shrink-0" style={{ color: 'var(--color-text-muted)' }} />
+                              </button>
+                            );
+                          })}
                         </div>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                            {t.durata_minuti} min
-                            {t.prezzo_listino ? ` · \u20AC${t.prezzo_listino.toFixed(2)}` : ''}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Chevron */}
-                      <div className="flex items-center shrink-0">
-                        <ChevronRight size={14} className="opacity-0 group-hover:opacity-50 transition-opacity" style={{ color: 'var(--color-text-muted)' }} />
-                      </div>
-                    </button>
+                      )}
+                    </div>
                   );
                 })}
               </div>

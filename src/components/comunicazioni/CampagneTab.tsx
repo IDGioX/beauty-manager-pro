@@ -60,10 +60,12 @@ export function CampagneTab({ templates, showToast }: CampagneTabProps) {
     return campagne.filter(c => c.stato === filterStato);
   }, [campagne, filterStato]);
 
-  const handleCreated = (campagna: CampagnaMarketing) => {
+  const handleCreated = (campagna: CampagnaMarketing, sendNow: boolean) => {
     setWizardOpen(false);
     loadCampagne();
-    setSendingCampagna(campagna);
+    if (sendNow) {
+      setSendingCampagna(campagna);
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -226,6 +228,7 @@ export function CampagneTab({ templates, showToast }: CampagneTabProps) {
         onClose={() => setWizardOpen(false)}
         onCreated={handleCreated}
         templates={templates}
+        showToast={showToast}
       />
 
       {sendingCampagna && (
@@ -243,6 +246,7 @@ export function CampagneTab({ templates, showToast }: CampagneTabProps) {
           onClose={() => setDetailCampagna(null)}
           campagna={detailCampagna}
           onDelete={() => handleDelete(detailCampagna.id)}
+          onSend={() => { setDetailCampagna(null); setSendingCampagna(detailCampagna); }}
         />
       )}
     </div>

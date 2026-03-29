@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Toast } from '../components/ui/Toast';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
@@ -21,6 +21,7 @@ import {
   Sparkles,
   Megaphone,
   FileText,
+  X,
 } from 'lucide-react';
 import { CampagneTab } from '../components/comunicazioni/CampagneTab';
 import * as comunicazioniService from '../services/comunicazioni';
@@ -78,6 +79,11 @@ export function Comunicazioni() {
   const [copiedPlaceholder, setCopiedPlaceholder] = useState<string | null>(null);
   const [templateStep, setTemplateStep] = useState<1 | 2>(1);
   const [confirmDeleteTemplateId, setConfirmDeleteTemplateId] = useState<string | null>(null);
+  const templateCorpoRef = useRef<HTMLTextAreaElement>(null);
+  const [birthdayCliente, setBirthdayCliente] = useState<Cliente | null>(null);
+  const [birthdayTemplateId, setBirthdayTemplateId] = useState<string>('');
+  const [birthdayCustomMsg, setBirthdayCustomMsg] = useState('');
+  const [birthdaySending, setBirthdaySending] = useState(false);
 
   const showToast = (message: string, type: 'success' | 'error') => {
     setToast({ message, type });
@@ -193,10 +199,20 @@ export function Comunicazioni() {
   };
 
   const insertPlaceholder = (tag: string) => {
-    setTemplateForm(prev => ({
-      ...prev,
-      corpo: prev.corpo + tag,
-    }));
+    const el = templateCorpoRef.current;
+    if (el) {
+      const start = el.selectionStart;
+      const end = el.selectionEnd;
+      const text = templateForm.corpo;
+      const newCorpo = text.substring(0, start) + tag + text.substring(end);
+      setTemplateForm(prev => ({ ...prev, corpo: newCorpo }));
+      requestAnimationFrame(() => {
+        el.selectionStart = el.selectionEnd = start + tag.length;
+        el.focus();
+      });
+    } else {
+      setTemplateForm(prev => ({ ...prev, corpo: prev.corpo + tag }));
+    }
     setCopiedPlaceholder(tag);
     setTimeout(() => setCopiedPlaceholder(null), 1000);
   };
@@ -209,27 +225,66 @@ export function Comunicazioni() {
     return preview;
   };
 
-  const sendBirthdayWish = async (cliente: Cliente) => {
+  const sendBirthdayWish = (cliente: Cliente) => {
     const channels = comunicazioniService.getAvailableChannels(cliente);
     if (channels.length === 0) {
       showToast('Il cliente non ha WhatsApp o email disponibile', 'error');
       return;
     }
+    // Apri il selettore template
+    setBirthdayCliente(cliente);
+    setBirthdayTemplateId('');
+    setBirthdayCustomMsg('');
+  };
+
+  const birthdayTemplates = templates.filter(t => t.tipo === 'auguri_compleanno' && t.attivo);
+
+  const handleSendBirthday = async () => {
+    if (!birthdayCliente) return;
+    const channels = comunicazioniService.getAvailableChannels(birthdayCliente);
     const canale = channels.includes('whatsapp') ? 'whatsapp' : channels[0];
     const destinatario = canale === 'whatsapp'
-      ? (cliente.cellulare || cliente.telefono || '')
-      : (cliente.email || '');
+      ? (birthdayCliente.cellulare || birthdayCliente.telefono || '')
+      : (birthdayCliente.email || '');
 
+    // Determina il messaggio
+    let messaggio = '';
+    let oggetto = '';
+    const selectedTmpl = birthdayTemplates.find(t => t.id === birthdayTemplateId);
+
+    if (selectedTmpl) {
+      // Sostituisci placeholder
+      messaggio = selectedTmpl.corpo
+        .replace(/\{nome\}/g, birthdayCliente.nome)
+        .replace(/\{cognome\}/g, birthdayCliente.cognome)
+        .replace(/\{nome_centro\}/g, '');
+      oggetto = (selectedTmpl.oggetto || '')
+        .replace(/\{nome\}/g, birthdayCliente.nome)
+        .replace(/\{cognome\}/g, birthdayCliente.cognome);
+    } else if (birthdayCustomMsg.trim()) {
+      messaggio = birthdayCustomMsg
+        .replace(/\{nome\}/g, birthdayCliente.nome)
+        .replace(/\{cognome\}/g, birthdayCliente.cognome);
+      oggetto = `Auguri ${birthdayCliente.nome}!`;
+    } else {
+      showToast('Seleziona un template o scrivi un messaggio', 'error');
+      return;
+    }
+
+    setBirthdaySending(true);
     try {
       await comunicazioniService.sendMessage(
         canale,
         destinatario,
-        `Tantissimi auguri di buon compleanno ${cliente.nome}!`,
-        canale === 'email' ? `Auguri ${cliente.nome}!` : undefined
+        messaggio,
+        canale === 'email' ? oggetto : undefined
       );
-      showToast(`Messaggio aperto per ${cliente.nome}!`, 'success');
-    } catch (error) {
+      showToast(`Messaggio aperto per ${birthdayCliente.nome}!`, 'success');
+      setBirthdayCliente(null);
+    } catch {
       showToast('Errore nell\'apertura del messaggio', 'error');
+    } finally {
+      setBirthdaySending(false);
     }
   };
 
@@ -524,6 +579,78 @@ export function Comunicazioni() {
         </div>
       )}
 
+      {/* MODAL SCELTA TEMPLATE COMPLEANNO */}
+      {birthdayCliente && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center">
+          <div className="absolute inset-0 backdrop-blur-sm" style={{ background: 'rgba(0,0,0,0.4)' }} onClick={() => setBirthdayCliente(null)} />
+          <div className="relative w-full max-w-md mx-4 rounded-2xl overflow-hidden shadow-2xl" style={{ background: 'var(--card-bg)', border: '1px solid var(--glass-border)' }}>
+            <div className="px-6 py-4 flex items-center justify-between" style={{ background: 'var(--sidebar-bg)' }}>
+              <div>
+                <h2 className="font-bold text-sm text-white">Auguri a {birthdayCliente.nome} {birthdayCliente.cognome}</h2>
+                <p className="text-[10px] text-white/50">Scegli il messaggio da inviare</p>
+              </div>
+              <button onClick={() => setBirthdayCliente(null)} className="p-1.5 rounded-lg hover:bg-white/10 text-white/60 hover:text-white transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="px-6 py-4 space-y-3 max-h-[50vh] overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
+              {birthdayTemplates.length > 0 ? (
+                birthdayTemplates.map(t => {
+                  const preview = t.corpo.replace(/\{nome\}/g, birthdayCliente.nome).replace(/\{cognome\}/g, birthdayCliente.cognome).replace(/\{nome_centro\}/g, '');
+                  return (
+                    <button
+                      key={t.id}
+                      onClick={() => { setBirthdayTemplateId(t.id); setBirthdayCustomMsg(''); }}
+                      className="w-full p-3 rounded-xl text-left transition-all"
+                      style={{
+                        background: birthdayTemplateId === t.id ? 'color-mix(in srgb, var(--color-primary) 10%, transparent)' : 'transparent',
+                        border: `1px solid ${birthdayTemplateId === t.id ? 'var(--color-primary)' : 'var(--glass-border)'}`,
+                      }}
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>{t.nome}</span>
+                        <span className="text-[9px] px-1.5 py-0.5 rounded font-medium" style={{ background: t.canale === 'whatsapp' ? 'color-mix(in srgb, #25D366 15%, transparent)' : 'color-mix(in srgb, var(--color-accent) 15%, transparent)', color: t.canale === 'whatsapp' ? '#25D366' : 'var(--color-accent)' }}>
+                          {t.canale === 'whatsapp' ? 'WhatsApp' : 'Email'}
+                        </span>
+                      </div>
+                      <p className="text-[11px] line-clamp-3" style={{ color: 'var(--color-text-muted)' }}>{preview}</p>
+                    </button>
+                  );
+                })
+              ) : (
+                <p className="text-xs text-center py-4" style={{ color: 'var(--color-text-muted)' }}>
+                  Nessun template di compleanno configurato. Creane uno nella sezione Templates.
+                </p>
+              )}
+
+              {/* Messaggio personalizzato */}
+              <div className="pt-2" style={{ borderTop: '1px solid var(--glass-border)' }}>
+                <p className="text-[10px] font-medium mb-1.5" style={{ color: 'var(--color-text-muted)' }}>Oppure scrivi un messaggio personalizzato</p>
+                <textarea
+                  value={birthdayCustomMsg}
+                  onChange={e => { setBirthdayCustomMsg(e.target.value); setBirthdayTemplateId(''); }}
+                  placeholder={`Auguri di buon compleanno {nome}!`}
+                  rows={3}
+                  className="w-full px-3 py-2 rounded-lg text-xs resize-none"
+                  style={{ background: 'color-mix(in srgb, var(--color-primary) 4%, transparent)', border: '1px solid var(--glass-border)', color: 'var(--color-text-primary)' }}
+                />
+              </div>
+            </div>
+            <div className="px-6 py-4 flex justify-end gap-2" style={{ borderTop: '1px solid var(--glass-border)' }}>
+              <button onClick={() => setBirthdayCliente(null)} className="px-4 py-2 rounded-lg text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>Annulla</button>
+              <button
+                onClick={handleSendBirthday}
+                disabled={birthdaySending || (!birthdayTemplateId && !birthdayCustomMsg.trim())}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium text-white disabled:opacity-40"
+                style={{ background: 'var(--color-primary)' }}
+              >
+                <Send size={13} /> Invia
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* TAB: TEMPLATES */}
       {activeTab === 'templates' && (<div className="space-y-4 animate-fade-in-up">
 
@@ -732,6 +859,7 @@ export function Comunicazioni() {
               Testo del messaggio
             </label>
             <Textarea
+              ref={templateCorpoRef}
               value={templateForm.corpo}
               onChange={(e) => setTemplateForm({ ...templateForm, corpo: e.target.value })}
               rows={5}

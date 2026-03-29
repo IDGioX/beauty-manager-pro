@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { X, MessageCircle, Mail, ArrowRight, ArrowLeft, FileText, Edit3, Eye, Loader2, AlertTriangle, Send } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { X, MessageCircle, Mail, ArrowRight, ArrowLeft, FileText, Edit3, Eye, Loader2, AlertTriangle, Send, Save } from 'lucide-react';
 import { ClientSelector } from './ClientSelector';
 import * as comunicazioniService from '../../services/comunicazioni';
 import type { CampagnaMarketing, TemplateMesaggio, CreateCampagnaInput } from '../../types/comunicazione';
@@ -7,8 +7,9 @@ import type { CampagnaMarketing, TemplateMesaggio, CreateCampagnaInput } from '.
 interface CampagnaWizardProps {
   isOpen: boolean;
   onClose: () => void;
-  onCreated: (campagna: CampagnaMarketing) => void;
+  onCreated: (campagna: CampagnaMarketing, sendNow: boolean) => void;
   templates: TemplateMesaggio[];
+  showToast: (message: string, type: 'success' | 'error') => void;
 }
 
 const PLACEHOLDERS = [
@@ -17,7 +18,7 @@ const PLACEHOLDERS = [
   { tag: '{nome_centro}', label: 'Centro' },
 ];
 
-export function CampagnaWizard({ isOpen, onClose, onCreated, templates }: CampagnaWizardProps) {
+export function CampagnaWizard({ isOpen, onClose, onCreated, templates, showToast }: CampagnaWizardProps) {
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [saving, setSaving] = useState(false);
 
@@ -29,6 +30,22 @@ export function CampagnaWizard({ isOpen, onClose, onCreated, templates }: Campag
   const [messaggioPersonalizzato, setMessaggioPersonalizzato] = useState('');
   const [oggettoEmail, setOggettoEmail] = useState('');
   const [selectedClientIds, setSelectedClientIds] = useState<string[]>([]);
+  const msgTextareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Reset completo quando si apre il wizard
+  useEffect(() => {
+    if (isOpen) {
+      setStep(1);
+      setSaving(false);
+      setCanale('whatsapp');
+      setUseTemplate(true);
+      setTemplateId('');
+      setNome('');
+      setMessaggioPersonalizzato('');
+      setOggettoEmail('');
+      setSelectedClientIds([]);
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -57,7 +74,7 @@ export function CampagnaWizard({ isOpen, onClose, onCreated, templates }: Campag
     return `Campagna ${canale === 'whatsapp' ? 'WhatsApp' : 'Email'} ${today}`;
   };
 
-  const handleCreate = async () => {
+  const handleCreate = async (sendNow: boolean) => {
     setSaving(true);
     try {
       const input: CreateCampagnaInput = {
@@ -73,16 +90,33 @@ export function CampagnaWizard({ isOpen, onClose, onCreated, templates }: Campag
 
       const campagna = await comunicazioniService.createCampagna(input);
       await comunicazioniService.prepareCampagnaDestinatari(campagna.id, selectedClientIds);
-      onCreated(campagna);
-    } catch (e) {
+      showToast(sendNow ? 'Campagna creata! Avvio invio...' : 'Campagna salvata come bozza', 'success');
+      onCreated(campagna, sendNow);
+    } catch (e: any) {
       console.error('Errore creazione campagna:', e);
+      const msg = typeof e === 'string' ? e : e?.message || 'Errore durante la creazione della campagna';
+      showToast(msg, 'error');
     } finally {
       setSaving(false);
     }
   };
 
   const insertPlaceholder = (tag: string) => {
-    setMessaggioPersonalizzato(prev => prev + tag);
+    const el = msgTextareaRef.current;
+    if (el) {
+      const start = el.selectionStart;
+      const end = el.selectionEnd;
+      const text = messaggioPersonalizzato;
+      const newText = text.substring(0, start) + tag + text.substring(end);
+      setMessaggioPersonalizzato(newText);
+      // Reimposta cursore dopo il tag inserito
+      requestAnimationFrame(() => {
+        el.selectionStart = el.selectionEnd = start + tag.length;
+        el.focus();
+      });
+    } else {
+      setMessaggioPersonalizzato(prev => prev + tag);
+    }
   };
 
   return (
@@ -256,6 +290,7 @@ export function CampagnaWizard({ isOpen, onClose, onCreated, templates }: Campag
                   <div>
                     <label className="text-[10px] font-medium" style={{ color: 'var(--color-text-muted)' }}>Messaggio</label>
                     <textarea
+                      ref={msgTextareaRef}
                       value={messaggioPersonalizzato}
                       onChange={e => setMessaggioPersonalizzato(e.target.value)}
                       placeholder="Scrivi il tuo messaggio..."
@@ -383,15 +418,26 @@ export function CampagnaWizard({ isOpen, onClose, onCreated, templates }: Campag
               Avanti <ArrowRight size={14} />
             </button>
           ) : (
-            <button
-              onClick={handleCreate}
-              disabled={saving}
-              className="flex items-center gap-1.5 px-5 py-2 rounded-lg text-xs font-medium text-white transition-colors disabled:opacity-40"
-              style={{ background: 'var(--color-primary)' }}
-            >
-              {saving ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-              Crea e Invia
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleCreate(false)}
+                disabled={saving}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium transition-colors disabled:opacity-40"
+                style={{ background: 'var(--glass-border)', color: 'var(--color-text-primary)' }}
+              >
+                {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                Salva bozza
+              </button>
+              <button
+                onClick={() => handleCreate(true)}
+                disabled={saving}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium text-white transition-colors disabled:opacity-40"
+                style={{ background: 'var(--color-primary)' }}
+              >
+                {saving ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                Crea e Invia
+              </button>
+            </div>
           )}
         </div>
       </div>

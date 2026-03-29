@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, MessageCircle, Mail, Users, Check, AlertCircle, Trash2, Calendar } from 'lucide-react';
+import { X, MessageCircle, Mail, Users, Check, AlertCircle, Trash2, Calendar, Send } from 'lucide-react';
 import type { CampagnaMarketing } from '../../types/comunicazione';
 
 interface CampagnaDetailModalProps {
@@ -7,6 +7,7 @@ interface CampagnaDetailModalProps {
   onClose: () => void;
   campagna: CampagnaMarketing;
   onDelete: () => void;
+  onSend: () => void;
 }
 
 const STATO_COLORS: Record<string, { bg: string; text: string; label: string }> = {
@@ -23,7 +24,7 @@ function formatDate(iso: string | null): string {
   } catch { return iso; }
 }
 
-export function CampagnaDetailModal({ isOpen, onClose, campagna, onDelete }: CampagnaDetailModalProps) {
+export function CampagnaDetailModal({ isOpen, onClose, campagna, onDelete, onSend }: CampagnaDetailModalProps) {
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   if (!isOpen) return null;
@@ -154,13 +155,24 @@ export function CampagnaDetailModal({ isOpen, onClose, campagna, onDelete }: Cam
               <Trash2 size={13} /> Elimina
             </button>
           )}
-          <button
-            onClick={onClose}
-            className="px-4 py-2 rounded-lg text-xs font-medium"
-            style={{ color: 'var(--color-text-secondary)', background: 'var(--glass-border)' }}
-          >
-            Chiudi
-          </button>
+          <div className="flex gap-2">
+            {(campagna.stato === 'bozza' || campagna.stato === 'completata') && (
+              <button
+                onClick={() => { onSend(); onClose(); }}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium text-white"
+                style={{ background: 'var(--color-primary)' }}
+              >
+                <Send size={13} /> {campagna.stato === 'completata' ? 'Reinvia' : 'Invia ora'}
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="px-4 py-2 rounded-lg text-xs font-medium"
+              style={{ color: 'var(--color-text-secondary)', background: 'var(--glass-border)' }}
+            >
+              Chiudi
+            </button>
+          </div>
         </div>
       </div>
     </div>

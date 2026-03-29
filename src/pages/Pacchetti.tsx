@@ -430,22 +430,15 @@ export const Pacchetti: React.FC<{
         {/* ═══════════════ LEFT PANEL ═══════════════ */}
         <div className={`flex flex-col min-w-0 master-panel ${hasDetailOpen ? 'w-[420px] shrink-0' : 'flex-1'}`}>
 
-          {/* Header */}
-          <div className="flex items-center justify-between gap-2 px-5 py-4">
+          {/* Header compatto */}
+          <div className="flex items-center justify-between gap-2 px-5 py-3">
             <div className="flex items-center gap-2 min-w-0">
               {onGoBack && (
                 <button onClick={onGoBack} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors shrink-0" style={{ color: 'var(--color-primary)', background: 'color-mix(in srgb, var(--color-primary) 10%, transparent)' }} title="Torna all'appuntamento">
                   <ArrowLeft size={14} /><span>Appuntamento</span>
                 </button>
               )}
-            <div className="min-w-0">
-              <h1 className="text-xl font-bold truncate" style={{ color: 'var(--color-text-primary)' }}>Pacchetti</h1>
-              <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
-                {viewMode === 'catalogo'
-                  ? `${pacchetti.length} pacchett${pacchetti.length === 1 ? 'o' : 'i'}`
-                  : `${clientiConPacchetti.length} client${clientiConPacchetti.length === 1 ? 'e' : 'i'} con pacchetti`}
-              </p>
-            </div>
+              <h1 className="text-lg font-bold truncate" style={{ color: 'var(--color-text-primary)' }}>Pacchetti</h1>
             </div>
             <Button
               onClick={() => viewMode === 'catalogo'
@@ -457,64 +450,71 @@ export const Pacchetti: React.FC<{
             </Button>
           </div>
 
-          {/* Search */}
-          <div className="px-5 pb-3">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2" size={15} style={{ color: 'var(--color-text-muted)' }} />
+          {/* Tab Bar */}
+          <div className="px-5 pb-2">
+            <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'var(--glass-border)' }}>
+              <button
+                onClick={() => switchView('catalogo')}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition-all"
+                style={{
+                  background: viewMode === 'catalogo' ? 'var(--card-bg)' : 'transparent',
+                  color: viewMode === 'catalogo' ? 'var(--color-primary)' : 'var(--color-text-muted)',
+                  boxShadow: viewMode === 'catalogo' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                }}
+              >
+                <Package size={13} /> Catalogo
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium" style={{ background: viewMode === 'catalogo' ? 'color-mix(in srgb, var(--color-primary) 12%, transparent)' : 'transparent', color: viewMode === 'catalogo' ? 'var(--color-primary)' : 'var(--color-text-muted)' }}>{pacchetti.length}</span>
+              </button>
+              <button
+                onClick={() => switchView('per_cliente')}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition-all"
+                style={{
+                  background: viewMode === 'per_cliente' ? 'var(--card-bg)' : 'transparent',
+                  color: viewMode === 'per_cliente' ? 'var(--color-primary)' : 'var(--color-text-muted)',
+                  boxShadow: viewMode === 'per_cliente' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                }}
+              >
+                <Users size={13} /> Per Cliente
+                {clientiConPacchetti.length > 0 && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium" style={{ background: viewMode === 'per_cliente' ? 'color-mix(in srgb, var(--color-primary) 12%, transparent)' : 'transparent', color: viewMode === 'per_cliente' ? 'var(--color-primary)' : 'var(--color-text-muted)' }}>{clientiConPacchetti.length}</span>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Search + Sub-filters inline */}
+          <div className="px-5 pb-2 flex items-center gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2" size={14} style={{ color: 'var(--color-text-muted)' }} />
               <input ref={searchRef} type="text"
                 placeholder={viewMode === 'catalogo' ? 'Cerca pacchetto...' : 'Cerca cliente...'}
                 value={viewMode === 'catalogo' ? searchCatalogo : searchClienti}
                 onChange={e => viewMode === 'catalogo' ? setSearchCatalogo(e.target.value) : setSearchClienti(e.target.value)}
-                className="w-full pl-9 pr-8 py-2 rounded-xl text-sm"
+                className="w-full pl-8 pr-7 py-1.5 rounded-lg text-xs"
                 style={{ background: 'var(--glass-border)', border: 'none', color: 'var(--color-text-primary)', outline: 'none' }}
               />
               {(viewMode === 'catalogo' ? searchCatalogo : searchClienti) && (
                 <button onClick={() => { viewMode === 'catalogo' ? setSearchCatalogo('') : setSearchClienti(''); searchRef.current?.focus(); }}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 rounded-md" style={{ color: 'var(--color-text-muted)' }}>
-                  <X size={14} />
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded-md" style={{ color: 'var(--color-text-muted)' }}>
+                  <X size={12} />
                 </button>
               )}
             </div>
-          </div>
-
-          {/* View switcher + Catalogo sub-filters */}
-          <div className="filter-chips">
-            {/* View switch */}
-            <button onClick={() => switchView('catalogo')}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all"
-              style={{ background: viewMode === 'catalogo' ? 'var(--color-primary)' : 'var(--glass-border)', color: viewMode === 'catalogo' ? 'white' : 'var(--color-text-secondary)' }}>
-              <Package size={12} />Catalogo <span className="opacity-70">{pacchetti.length}</span>
-            </button>
-            <button onClick={() => switchView('per_cliente')}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all"
-              style={{ background: viewMode === 'per_cliente' ? 'var(--color-primary)' : 'var(--glass-border)', color: viewMode === 'per_cliente' ? 'white' : 'var(--color-text-secondary)' }}>
-              <Users size={12} />Per Cliente
-            </button>
-
-            {/* Catalogo sub-filters */}
+            {/* Sub-filtri catalogo */}
             {viewMode === 'catalogo' && (
-              <>
-                <div className="w-px h-4 mx-1" style={{ background: 'var(--glass-border)' }} />
-                <button onClick={() => setFilterAttivo('tutti')}
-                  className="px-2.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all"
-                  style={{ background: filterAttivo === 'tutti' ? 'color-mix(in srgb, var(--color-primary) 12%, transparent)' : 'transparent', color: filterAttivo === 'tutti' ? 'var(--color-primary)' : 'var(--color-text-muted)' }}>
-                  Tutti <span className="opacity-70">{pacchetti.length}</span>
-                </button>
-                <button onClick={() => setFilterAttivo('attivi')}
-                  className="px-2.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all"
-                  style={{ background: filterAttivo === 'attivi' ? 'color-mix(in srgb, var(--color-success) 12%, transparent)' : 'transparent', color: filterAttivo === 'attivi' ? 'var(--color-success)' : 'var(--color-text-muted)' }}>
-                  Attivi <span className="opacity-70">{countAttivi}</span>
-                </button>
-                {countInattivi > 0 && (
-                  <button onClick={() => setFilterAttivo('inattivi')}
-                    className="px-2.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all"
-                    style={{ background: filterAttivo === 'inattivi' ? 'color-mix(in srgb, var(--color-text-muted) 12%, transparent)' : 'transparent', color: 'var(--color-text-muted)' }}>
-                    Inattivi <span className="opacity-70">{countInattivi}</span>
+              <div className="flex gap-1 shrink-0">
+                {(['tutti', 'attivi', ...(countInattivi > 0 ? ['inattivi'] : [])] as const).map(f => (
+                  <button key={f} onClick={() => setFilterAttivo(f as any)}
+                    className="px-2 py-1.5 rounded-lg text-[10px] font-medium transition-all"
+                    style={{
+                      background: filterAttivo === f ? 'color-mix(in srgb, var(--color-primary) 12%, transparent)' : 'transparent',
+                      color: filterAttivo === f ? 'var(--color-primary)' : 'var(--color-text-muted)',
+                    }}>
+                    {f === 'tutti' ? `Tutti ${pacchetti.length}` : f === 'attivi' ? `Attivi ${countAttivi}` : `Inattivi ${countInattivi}`}
                   </button>
-                )}
-              </>
+                ))}
+              </div>
             )}
-
           </div>
 
           {/* ═══════════════ LIST CONTENT ═══════════════ */}

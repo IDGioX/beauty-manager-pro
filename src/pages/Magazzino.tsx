@@ -445,27 +445,25 @@ export function Magazzino({ onNavigateToAgenda }: MagazzinoProps) {
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
       {/* ═══════════════ HEADER ═══════════════ */}
-      <div className="px-5 pt-4 pb-0 space-y-3 shrink-0">
+      <div className="px-5 pt-3 pb-0 space-y-2 shrink-0">
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold" style={{ color: 'var(--color-text-primary)' }}>Magazzino</h1>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>{prodotti.length} prodott{prodotti.length === 1 ? 'o' : 'i'}</p>
-          </div>
+          <h1 className="text-lg font-bold" style={{ color: 'var(--color-text-primary)' }}>Magazzino</h1>
         </div>
 
-        {/* Tab chips */}
-        <div className="filter-chips">
+        {/* Tab bar */}
+        <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'var(--glass-border)' }}>
           {tabs.map(tab => (
             <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all"
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition-all"
               style={{
-                background: activeTab === tab.id ? 'var(--color-primary)' : 'var(--glass-border)',
-                color: activeTab === tab.id ? 'white' : 'var(--color-text-secondary)',
+                background: activeTab === tab.id ? 'var(--card-bg)' : 'transparent',
+                color: activeTab === tab.id ? 'var(--color-primary)' : 'var(--color-text-muted)',
+                boxShadow: activeTab === tab.id ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
               }}>
               {tab.icon}
               {tab.label}
               {tab.id === 'articoli' && totalAlerts > 0 && (
-                <span className="text-[10px] px-1 py-0.5 rounded-full font-medium" style={{ background: 'rgba(255,255,255,0.25)', color: activeTab === 'articoli' ? 'white' : '#f59e0b' }}>{totalAlerts}</span>
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold" style={{ background: 'color-mix(in srgb, #f59e0b 15%, transparent)', color: '#f59e0b' }}>{totalAlerts}</span>
               )}
             </button>
           ))}
