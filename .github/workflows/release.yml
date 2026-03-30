@@ -137,9 +137,15 @@ jobs:
           MAC_X64_SIG=""
           MAC_ARM_SIG=""
 
-          for f in artifacts/sig-windows/*.nsis.zip.sig; do
-            [ -f "$f" ] && WIN_SIG=$(cat "$f") && echo "WIN SIG: ${WIN_SIG:0:40}..."
+          # Cerca prima nsis.zip.sig, poi exe.sig come fallback
+          for f in artifacts/sig-windows/*nsis.zip.sig; do
+            [ -f "$f" ] && WIN_SIG=$(cat "$f") && echo "WIN SIG (nsis): ${WIN_SIG:0:40}..."
           done
+          if [ -z "$WIN_SIG" ]; then
+            for f in artifacts/sig-windows/*setup.exe.sig; do
+              [ -f "$f" ] && WIN_SIG=$(cat "$f") && echo "WIN SIG (exe): ${WIN_SIG:0:40}..."
+            done
+          fi
           for f in artifacts/sig-macos-x64/*.app.tar.gz.sig; do
             [ -f "$f" ] && MAC_X64_SIG=$(cat "$f") && echo "MAC X64 SIG: ${MAC_X64_SIG:0:40}..."
           done
@@ -147,9 +153,9 @@ jobs:
             [ -f "$f" ] && MAC_ARM_SIG=$(cat "$f") && echo "MAC ARM SIG: ${MAC_ARM_SIG:0:40}..."
           done
 
-          # Nome del nsis.zip
-          NSIS_NAME=$(find artifacts/ -name "*.nsis.zip" ! -name "*.sig" -exec basename {} \; | head -1)
-          [ -z "$NSIS_NAME" ] && NSIS_NAME="BeautyManagerPro_${V}_x64-setup.nsis.zip"
+          # Nome del file Windows per l'updater (preferisce nsis.zip, fallback exe)
+          WIN_FILE=$(find artifacts/ -name "*.nsis.zip" ! -name "*.sig" -exec basename {} \; | head -1)
+          [ -z "$WIN_FILE" ] && WIN_FILE="BeautyManagerPro_${V}_x64-setup.exe"
 
           # Genera latest.json
           cat > latest.json << EOF
@@ -160,7 +166,7 @@ jobs:
             "platforms": {
               "windows-x86_64": {
                 "signature": "${WIN_SIG}",
-                "url": "https://github.com/IDGioX/beauty-manager-pro/releases/download/v${V}/${NSIS_NAME}"
+                "url": "https://github.com/IDGioX/beauty-manager-pro/releases/download/v${V}/${WIN_FILE}"
               },
               "darwin-x86_64": {
                 "signature": "${MAC_X64_SIG}",
