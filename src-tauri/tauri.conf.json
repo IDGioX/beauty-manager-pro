@@ -8,7 +8,7 @@
       "endpoints": [
         "https://github.com/IDGioX/beauty-manager-pro/releases/latest/download/latest.json"
       ],
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IENEREQwMkU2Q0M0MzNDQkIKUldTN1BFUE01Z0xkemYxMlhncTc5WW9aNDh1WGc5OWVadGxqTVBPSjVyREV1cTZJaEhFWU1lZUYK"
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDNDNDc1MkQ0MjZCRTMzMjAKUldRZ003NG0xRkpIUEJ5U3E2bXcydDRrNnZwU1JsaHA4UmYyQk9iMGRpOHFuSXJkQkxIQzV1cTkK"
     }
   },
   "build": {
