@@ -55,20 +55,29 @@ jobs:
           prerelease: false
           args: ${{ matrix.args }}
 
-      # Salva firme + nsis.zip come artifact
-      - name: Collect signatures and updater files
+      # Salva firme + nsis.zip come artifact (usa pwsh su Windows, bash su macOS)
+      - name: Collect signatures and updater files (macOS)
+        if: matrix.platform == 'macos-latest'
         shell: bash
         run: |
           mkdir -p /tmp/updater-files
           find src-tauri/target -name "*.sig" -type f -exec cp {} /tmp/updater-files/ \;
-          find src-tauri/target -name "*.nsis.zip" -type f ! -name "*.sig" -exec cp {} /tmp/updater-files/ \;
-          ls -la /tmp/updater-files/ || echo "No files found"
+          ls -la /tmp/updater-files/
+
+      - name: Collect signatures and updater files (Windows)
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path updater-files | Out-Null
+          Get-ChildItem -Path src-tauri/target -Recurse -Filter "*.sig" | Copy-Item -Destination updater-files/
+          Get-ChildItem -Path src-tauri/target -Recurse -Filter "*.nsis.zip" | Where-Object { -not $_.Name.EndsWith(".sig") } | Copy-Item -Destination updater-files/
+          Get-ChildItem updater-files/
 
       - name: Upload updater artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
-          path: /tmp/updater-files/
+          path: ${{ matrix.platform == 'windows-latest' && 'updater-files/' || '/tmp/updater-files/' }}
           if-no-files-found: warn
 
   # Job finale: assembla latest.json e uploada nsis.zip
