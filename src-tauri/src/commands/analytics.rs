@@ -364,7 +364,7 @@ pub async fn get_report_filtrato(
                 THEN c.id ELSE NULL
             END) as nuovi_clienti
         FROM appuntamenti a
-        INNER JOIN clienti c ON a.cliente_id = c.id
+        LEFT JOIN clienti c ON a.cliente_id = c.id
         WHERE {}"#,
         where_sql
     );
@@ -387,7 +387,7 @@ pub async fn get_report_filtrato(
     let durata_sql = format!(
         r#"SELECT COALESCE(AVG(t.durata_minuti), 0.0)
         FROM appuntamenti a
-        INNER JOIN trattamenti t ON a.trattamento_id = t.id
+        LEFT JOIN trattamenti t ON a.trattamento_id = t.id
         WHERE {} AND a.stato IN ('completato', 'in_corso')"#,
         where_sql
     );
@@ -435,7 +435,7 @@ pub async fn get_report_filtrato(
             COALESCE(AVG(a.prezzo_applicato), 0.0) as ricavo_medio,
             AVG(t.durata_minuti) as durata_media_minuti
         FROM appuntamenti a
-        INNER JOIN trattamenti t ON a.trattamento_id = t.id
+        LEFT JOIN trattamenti t ON a.trattamento_id = t.id
         LEFT JOIN categorie_trattamenti ct ON t.categoria_id = ct.id
         WHERE {} AND a.stato IN ('completato', 'in_corso')
         GROUP BY t.id, t.nome, ct.nome
@@ -469,9 +469,9 @@ pub async fn get_report_filtrato(
             COALESCE(SUM(a.prezzo_applicato), 0.0) as ricavo_totale,
             COUNT(a.id) as totale_appuntamenti,
             COALESCE(AVG(a.prezzo_applicato), 0.0) as ricavo_medio
-        FROM clienti c
-        INNER JOIN appuntamenti a ON c.id = a.cliente_id
-        WHERE {} AND a.stato IN ('completato', 'in_corso') AND c.attivo = 1
+        FROM appuntamenti a
+        LEFT JOIN clienti c ON c.id = a.cliente_id
+        WHERE {} AND a.stato IN ('completato', 'in_corso') AND (c.attivo = 1 OR c.attivo IS NULL)
         GROUP BY c.id, c.nome, c.cognome, c.email, c.cellulare
         ORDER BY ricavo_totale DESC
         LIMIT 10"#,
@@ -504,7 +504,7 @@ pub async fn get_report_filtrato(
             COALESCE(AVG(CASE WHEN a.stato IN ('completato', 'in_corso') THEN a.prezzo_applicato ELSE NULL END), 0.0) as ricavo_medio,
             COALESCE(SUM(CASE WHEN a.stato IN ('completato', 'in_corso') THEN t.durata_minuti ELSE 0 END), 0.0) / 60.0 as ore_lavorate
         FROM appuntamenti a
-        INNER JOIN operatrici o ON a.operatrice_id = o.id
+        LEFT JOIN operatrici o ON a.operatrice_id = o.id
         LEFT JOIN trattamenti t ON a.trattamento_id = t.id
         WHERE {}
         GROUP BY o.id, o.nome, o.cognome
