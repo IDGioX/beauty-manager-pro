@@ -41,7 +41,45 @@ jobs:
       - name: Install frontend dependencies
         run: npm install
 
-      - name: Build the app
+      # Build manuale per catturare i file PRIMA che tauri-action li processi
+      - name: Build Tauri app
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: npx tauri build ${{ matrix.args }}
+
+      # Salva sig + nsis.zip PRIMA di tauri-action
+      - name: Collect updater files (Windows)
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path updater-files | Out-Null
+          Get-ChildItem -Path src-tauri/target -Recurse -Include "*.sig","*.nsis.zip" | ForEach-Object {
+            Write-Host "Copying: $($_.Name)"
+            Copy-Item $_.FullName updater-files/
+          }
+          Write-Host "=== updater-files ==="
+          Get-ChildItem updater-files/
+
+      - name: Collect updater files (macOS)
+        if: matrix.platform == 'macos-latest'
+        shell: bash
+        run: |
+          mkdir -p updater-files
+          find src-tauri/target -name "*.sig" -type f -exec cp {} updater-files/ \;
+          find src-tauri/target -name "*.tar.gz" -type f -exec cp {} updater-files/ \;
+          ls -la updater-files/
+
+      - name: Upload updater artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: updater-files/
+          if-no-files-found: warn
+
+      # Ora tauri-action fa solo la release (upload asset)
+      - name: Create release
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -54,37 +92,6 @@ jobs:
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
-
-      # Salva firme + nsis.zip come artifact (usa pwsh su Windows, bash su macOS)
-      - name: Collect signatures and updater files (macOS)
-        if: matrix.platform == 'macos-latest'
-        shell: bash
-        run: |
-          mkdir -p /tmp/updater-files
-          find src-tauri/target -name "*.sig" -type f -exec cp {} /tmp/updater-files/ \;
-          ls -la /tmp/updater-files/
-
-      - name: Collect signatures and updater files (Windows)
-        if: matrix.platform == 'windows-latest'
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force -Path updater-files | Out-Null
-          # Cerca nei path esatti dove Tauri genera i file
-          $nsisDir = "src-tauri\target\release\bundle\nsis"
-          $msiDir = "src-tauri\target\release\bundle\msi"
-          Write-Host "Checking $nsisDir ..."
-          if (Test-Path $nsisDir) { Get-ChildItem $nsisDir | ForEach-Object { Write-Host "  $_"; Copy-Item $_.FullName updater-files/ } }
-          Write-Host "Checking $msiDir ..."
-          if (Test-Path $msiDir) { Get-ChildItem $msiDir -Filter "*.sig" | ForEach-Object { Write-Host "  $_"; Copy-Item $_.FullName updater-files/ } }
-          Write-Host "=== updater-files ==="
-          Get-ChildItem updater-files/
-
-      - name: Upload updater artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.artifact }}
-          path: ${{ matrix.platform == 'windows-latest' && 'updater-files/' || '/tmp/updater-files/' }}
-          if-no-files-found: warn
 
   # Job finale: assembla latest.json e uploada nsis.zip
   updater:
