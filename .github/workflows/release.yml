@@ -80,6 +80,19 @@ jobs:
 **macOS Intel:** BeautyManagerPro_${VERSION}_x64.dmg"
           gh release edit "v${VERSION}" --notes "$BODY" || true
 
+      - name: Upload nsis.zip for Windows updater
+        if: matrix.platform == 'windows-latest'
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=$(jq -r .version src-tauri/tauri.conf.json)
+          NSIS_ZIP=$(find src-tauri/target -name "*.nsis.zip" -type f | head -1)
+          if [ -n "$NSIS_ZIP" ]; then
+            echo "Uploading nsis.zip: $NSIS_ZIP"
+            gh release upload "v${VERSION}" "$NSIS_ZIP" --clobber || true
+          fi
+
       - name: Find sig file and save as artifact
         shell: bash
         run: |
@@ -149,7 +162,7 @@ jobs:
             "platforms": {
               "windows-x86_64": {
                 "signature": "${WIN_SIG}",
-                "url": "https://github.com/IDGioX/beauty-manager-pro/releases/download/v${V}/BeautyManagerPro_${V}_x64-setup.exe"
+                "url": "https://github.com/IDGioX/beauty-manager-pro/releases/download/v${V}/BeautyManagerPro_${V}_x64-setup.nsis.zip"
               },
               "darwin-x86_64": {
                 "signature": "${MAC_X64_SIG}",
