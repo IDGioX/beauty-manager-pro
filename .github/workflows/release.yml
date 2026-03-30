@@ -41,66 +41,7 @@ jobs:
       - name: Install frontend dependencies
         run: npm install
 
-      # Build manuale per catturare i file PRIMA che tauri-action li processi
-      - name: Build Tauri app
-        shell: bash
-        env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: npx tauri build ${{ matrix.args }}
-
-      # Salva nsis.zip + sig PRIMA di tauri-action
-      - name: Collect updater files (Windows)
-        if: matrix.platform == 'windows-latest'
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force -Path updater-files | Out-Null
-          $version = (Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json).version
-          $nsisDir = "src-tauri\target\release\bundle\nsis"
-          Write-Host "Looking in: $nsisDir"
-          if (Test-Path $nsisDir) {
-            Get-ChildItem $nsisDir -File | ForEach-Object {
-              Write-Host "Found: $($_.Name) ($($_.Length) bytes)"
-              Copy-Item $_.FullName updater-files/
-            }
-          } else {
-            Write-Host "NSIS dir not found!"
-            # Cerca ovunque
-            Get-ChildItem -Path src-tauri -Recurse -File | Where-Object { $_.Name -match "\.nsis\.zip$|\.nsis\.zip\.sig$" } | ForEach-Object {
-              Write-Host "Found elsewhere: $($_.FullName)"
-              Copy-Item $_.FullName updater-files/
-            }
-          }
-          Write-Host "=== updater-files ==="
-          Get-ChildItem updater-files/ -File | ForEach-Object { Write-Host "  $($_.Name) ($($_.Length) bytes)" }
-
-      - name: Collect updater files (macOS)
-        if: matrix.platform == 'macos-latest'
-        shell: bash
-        run: |
-          mkdir -p updater-files
-          echo "Searching for .sig and .tar.gz files..."
-          find src-tauri/target -name "*.app.tar.gz.sig" -type f | while read f; do
-            echo "Found sig: $f"
-            cp "$f" updater-files/
-          done
-          find src-tauri/target -name "*.app.tar.gz" -type f | while read f; do
-            echo "Found tar.gz: $f"
-            # Rinomina per evitare collisioni tra arch
-            cp "$f" updater-files/
-          done
-          echo "=== updater-files ==="
-          ls -la updater-files/
-
-      - name: Upload updater artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.artifact }}
-          path: updater-files/
-          if-no-files-found: warn
-
-      # Ora tauri-action fa solo la release (upload asset)
-      - name: Create release
+      - name: Build the app
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -114,7 +55,44 @@ jobs:
           prerelease: false
           args: ${{ matrix.args }}
 
-  # Job finale: assembla latest.json e uploada nsis.zip
+      # DOPO tauri-action: raccoglie nsis.zip e sig generati
+      - name: Upload nsis.zip to release (Windows)
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $version = (Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json).version
+          Write-Host "=== Searching for nsis.zip ==="
+          $allFiles = Get-ChildItem -Path src-tauri/target -Recurse -File | Where-Object { $_.Name -match "\.nsis\.zip$" -and $_.Name -notmatch "\.sig$" }
+          foreach ($f in $allFiles) {
+            Write-Host "Found: $($f.FullName) ($($f.Length) bytes)"
+            gh release upload "v$version" "$($f.FullName)" --clobber
+            Write-Host "Uploaded!"
+          }
+          if (-not $allFiles) { Write-Host "WARNING: No nsis.zip found anywhere" }
+
+      # Raccoglie sig per il job updater
+      - name: Collect sig files
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path updater-files | Out-Null
+          Get-ChildItem -Path src-tauri/target -Recurse -File | Where-Object { $_.Name -match "\.(nsis\.zip\.sig|app\.tar\.gz\.sig|exe\.sig)$" } | ForEach-Object {
+            Write-Host "Sig: $($_.Name)"
+            Copy-Item $_.FullName updater-files/
+          }
+          Get-ChildItem -Path src-tauri/target -Recurse -File | Where-Object { $_.Name -match "\.nsis\.zip$" -and $_.Name -notmatch "\.sig$" } | ForEach-Object {
+            Write-Host "Zip: $($_.Name)"
+            Copy-Item $_.FullName updater-files/
+          }
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: updater-files/
+          if-no-files-found: warn
+
   updater:
     needs: release
     runs-on: ubuntu-latest
@@ -135,50 +113,37 @@ jobs:
       - name: List artifacts
         run: find artifacts/ -type f | sort
 
-      - name: Upload nsis.zip to release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          V: ${{ steps.ver.outputs.v }}
-        run: |
-          NSIS=$(find artifacts/ -name "*.nsis.zip" ! -name "*.sig" | head -1)
-          if [ -n "$NSIS" ]; then
-            echo "Uploading nsis.zip: $NSIS"
-            gh release upload "v${V}" "$NSIS" --clobber
-          else
-            echo "WARNING: No nsis.zip found"
-          fi
-
       - name: Create latest.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           V: ${{ steps.ver.outputs.v }}
         run: |
-          # Leggi le firme
           WIN_SIG=""
           MAC_X64_SIG=""
           MAC_ARM_SIG=""
 
-          # Cerca prima nsis.zip.sig, poi exe.sig come fallback
+          # Windows: preferisce nsis.zip.sig, fallback exe.sig
           for f in artifacts/sig-windows/*nsis.zip.sig; do
-            [ -f "$f" ] && WIN_SIG=$(cat "$f") && echo "WIN SIG (nsis): ${WIN_SIG:0:40}..."
+            [ -f "$f" ] && WIN_SIG=$(cat "$f") && echo "WIN SIG (nsis): found"
           done
           if [ -z "$WIN_SIG" ]; then
             for f in artifacts/sig-windows/*setup.exe.sig; do
-              [ -f "$f" ] && WIN_SIG=$(cat "$f") && echo "WIN SIG (exe): ${WIN_SIG:0:40}..."
+              [ -f "$f" ] && WIN_SIG=$(cat "$f") && echo "WIN SIG (exe): found"
             done
           fi
+
           for f in artifacts/sig-macos-x64/*.app.tar.gz.sig; do
-            [ -f "$f" ] && MAC_X64_SIG=$(cat "$f") && echo "MAC X64 SIG: ${MAC_X64_SIG:0:40}..."
+            [ -f "$f" ] && MAC_X64_SIG=$(cat "$f") && echo "MAC X64 SIG: found"
           done
           for f in artifacts/sig-macos-arm/*.app.tar.gz.sig; do
-            [ -f "$f" ] && MAC_ARM_SIG=$(cat "$f") && echo "MAC ARM SIG: ${MAC_ARM_SIG:0:40}..."
+            [ -f "$f" ] && MAC_ARM_SIG=$(cat "$f") && echo "MAC ARM SIG: found"
           done
 
-          # Nome del file Windows per l'updater (preferisce nsis.zip, fallback exe)
+          # URL Windows: preferisce nsis.zip se uploadato, altrimenti exe
           WIN_FILE=$(find artifacts/ -name "*.nsis.zip" ! -name "*.sig" -exec basename {} \; | head -1)
           [ -z "$WIN_FILE" ] && WIN_FILE="BeautyManagerPro_${V}_x64-setup.exe"
+          echo "WIN_FILE: $WIN_FILE"
 
-          # Genera latest.json
           cat > latest.json << EOF
           {
             "version": "${V}",
@@ -201,9 +166,7 @@ jobs:
           }
           EOF
 
-          echo "=== latest.json ==="
           cat latest.json
-
           gh release upload "v${V}" latest.json --clobber
 
       - name: Update release notes
