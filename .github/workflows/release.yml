@@ -72,13 +72,7 @@ jobs:
         run: |
           VERSION=$(jq -r .version src-tauri/tauri.conf.json)
           NOTES=$(cat /tmp/release_notes.txt)
-          BODY="${NOTES}
-
----
-**Windows:** BeautyManagerPro_${VERSION}_x64-setup.exe
-**macOS ARM:** BeautyManagerPro_${VERSION}_aarch64.dmg
-**macOS Intel:** BeautyManagerPro_${VERSION}_x64.dmg"
-          gh release edit "v${VERSION}" --notes "$BODY" || true
+          gh release edit "v${VERSION}" --notes "${NOTES}" || true
 
       - name: Upload nsis.zip for Windows updater
         if: matrix.platform == 'windows-latest'
