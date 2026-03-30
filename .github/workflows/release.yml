@@ -16,10 +16,13 @@ jobs:
         include:
           - platform: 'macos-latest'
             args: '--target aarch64-apple-darwin'
+            artifact: 'sig-macos-arm'
           - platform: 'macos-latest'
             args: '--target x86_64-apple-darwin'
+            artifact: 'sig-macos-x64'
           - platform: 'windows-latest'
             args: ''
+            artifact: 'sig-windows'
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -50,30 +53,114 @@ jobs:
           releaseBody: 'Aggiornamento Beauty Manager Pro'
           releaseDraft: false
           prerelease: false
-          includeUpdaterJson: true
           args: ${{ matrix.args }}
 
-      - name: Upload nsis.zip for Windows updater
-        if: matrix.platform == 'windows-latest'
-        shell: pwsh
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          $VERSION = (Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json).version
-          $nsisFile = Get-ChildItem -Path src-tauri/target -Recurse -Filter "*.nsis.zip" | Where-Object { -not $_.Name.EndsWith(".sig") } | Select-Object -First 1
-          if ($nsisFile) {
-            Write-Host "Uploading: $($nsisFile.FullName)"
-            gh release upload "v$VERSION" "$($nsisFile.FullName)" --clobber
-          } else {
-            Write-Host "No nsis.zip found"
-          }
-
-      - name: Update release notes from commit
-        if: matrix.platform == 'windows-latest'
+      # Salva firme + nsis.zip come artifact
+      - name: Collect signatures and updater files
         shell: bash
+        run: |
+          mkdir -p /tmp/updater-files
+          find src-tauri/target -name "*.sig" -type f -exec cp {} /tmp/updater-files/ \;
+          find src-tauri/target -name "*.nsis.zip" -type f ! -name "*.sig" -exec cp {} /tmp/updater-files/ \;
+          ls -la /tmp/updater-files/ || echo "No files found"
+
+      - name: Upload updater artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: /tmp/updater-files/
+          if-no-files-found: warn
+
+  # Job finale: assembla latest.json e uploada nsis.zip
+  updater:
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get version
+        id: ver
+        run: echo "v=$(jq -r .version src-tauri/tauri.conf.json)" >> $GITHUB_OUTPUT
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: List artifacts
+        run: find artifacts/ -type f | sort
+
+      - name: Upload nsis.zip to release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          V: ${{ steps.ver.outputs.v }}
         run: |
-          VERSION=$(jq -r .version src-tauri/tauri.conf.json)
+          NSIS=$(find artifacts/ -name "*.nsis.zip" ! -name "*.sig" | head -1)
+          if [ -n "$NSIS" ]; then
+            echo "Uploading nsis.zip: $NSIS"
+            gh release upload "v${V}" "$NSIS" --clobber
+          else
+            echo "WARNING: No nsis.zip found"
+          fi
+
+      - name: Create latest.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          V: ${{ steps.ver.outputs.v }}
+        run: |
+          # Leggi le firme
+          WIN_SIG=""
+          MAC_X64_SIG=""
+          MAC_ARM_SIG=""
+
+          for f in artifacts/sig-windows/*.nsis.zip.sig; do
+            [ -f "$f" ] && WIN_SIG=$(cat "$f") && echo "WIN SIG: ${WIN_SIG:0:40}..."
+          done
+          for f in artifacts/sig-macos-x64/*.app.tar.gz.sig; do
+            [ -f "$f" ] && MAC_X64_SIG=$(cat "$f") && echo "MAC X64 SIG: ${MAC_X64_SIG:0:40}..."
+          done
+          for f in artifacts/sig-macos-arm/*.app.tar.gz.sig; do
+            [ -f "$f" ] && MAC_ARM_SIG=$(cat "$f") && echo "MAC ARM SIG: ${MAC_ARM_SIG:0:40}..."
+          done
+
+          # Nome del nsis.zip
+          NSIS_NAME=$(find artifacts/ -name "*.nsis.zip" ! -name "*.sig" -exec basename {} \; | head -1)
+          [ -z "$NSIS_NAME" ] && NSIS_NAME="BeautyManagerPro_${V}_x64-setup.nsis.zip"
+
+          # Genera latest.json
+          cat > latest.json << EOF
+          {
+            "version": "${V}",
+            "notes": "Aggiornamento Beauty Manager Pro v${V}",
+            "pub_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "platforms": {
+              "windows-x86_64": {
+                "signature": "${WIN_SIG}",
+                "url": "https://github.com/IDGioX/beauty-manager-pro/releases/download/v${V}/${NSIS_NAME}"
+              },
+              "darwin-x86_64": {
+                "signature": "${MAC_X64_SIG}",
+                "url": "https://github.com/IDGioX/beauty-manager-pro/releases/download/v${V}/BeautyManagerPro_x64.app.tar.gz"
+              },
+              "darwin-aarch64": {
+                "signature": "${MAC_ARM_SIG}",
+                "url": "https://github.com/IDGioX/beauty-manager-pro/releases/download/v${V}/BeautyManagerPro_aarch64.app.tar.gz"
+              }
+            }
+          }
+          EOF
+
+          echo "=== latest.json ==="
+          cat latest.json
+
+          gh release upload "v${V}" latest.json --clobber
+
+      - name: Update release notes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          V: ${{ steps.ver.outputs.v }}
+        run: |
           NOTES=$(git log -1 --pretty=format:"%B" | grep -v "Co-Authored-By" | head -50)
-          gh release edit "v${VERSION}" --notes "${NOTES}" || true
+          gh release edit "v${V}" --notes "${NOTES}" || true
