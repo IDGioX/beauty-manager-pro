@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Sparkles } from 'lucide-react';
 import { aziendaService } from '../../services/azienda';
+import { getVersion } from '@tauri-apps/api/app';
 
 interface SplashScreenProps {
   onComplete?: () => void;
@@ -10,8 +11,11 @@ interface SplashScreenProps {
 export const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete }) => {
   const [progress, setProgress] = useState(0);
   const [nomeAzienda, setNomeAzienda] = useState('');
+  const [appVersion, setAppVersion] = useState('');
   const animationRef = useRef<number | undefined>(undefined);
   const startTimeRef = useRef<number | undefined>(undefined);
+
+  useEffect(() => { getVersion().then(v => setAppVersion(v)).catch(() => {}); }, []);
 
   useEffect(() => {
     // Carica il nome dell'azienda
@@ -176,7 +180,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete }) => {
         className="absolute bottom-8 text-xs tracking-wider"
         style={{ color: 'var(--color-text-muted)' }}
       >
-        v1.0.0
+        {appVersion ? `v${appVersion}` : ''}
       </motion.div>
     </div>
   );

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, LogIn, AlertCircle, KeyRound, ArrowLeft, Save } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
+import { getVersion } from '@tauri-apps/api/app';
 import { useAuthStore } from '../stores/authStore';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -15,6 +16,8 @@ export const Login: React.FC = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [appVersion, setAppVersion] = useState('');
+  useEffect(() => { getVersion().then(v => setAppVersion(v)).catch(() => {}); }, []);
 
   // Password reset state
   const [view, setView] = useState<LoginView>('login');
@@ -421,7 +424,7 @@ export const Login: React.FC = () => {
           className="text-center text-xs mt-8 tracking-wide"
           style={{ color: 'var(--color-text-muted)' }}
         >
-          Beauty Manager Pro v1.0.0
+          Beauty Manager Pro {appVersion ? `v${appVersion}` : ''}
         </motion.p>
       </motion.div>
     </div>

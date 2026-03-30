@@ -2,6 +2,18 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Blocca overscroll globale (Windows bounce) */
+html, body {
+  overflow: hidden;
+  overscroll-behavior: none;
+  height: 100%;
+  margin: 0;
+}
+#root {
+  height: 100%;
+  overflow: hidden;
+}
+
 /* CSS Custom Properties - Valori default (verranno sovrascritti da JavaScript) */
 :root {
   /* Colori principali */
