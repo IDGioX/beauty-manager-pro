@@ -45,13 +45,10 @@ jobs:
         id: notes
         shell: bash
         run: |
-          # Prende il messaggio dell'ultimo commit taggato con v* o l'ultimo commit
+          # Prende il messaggio dell'ultimo commit (senza Co-Authored-By)
           NOTES=$(git log -1 --pretty=format:"%B" | grep -v "Co-Authored-By" | head -50)
-          # Escape per multiline
-          NOTES="${NOTES//'%'/'%25'}"
-          NOTES="${NOTES//$'\n'/'%0A'}"
-          NOTES="${NOTES//$'\r'/'%0D'}"
-          echo "body=${NOTES}" >> $GITHUB_OUTPUT
+          # Salva in file per evitare problemi di encoding
+          echo "$NOTES" > /tmp/release_notes.txt
 
       - name: Build the app
         uses: tauri-apps/tauri-action@v0
@@ -62,18 +59,26 @@ jobs:
         with:
           tagName: v__VERSION__
           releaseName: 'Beauty Manager Pro v__VERSION__'
-          releaseBody: |
-            ${{ steps.notes.outputs.body }}
-
-            ---
-            ## Download
-
-            **Windows:** `BeautyManagerPro_*_x64-setup.exe`
-            **macOS ARM:** `BeautyManagerPro_*_aarch64.dmg`
-            **macOS Intel:** `BeautyManagerPro_*_x64.dmg`
+          releaseBody: 'Release automatica'
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
+
+      - name: Update release notes from commit
+        if: matrix.platform == 'windows-latest'
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=$(jq -r .version src-tauri/tauri.conf.json)
+          NOTES=$(cat /tmp/release_notes.txt)
+          BODY="${NOTES}
+
+---
+**Windows:** BeautyManagerPro_${VERSION}_x64-setup.exe
+**macOS ARM:** BeautyManagerPro_${VERSION}_aarch64.dmg
+**macOS Intel:** BeautyManagerPro_${VERSION}_x64.dmg"
+          gh release edit "v${VERSION}" --notes "$BODY" || true
 
       - name: Find sig file and save as artifact
         shell: bash
