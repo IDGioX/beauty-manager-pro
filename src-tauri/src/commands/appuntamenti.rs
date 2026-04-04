@@ -73,29 +73,29 @@ pub async fn get_appuntamento_by_id(
         SELECT
             a.id,
             a.cliente_id,
-            c.nome as cliente_nome,
-            c.cognome as cliente_cognome,
+            COALESCE(c.nome, '') as cliente_nome,
+            COALESCE(c.cognome, '') as cliente_cognome,
             c.cellulare as cliente_cellulare,
-            a.operatrice_id,
-            o.nome as operatrice_nome,
-            o.cognome as operatrice_cognome,
-            o.colore_agenda as operatrice_colore,
-            a.trattamento_id,
-            t.nome as trattamento_nome,
-            t.durata_minuti as trattamento_durata,
+            COALESCE(a.operatrice_id, '') as operatrice_id,
+            COALESCE(o.nome, '') as operatrice_nome,
+            COALESCE(o.cognome, '') as operatrice_cognome,
+            COALESCE(o.colore_agenda, '#999999') as operatrice_colore,
+            COALESCE(a.trattamento_id, '') as trattamento_id,
+            COALESCE(t.nome, 'Rimosso') as trattamento_nome,
+            COALESCE(t.durata_minuti, 30) as trattamento_durata,
             a.data_ora_inizio,
             a.data_ora_fine,
             a.stato,
             a.note_prenotazione,
             a.note_trattamento,
             a.prezzo_applicato,
-            a.omaggio,
+            COALESCE(a.omaggio, 0) as omaggio,
             a.created_at,
             a.updated_at
         FROM appuntamenti a
-        INNER JOIN clienti c ON a.cliente_id = c.id
-        INNER JOIN operatrici o ON a.operatrice_id = o.id
-        INNER JOIN trattamenti t ON a.trattamento_id = t.id
+        LEFT JOIN clienti c ON a.cliente_id = c.id
+        LEFT JOIN operatrici o ON a.operatrice_id = o.id
+        LEFT JOIN trattamenti t ON a.trattamento_id = t.id
         WHERE a.id = ?1
         "#
     )
