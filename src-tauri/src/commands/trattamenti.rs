@@ -104,9 +104,9 @@ pub async fn create_trattamento(
         r#"
         INSERT INTO trattamenti (
             codice, categoria_id, nome, descrizione, durata_minuti,
-            prezzo_listino, attivo, note_operative
+            prezzo_listino, attivo, note_operative, controindicazioni, attrezzature_richieste
         )
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
         "#,
     )
     .bind(&codice)
@@ -117,6 +117,8 @@ pub async fn create_trattamento(
     .bind(input.prezzo_listino)
     .bind(attivo_int)
     .bind(&input.note_operative)
+    .bind(&input.controindicazioni)
+    .bind(&input.attrezzature_richieste)
     .execute(&state.db.pool)
     .await?;
 
@@ -160,6 +162,12 @@ pub async fn update_trattamento(
     if input.note_operative.is_some() {
         updates.push("note_operative = ?");
     }
+    if input.controindicazioni.is_some() {
+        updates.push("controindicazioni = ?");
+    }
+    if input.attrezzature_richieste.is_some() {
+        updates.push("attrezzature_richieste = ?");
+    }
 
     if updates.is_empty() {
         return Err(crate::error::AppError::InvalidInput("No updates provided".to_string()));
@@ -193,6 +201,12 @@ pub async fn update_trattamento(
     }
     if let Some(note_operative) = &input.note_operative {
         query = query.bind(note_operative);
+    }
+    if let Some(controindicazioni) = &input.controindicazioni {
+        query = query.bind(controindicazioni);
+    }
+    if let Some(attrezzature_richieste) = &input.attrezzature_richieste {
+        query = query.bind(attrezzature_richieste);
     }
 
     query = query.bind(&id);

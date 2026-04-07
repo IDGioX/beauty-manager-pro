@@ -225,7 +225,7 @@ const DATA_TABLES: &[&str] = &[
     "clienti", "operatrici", "cabine",
     "categorie_trattamenti", "trattamenti", "protocolli_trattamento",
     "categorie_prodotti", "prodotti",
-    "appuntamenti", "schede_trattamento",
+    "appuntamenti", "appuntamento_trattamenti", "schede_trattamento",
     "movimenti_magazzino", "inventari", "righe_inventario",
     "template_messaggi", "comunicazioni",
     "campagne_marketing", "campagna_destinatari",

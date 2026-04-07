@@ -74,6 +74,7 @@ export interface CreateAppuntamentoInput {
   operatrice_id: string;
   cabina_id?: string;
   trattamento_id: string;
+  trattamento_ids?: string[];
   data_ora_inizio: string;
   data_ora_fine: string;
   stato?: 'prenotato' | 'in_corso' | 'completato' | 'annullato' | 'no_show';
@@ -87,6 +88,7 @@ export interface UpdateAppuntamentoInput {
   operatrice_id?: string;
   cabina_id?: string;
   trattamento_id?: string;
+  trattamento_ids?: string[];
   data_ora_inizio?: string;
   data_ora_fine?: string;
   stato?: 'prenotato' | 'in_corso' | 'completato' | 'annullato' | 'no_show';

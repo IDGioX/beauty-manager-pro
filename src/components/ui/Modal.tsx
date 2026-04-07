@@ -49,7 +49,7 @@ export const Modal: React.FC<ModalProps> = ({
       {/* Backdrop */}
       <div
         className="fixed inset-0 z-[100]"
-        style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
+        style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(6px)', animation: 'fade-in 0.2s ease-out' }}
         onClick={onClose}
       />
 
@@ -59,7 +59,12 @@ export const Modal: React.FC<ModalProps> = ({
           {/* Modal card */}
           <div
             className={`pointer-events-auto relative w-full ${sizes[size]} rounded-2xl shadow-2xl`}
-            style={{ background: 'var(--card-bg, #fff)', border: '1px solid var(--glass-border, rgba(0,0,0,0.1))' }}
+            style={{
+              background: 'var(--card-bg, #fff)',
+              border: '1px solid var(--glass-border, rgba(0,0,0,0.1))',
+              animation: 'modal-spring 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)',
+              boxShadow: '0 25px 60px rgba(0,0,0,0.15), 0 0 0 1px var(--glass-border)',
+            }}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}

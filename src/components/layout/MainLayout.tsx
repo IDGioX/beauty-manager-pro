@@ -48,7 +48,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
 
       <Sidebar currentPage={currentPage} onNavigate={onNavigate} />
 
-      <div className="flex-1 flex flex-col overflow-hidden relative z-10">
+      <div className="flex-1 flex flex-col overflow-hidden relative z-10 min-w-0">
         <Header title={pageTitle} onNavigate={onNavigate} />
 
         {/* Tasto indietro globale */}
@@ -64,8 +64,8 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
           </div>
         )}
 
-        <main className="flex-1 flex flex-col overflow-hidden p-6">
-          <div className="animate-in flex-1 flex flex-col min-h-0 overflow-y-auto">
+        <main className="flex-1 flex flex-col overflow-hidden p-6 min-w-0">
+          <div className="animate-in flex-1 flex flex-col min-h-0 min-w-0 overflow-y-auto" style={{ overscrollBehavior: 'contain' }}>
             {children}
           </div>
         </main>

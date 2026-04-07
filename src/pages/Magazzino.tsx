@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import {
   Package, TrendingUp, TrendingDown, History, AlertTriangle, X,
   Search, Plus, Edit2, Trash2, Clock, Eye, EyeOff, Settings, Filter,
-  Euro, MoreHorizontal, Save
+  Euro, MoreHorizontal, Save, ChevronsUpDown, ChevronRight
 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -114,13 +114,6 @@ function AnagraficaProdottoTab({
     finally { setSaving(false); }
   };
 
-  const InfoRow = ({ label, value }: { label: string; value: React.ReactNode }) => (
-    <div className="flex items-start justify-between py-2.5" style={{ borderBottom: '1px solid var(--glass-border)' }}>
-      <span className="text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>{label}</span>
-      <span className="text-sm text-right max-w-[60%]" style={{ color: 'var(--color-text-primary)' }}>{value || '—'}</span>
-    </div>
-  );
-
   if (isEditing) {
     return (
       <div className="space-y-5 animate-fade-in-up">
@@ -176,37 +169,56 @@ function AnagraficaProdottoTab({
   // View mode
   const usoLabel = USO_OPTIONS.find(o => o.value === prodotto.uso)?.label || prodotto.uso || '—';
   const umLabel = UNITA_MISURA_OPTIONS.find(o => o.value === prodotto.unita_misura)?.label || prodotto.unita_misura;
+  const Field = ({ label, value }: { label: string; value: React.ReactNode }) => (
+    <div>
+      <label className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>{label}</label>
+      <p className="text-sm mt-0.5" style={{ color: value && value !== '—' ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>{value || '—'}</p>
+    </div>
+  );
+  const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
+    <div className="mt-6 mb-3">
+      <h4 className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: 'var(--color-text-muted)' }}>{title}</h4>
+      {children}
+    </div>
+  );
 
   return (
-    <div className="animate-fade-in-up">
-      <InfoRow label="Nome" value={prodotto.nome} />
-      <InfoRow label="Codice" value={<span className="font-mono text-xs">{prodotto.codice}</span>} />
-      <InfoRow label="Categoria" value={prodotto.categoria_nome || '—'} />
-      <InfoRow label="Marca" value={prodotto.marca} />
-      <InfoRow label="Linea" value={prodotto.linea} />
-      <InfoRow label="Barcode" value={prodotto.barcode ? <span className="font-mono text-xs">{prodotto.barcode}</span> : '—'} />
-      <InfoRow label="Uso" value={usoLabel} />
-      <InfoRow label="Descrizione" value={prodotto.descrizione} />
-
-      <div className="mt-5 mb-3">
-        <span className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>Unità e Scorte</span>
+    <div className="space-y-4 animate-fade-in-up">
+      {/* Info Base */}
+      <div className="grid grid-cols-2 gap-4">
+        <Field label="Nome" value={prodotto.nome} />
+        <Field label="Codice" value={<span className="font-mono text-xs">{prodotto.codice}</span>} />
+        <Field label="Categoria" value={prodotto.categoria_nome} />
+        <Field label="Uso" value={usoLabel} />
+        <Field label="Marca" value={prodotto.marca} />
+        <Field label="Linea" value={prodotto.linea} />
       </div>
-      <InfoRow label="Unità di Misura" value={umLabel} />
-      <InfoRow label="Capacità" value={prodotto.capacita != null ? prodotto.capacita : '—'} />
-      <InfoRow label="Giacenza" value={<span className="font-semibold">{prodotto.giacenza} {prodotto.unita_misura}</span>} />
-      <InfoRow label="Scorta Minima" value={`${prodotto.scorta_minima} ${prodotto.unita_misura}`} />
-      <InfoRow label="Scorta Riordino" value={`${prodotto.scorta_riordino} ${prodotto.unita_misura}`} />
+      {prodotto.barcode && <Field label="Barcode" value={<span className="font-mono text-xs">{prodotto.barcode}</span>} />}
+      <Field label="Descrizione" value={prodotto.descrizione} />
 
-      <div className="mt-5 mb-3">
-        <span className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>Prezzo e Scadenza</span>
-      </div>
-      <InfoRow label="Prezzo Vendita" value={formatPrice(prodotto.prezzo_vendita)} />
-      <InfoRow label="Data Scadenza" value={formatDate(prodotto.data_scadenza)} />
-      <InfoRow label="Note" value={prodotto.note} />
+      <Section title="Magazzino">
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="Giacenza" value={<span className="font-semibold">{prodotto.giacenza} {prodotto.unita_misura}</span>} />
+          <Field label="Unità di Misura" value={umLabel} />
+          <Field label="Scorta Minima" value={`${prodotto.scorta_minima} ${prodotto.unita_misura}`} />
+          <Field label="Scorta Riordino" value={`${prodotto.scorta_riordino} ${prodotto.unita_misura}`} />
+          {prodotto.capacita != null && <Field label="Capacità" value={prodotto.capacita} />}
+        </div>
+      </Section>
 
-      <div className="mt-5 pt-3 space-y-1" style={{ borderTop: '1px solid var(--glass-border)' }}>
-        <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>Creato: {formatDateTime(prodotto.created_at)}</p>
-        <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>Aggiornato: {formatDateTime(prodotto.updated_at)}</p>
+      <Section title="Prezzo e Scadenza">
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="Prezzo Vendita" value={formatPrice(prodotto.prezzo_vendita)} />
+          <Field label="Data Scadenza" value={formatDate(prodotto.data_scadenza)} />
+        </div>
+      </Section>
+
+      {prodotto.note && <Field label="Note" value={prodotto.note} />}
+
+      {/* Meta */}
+      <div className="pt-4 flex items-center gap-4 text-[10px]" style={{ borderTop: '1px solid var(--glass-border)', color: 'var(--color-text-muted)' }}>
+        <span>Creato {formatDateTime(prodotto.created_at)}</span>
+        <span>Aggiornato {formatDateTime(prodotto.updated_at)}</span>
       </div>
     </div>
   );
@@ -243,10 +255,9 @@ function ProdottoDetailPanel({
   const isScaduto = prodotto.data_scadenza && new Date(prodotto.data_scadenza) < new Date();
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col flex-1 min-h-0">
       {/* Panel Header */}
-      <div className="p-5 pb-4">
-        <div className="max-w-2xl">
+      <div className="p-5 pb-3">
         <div className="flex items-start justify-between mb-4">
           <button onClick={onClose} className="p-1.5 rounded-lg transition-colors" style={{ color: 'var(--color-text-muted)' }}
             onMouseEnter={e => { e.currentTarget.style.background = 'var(--glass-border)'; }}
@@ -288,7 +299,7 @@ function ProdottoDetailPanel({
 
         {/* Product Name + Badges */}
         <div>
-          <h2 className="text-lg font-bold" style={{ color: 'var(--color-text-primary)' }}>
+          <h2 className="text-xl font-bold" style={{ color: 'var(--color-text-primary)' }}>
             {prodotto.nome}
           </h2>
           <div className="flex items-center gap-2 mt-0.5 flex-wrap">
@@ -336,12 +347,11 @@ function ProdottoDetailPanel({
             ) : null}
           </div>
         </div>
-        </div>
       </div>
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-5" style={{ borderTop: '1px solid var(--glass-border)' }}>
-        <div className="max-w-2xl">
+        <div>
           <AnagraficaProdottoTab
             prodotto={prodotto}
             categorie={categorie}
@@ -381,6 +391,19 @@ export function Magazzino({ onNavigateToAgenda }: MagazzinoProps) {
   const [showInattivi, setShowInattivi] = useState(false);
   const [filterSottoScorta, setFilterSottoScorta] = useState(false);
   const [filterInScadenza, setFilterInScadenza] = useState(false);
+  const COLLAPSED_KEY = 'bmp_magazzino_collapsed';
+  const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(() => {
+    try { const s = localStorage.getItem(COLLAPSED_KEY); return s ? new Set(JSON.parse(s)) : new Set(); } catch { return new Set(); }
+  });
+  const updateCollapsed = (next: Set<string>) => {
+    setCollapsedCategories(next);
+    try { localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...next])); } catch {}
+  };
+  const toggleCategory = (catId: string) => {
+    const next = new Set(collapsedCategories);
+    if (next.has(catId)) next.delete(catId); else next.add(catId);
+    updateCollapsed(next);
+  };
   const [selectedProdotto, setSelectedProdotto] = useState<Prodotto | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
@@ -451,7 +474,7 @@ export function Magazzino({ onNavigateToAgenda }: MagazzinoProps) {
   const valoreInventario = prodotti.reduce((a, p) => a + (p.prezzo_vendita || 0) * p.giacenza, 0);
 
   return (
-    <div className="flex flex-col" style={{ height: 'calc(100vh - 80px)' }}>
+    <div className="flex flex-col flex-1 min-h-0">
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
       {/* ═══════════════ HEADER ═══════════════ */}
@@ -565,6 +588,19 @@ export function Magazzino({ onNavigateToAgenda }: MagazzinoProps) {
                       </>
                     )}
                   </div>
+                  <button
+                    onClick={() => {
+                      const grouped = new Map<string, string>();
+                      for (const p of prodotti) grouped.set(p.categoria_id || '_none', '');
+                      const allCatIds = [...grouped.keys()];
+                      const allCollapsed = allCatIds.every(id => collapsedCategories.has(id));
+                      updateCollapsed(allCollapsed ? new Set() : new Set(allCatIds));
+                    }}
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-colors"
+                    style={{ color: 'var(--color-text-muted)', background: 'var(--glass-border)' }}
+                  >
+                    <ChevronsUpDown size={11} />Comprimi
+                  </button>
               </div>
 
               {/* Product list */}
@@ -587,55 +623,89 @@ export function Magazzino({ onNavigateToAgenda }: MagazzinoProps) {
                       {searchTerm || selectedCategoria || filterSottoScorta || filterInScadenza ? 'Prova a modificare i filtri' : 'Crea il primo prodotto'}
                     </p>
                   </div>
-                ) : (
-                  <div className={selectedProdotto ? 'space-y-1' : 'grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-2'}>
-                    {prodotti.map(prodotto => {
-                      const isSelected = selectedProdotto?.id === prodotto.id;
-                      const isScorta = prodotto.scorta_minima > 0 && prodotto.giacenza <= prodotto.scorta_minima;
-                      const isScaduto = prodotto.data_scadenza && new Date(prodotto.data_scadenza) < new Date();
-                      const isScadenza = prodotto.data_scadenza && !isScaduto && new Date(prodotto.data_scadenza) <= new Date(Date.now() + 30 * 86400000);
+                ) : (() => {
+                  // Raggruppa per categoria
+                  const grouped = new Map<string, { nome: string; prodotti: typeof prodotti }>();
+                  for (const p of prodotti) {
+                    const catKey = p.categoria_id || '_none';
+                    const catNome = p.categoria_nome || 'Senza categoria';
+                    if (!grouped.has(catKey)) grouped.set(catKey, { nome: catNome, prodotti: [] });
+                    grouped.get(catKey)!.prodotti.push(p);
+                  }
+                  const groups = Array.from(grouped.entries());
 
-                      return (
-                        <button
-                          key={prodotto.id}
-                          onClick={() => { setSelectedProdotto(prodotto); setIsEditing(false); }}
-                          className={`w-full flex items-center gap-3 p-3 rounded-xl text-left group list-card ${isSelected ? 'list-card-selected' : ''}`}
-                          style={{ opacity: prodotto.attivo ? 1 : 0.5 }}
-                        >
-                          {/* Icon */}
-                          <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
-                            style={{ background: isScorta || isScaduto ? 'rgba(239, 68, 68, 0.08)' : isScadenza ? 'rgba(245, 158, 11, 0.08)' : 'rgba(99, 102, 241, 0.08)' }}>
-                            {isScorta || isScaduto || isScadenza
-                              ? <AlertTriangle size={16} style={{ color: isScaduto || isScorta ? '#ef4444' : '#f59e0b' }} />
-                              : <Package size={16} style={{ color: '#6366f1' }} />
-                            }
-                          </div>
-                          {/* Info */}
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>{prodotto.nome}</p>
-                            <div className="flex items-center gap-2 mt-0.5">
-                              <span className="font-mono text-[10px]" style={{ color: 'var(--color-text-muted)' }}>{prodotto.codice}</span>
-                              {(prodotto.marca || prodotto.linea) && (
-                                <span className="text-[10px] truncate" style={{ color: 'var(--color-text-muted)' }}>
-                                  {[prodotto.marca, prodotto.linea].filter(Boolean).join(' — ')}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          {/* Right info */}
-                          <div className="text-right shrink-0">
-                            <p className="text-sm font-semibold" style={{ color: isScorta ? '#ef4444' : 'var(--color-text-primary)' }}>
-                              {prodotto.giacenza} <span className="text-[10px] font-normal" style={{ color: 'var(--color-text-muted)' }}>{prodotto.unita_misura}</span>
-                            </p>
-                            {prodotto.prezzo_vendita != null && (
-                              <p className="text-[11px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>{formatPrice(prodotto.prezzo_vendita)}</p>
+                  const renderProdotto = (prodotto: typeof prodotti[0]) => {
+                    const isSelected = selectedProdotto?.id === prodotto.id;
+                    const isScorta = prodotto.scorta_minima > 0 && prodotto.giacenza <= prodotto.scorta_minima;
+                    const isScaduto = prodotto.data_scadenza && new Date(prodotto.data_scadenza) < new Date();
+                    const isScadenza = prodotto.data_scadenza && !isScaduto && new Date(prodotto.data_scadenza) <= new Date(Date.now() + 30 * 86400000);
+
+                    return (
+                      <button
+                        key={prodotto.id}
+                        onClick={() => { setSelectedProdotto(prodotto); setIsEditing(false); }}
+                        className={`w-full flex items-center gap-3 p-3 rounded-xl text-left group list-card ${isSelected ? 'list-card-selected' : ''}`}
+                        style={{ opacity: prodotto.attivo ? 1 : 0.5 }}
+                      >
+                        <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
+                          style={{ background: isScorta || isScaduto ? 'rgba(239, 68, 68, 0.08)' : isScadenza ? 'rgba(245, 158, 11, 0.08)' : 'rgba(99, 102, 241, 0.06)' }}>
+                          {isScorta || isScaduto || isScadenza
+                            ? <AlertTriangle size={14} style={{ color: isScaduto || isScorta ? '#ef4444' : '#f59e0b' }} />
+                            : <Package size={14} style={{ color: 'var(--color-primary)' }} />
+                          }
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate" style={{ color: 'var(--color-text-primary)' }}>{prodotto.nome}</p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            {(prodotto.marca || prodotto.linea) && (
+                              <span className="text-[10px] truncate" style={{ color: 'var(--color-text-muted)' }}>
+                                {[prodotto.marca, prodotto.linea].filter(Boolean).join(' · ')}
+                              </span>
                             )}
                           </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="text-sm font-semibold" style={{ color: isScorta ? '#ef4444' : 'var(--color-text-primary)' }}>
+                            {prodotto.giacenza} <span className="text-[10px] font-normal" style={{ color: 'var(--color-text-muted)' }}>{prodotto.unita_misura}</span>
+                          </p>
+                          {prodotto.prezzo_vendita != null && (
+                            <p className="text-[10px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>{formatPrice(prodotto.prezzo_vendita)}</p>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  };
+
+                  return groups.length === 1 ? (
+                    <div className="space-y-1">{groups[0][1].prodotti.map(renderProdotto)}</div>
+                  ) : (
+                    <div className="space-y-2">
+                      {groups.map(([catId, group]) => {
+                        const isCollapsed = collapsedCategories.has(catId);
+                        return (
+                        <div key={catId}>
+                          <button
+                            onClick={() => toggleCategory(catId)}
+                            className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-left transition-colors"
+                            style={{ background: 'var(--glass-border)' }}
+                            onMouseEnter={e => { e.currentTarget.style.opacity = '0.8'; }}
+                            onMouseLeave={e => { e.currentTarget.style.opacity = '1'; }}
+                          >
+                            <ChevronRight size={13} style={{ color: 'var(--color-text-muted)', transform: isCollapsed ? 'rotate(0deg)' : 'rotate(90deg)', transition: 'transform 150ms', flexShrink: 0 }} />
+                            <span className="text-[11px] font-semibold uppercase tracking-wide flex-1" style={{ color: 'var(--color-text-secondary)' }}>{group.nome}</span>
+                            <span className="text-[10px] font-medium" style={{ color: 'var(--color-text-muted)' }}>{group.prodotti.length}</span>
+                          </button>
+                          {!isCollapsed && (
+                          <div className="mt-0.5 space-y-0.5">
+                            {group.prodotti.map(renderProdotto)}
+                          </div>
+                          )}
+                        </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Footer count */}
@@ -650,7 +720,7 @@ export function Magazzino({ onNavigateToAgenda }: MagazzinoProps) {
 
             {/* ═══════════════ RIGHT: DETAIL PANEL ═══════════════ */}
             {selectedProdotto && (
-              <div className="flex-1 min-w-0 animate-fade-in-up">
+              <div className="flex-1 min-w-0 min-h-0 flex flex-col border-l overflow-hidden animate-fade-in-up" style={{ borderColor: 'var(--glass-border)', background: 'var(--card-bg)' }}>
                 <ProdottoDetailPanel
                   prodotto={selectedProdotto}
                   categorie={categorie}
@@ -669,17 +739,17 @@ export function Magazzino({ onNavigateToAgenda }: MagazzinoProps) {
         )}
 
         {activeTab === 'carico' && (
-          <div className="p-5 overflow-y-auto" style={{ height: '100%' }}>
+          <div className="p-5 flex-1 min-h-0 overflow-y-auto">
             <CaricoTab onRefresh={handleRefresh} />
           </div>
         )}
         {activeTab === 'scarico' && (
-          <div className="p-5 overflow-y-auto" style={{ height: '100%' }}>
+          <div className="p-5 flex-1 min-h-0 overflow-y-auto">
             <ScaricoTab onRefresh={handleRefresh} />
           </div>
         )}
         {activeTab === 'movimenti' && (
-          <div className="p-5 overflow-y-auto" style={{ height: '100%' }}>
+          <div className="p-5 flex-1 min-h-0 overflow-y-auto">
             <MovimentiTab
               onOpenCarico={() => setActiveTab('carico')}
               onOpenScarico={() => setActiveTab('scarico')}

@@ -1658,39 +1658,51 @@ pub async fn get_movimenti_appuntamento(
 ) -> AppResult<Vec<MovimentoWithDetails>> {
     let state = db.lock().await;
 
-    // Query che calcola la quantità NETTA per prodotto, separando uso da vendita.
-    // Ogni prodotto può comparire come scarico_uso O scarico_vendita (o entrambi se raro).
-    // I resi vengono sottratti dal tipo originale corrispondente.
+    // Query che calcola la quantità NETTA per prodotto (scarichi - resi).
+    // Usa sotto-query per calcolare scarichi e resi separatamente, poi sottrae.
+    // HAVING netto > 0 esclude prodotti completamente resi.
     let result = sqlx::query_as::<_, MovimentoWithDetails>(
         "SELECT
-            MIN(m.id) as id,
-            m.prodotto_id,
-            m.tipo as tipo,
-            SUM(m.quantita) as quantita,
+            MIN(s.id) as id,
+            s.prodotto_id,
+            s.tipo as tipo,
+            (SUM(s.quantita) - COALESCE(
+                (SELECT SUM(r.quantita) FROM movimenti_magazzino r
+                 WHERE r.appuntamento_id = s.appuntamento_id
+                   AND r.prodotto_id = s.prodotto_id
+                   AND r.tipo = 'reso'),
+                0
+            )) as quantita,
             0.0 as giacenza_risultante,
-            m.appuntamento_id,
-            MAX(m.operatrice_id) as operatrice_id,
-            MAX(m.cliente_id) as cliente_id,
+            s.appuntamento_id,
+            MAX(s.operatrice_id) as operatrice_id,
+            MAX(s.cliente_id) as cliente_id,
             NULL as fornitore,
             NULL as documento_riferimento,
             NULL as prezzo_unitario,
             NULL as lotto,
             NULL as data_scadenza,
             NULL as note,
-            MAX(m.created_at) as created_at,
+            MAX(s.created_at) as created_at,
             p.nome as prodotto_nome,
             p.codice as prodotto_codice,
             MAX(o.nome || ' ' || o.cognome) as operatrice_nome,
             MAX(cl.nome || ' ' || cl.cognome) as cliente_nome
-         FROM movimenti_magazzino m
-         LEFT JOIN prodotti p ON m.prodotto_id = p.id
-         LEFT JOIN operatrici o ON m.operatrice_id = o.id
-         LEFT JOIN clienti cl ON m.cliente_id = cl.id
-         WHERE m.appuntamento_id = ?
-           AND m.tipo IN ('scarico_uso', 'scarico_vendita')
-         GROUP BY m.prodotto_id, m.tipo, m.appuntamento_id, p.nome, p.codice
-         HAVING SUM(m.quantita) > 0
-         ORDER BY MAX(m.created_at) DESC"
+         FROM movimenti_magazzino s
+         LEFT JOIN prodotti p ON s.prodotto_id = p.id
+         LEFT JOIN operatrici o ON s.operatrice_id = o.id
+         LEFT JOIN clienti cl ON s.cliente_id = cl.id
+         WHERE s.appuntamento_id = ?
+           AND s.tipo IN ('scarico_uso', 'scarico_vendita')
+         GROUP BY s.prodotto_id, s.tipo, s.appuntamento_id, p.nome, p.codice
+         HAVING (SUM(s.quantita) - COALESCE(
+                (SELECT SUM(r.quantita) FROM movimenti_magazzino r
+                 WHERE r.appuntamento_id = s.appuntamento_id
+                   AND r.prodotto_id = s.prodotto_id
+                   AND r.tipo = 'reso'),
+                0
+            )) > 0
+         ORDER BY MAX(s.created_at) DESC"
     )
     .bind(&appuntamento_id)
     .fetch_all(&state.db.pool)

@@ -33,8 +33,14 @@ pub async fn get_appuntamenti_by_date_range(
             COALESCE(o.cognome, '') as operatrice_cognome,
             COALESCE(o.colore_agenda, '#999999') as operatrice_colore,
             COALESCE(a.trattamento_id, '') as trattamento_id,
-            COALESCE(t.nome, 'Rimosso') as trattamento_nome,
-            COALESCE(t.durata_minuti, 30) as trattamento_durata,
+            COALESCE(
+                (SELECT GROUP_CONCAT(t2.nome, ', ') FROM appuntamento_trattamenti at2 JOIN trattamenti t2 ON t2.id = at2.trattamento_id WHERE at2.appuntamento_id = a.id ORDER BY at2.ordine),
+                COALESCE(t.nome, 'Rimosso')
+            ) as trattamento_nome,
+            COALESCE(
+                (SELECT SUM(t2.durata_minuti) FROM appuntamento_trattamenti at2 JOIN trattamenti t2 ON t2.id = at2.trattamento_id WHERE at2.appuntamento_id = a.id),
+                COALESCE(t.durata_minuti, 30)
+            ) as trattamento_durata,
             a.data_ora_inizio,
             a.data_ora_fine,
             a.stato,
@@ -81,8 +87,14 @@ pub async fn get_appuntamento_by_id(
             COALESCE(o.cognome, '') as operatrice_cognome,
             COALESCE(o.colore_agenda, '#999999') as operatrice_colore,
             COALESCE(a.trattamento_id, '') as trattamento_id,
-            COALESCE(t.nome, 'Rimosso') as trattamento_nome,
-            COALESCE(t.durata_minuti, 30) as trattamento_durata,
+            COALESCE(
+                (SELECT GROUP_CONCAT(t2.nome, ', ') FROM appuntamento_trattamenti at2 JOIN trattamenti t2 ON t2.id = at2.trattamento_id WHERE at2.appuntamento_id = a.id ORDER BY at2.ordine),
+                COALESCE(t.nome, 'Rimosso')
+            ) as trattamento_nome,
+            COALESCE(
+                (SELECT SUM(t2.durata_minuti) FROM appuntamento_trattamenti at2 JOIN trattamenti t2 ON t2.id = at2.trattamento_id WHERE at2.appuntamento_id = a.id),
+                COALESCE(t.durata_minuti, 30)
+            ) as trattamento_durata,
             a.data_ora_inizio,
             a.data_ora_fine,
             a.stato,
@@ -144,6 +156,14 @@ pub async fn create_appuntamento(
     let id = generate_uuid();
     let stato = input.stato.as_deref().unwrap_or("prenotato");
 
+    // Determina la lista trattamenti: usa trattamento_ids se presente, altrimenti il singolo trattamento_id
+    let trattamento_ids: Vec<String> = if let Some(ids) = &input.trattamento_ids {
+        if ids.is_empty() { vec![input.trattamento_id.clone()] } else { ids.clone() }
+    } else {
+        vec![input.trattamento_id.clone()]
+    };
+    let primo_trattamento = trattamento_ids.first().cloned().unwrap_or(input.trattamento_id.clone());
+
     sqlx::query(
         r#"
         INSERT INTO appuntamenti (
@@ -158,7 +178,7 @@ pub async fn create_appuntamento(
     .bind(&input.cliente_id)
     .bind(&input.operatrice_id)
     .bind(&input.cabina_id)
-    .bind(&input.trattamento_id)
+    .bind(&primo_trattamento)
     .bind(&input.data_ora_inizio)
     .bind(&input.data_ora_fine)
     .bind(&input.note_prenotazione)
@@ -167,6 +187,21 @@ pub async fn create_appuntamento(
     .bind(input.omaggio.unwrap_or(false))
     .execute(&state.db.pool)
     .await?;
+
+    // Inserisci nella junction table appuntamento_trattamenti
+    for (ordine, trattamento_id) in trattamento_ids.iter().enumerate() {
+        let jt_id = generate_uuid();
+        sqlx::query(
+            r#"INSERT INTO appuntamento_trattamenti (id, appuntamento_id, trattamento_id, ordine)
+               VALUES (?1, ?2, ?3, ?4)"#
+        )
+        .bind(&jt_id)
+        .bind(&id)
+        .bind(trattamento_id)
+        .bind(ordine as i32)
+        .execute(&state.db.pool)
+        .await?;
+    }
 
     let appuntamento = sqlx::query_as::<_, Appuntamento>(
         "SELECT * FROM appuntamenti WHERE id = ?1"
@@ -242,6 +277,37 @@ pub async fn update_appuntamento(
         ));
     }
 
+    // Se trattamento_ids fornito, aggiorna la junction table e il trattamento_id principale
+    let trattamento_id_principale = if let Some(ref ids) = input.trattamento_ids {
+        if !ids.is_empty() {
+            // Elimina vecchi record dalla junction table
+            sqlx::query("DELETE FROM appuntamento_trattamenti WHERE appuntamento_id = ?1")
+                .bind(&id)
+                .execute(&state.db.pool)
+                .await?;
+
+            // Inserisci nuovi record
+            for (ordine, trattamento_id) in ids.iter().enumerate() {
+                let jt_id = generate_uuid();
+                sqlx::query(
+                    r#"INSERT INTO appuntamento_trattamenti (id, appuntamento_id, trattamento_id, ordine)
+                       VALUES (?1, ?2, ?3, ?4)"#
+                )
+                .bind(&jt_id)
+                .bind(&id)
+                .bind(trattamento_id)
+                .bind(ordine as i32)
+                .execute(&state.db.pool)
+                .await?;
+            }
+            Some(ids[0].clone())
+        } else {
+            input.trattamento_id.clone()
+        }
+    } else {
+        input.trattamento_id.clone()
+    };
+
     sqlx::query(
         r#"UPDATE appuntamenti SET
            cliente_id = COALESCE(?1, cliente_id),
@@ -250,8 +316,8 @@ pub async fn update_appuntamento(
            data_ora_inizio = COALESCE(?4, data_ora_inizio),
            data_ora_fine = COALESCE(?5, data_ora_fine),
            stato = COALESCE(?6, stato),
-           note_prenotazione = ?7,
-           note_trattamento = ?8,
+           note_prenotazione = COALESCE(?7, note_prenotazione),
+           note_trattamento = COALESCE(?8, note_trattamento),
            prezzo_applicato = ?9,
            omaggio = COALESCE(?10, omaggio),
            updated_at = datetime('now')
@@ -259,7 +325,7 @@ pub async fn update_appuntamento(
     )
     .bind(&input.cliente_id)
     .bind(&input.operatrice_id)
-    .bind(&input.trattamento_id)
+    .bind(&trattamento_id_principale)
     .bind(&input.data_ora_inizio)
     .bind(&input.data_ora_fine)
     .bind(&input.stato)
@@ -364,29 +430,35 @@ pub async fn get_appuntamenti_giorno(
         SELECT
             a.id,
             a.cliente_id,
-            c.nome as cliente_nome,
-            c.cognome as cliente_cognome,
+            COALESCE(c.nome, '') as cliente_nome,
+            COALESCE(c.cognome, '') as cliente_cognome,
             c.cellulare as cliente_cellulare,
-            a.operatrice_id,
-            o.nome as operatrice_nome,
-            o.cognome as operatrice_cognome,
-            o.colore_agenda as operatrice_colore,
-            a.trattamento_id,
-            t.nome as trattamento_nome,
-            t.durata_minuti as trattamento_durata,
+            COALESCE(a.operatrice_id, '') as operatrice_id,
+            COALESCE(o.nome, '') as operatrice_nome,
+            COALESCE(o.cognome, '') as operatrice_cognome,
+            COALESCE(o.colore_agenda, '#999999') as operatrice_colore,
+            COALESCE(a.trattamento_id, '') as trattamento_id,
+            COALESCE(
+                (SELECT GROUP_CONCAT(t2.nome, ', ') FROM appuntamento_trattamenti at2 JOIN trattamenti t2 ON t2.id = at2.trattamento_id WHERE at2.appuntamento_id = a.id ORDER BY at2.ordine),
+                COALESCE(t.nome, 'Rimosso')
+            ) as trattamento_nome,
+            COALESCE(
+                (SELECT SUM(t2.durata_minuti) FROM appuntamento_trattamenti at2 JOIN trattamenti t2 ON t2.id = at2.trattamento_id WHERE at2.appuntamento_id = a.id),
+                COALESCE(t.durata_minuti, 30)
+            ) as trattamento_durata,
             a.data_ora_inizio,
             a.data_ora_fine,
             a.stato,
             a.note_prenotazione,
             a.note_trattamento,
             a.prezzo_applicato,
-            a.omaggio,
+            COALESCE(a.omaggio, 0) as omaggio,
             a.created_at,
             a.updated_at
         FROM appuntamenti a
-        INNER JOIN clienti c ON a.cliente_id = c.id
-        INNER JOIN operatrici o ON a.operatrice_id = o.id
-        INNER JOIN trattamenti t ON a.trattamento_id = t.id
+        LEFT JOIN clienti c ON a.cliente_id = c.id
+        LEFT JOIN operatrici o ON a.operatrice_id = o.id
+        LEFT JOIN trattamenti t ON a.trattamento_id = t.id
         WHERE datetime(a.data_ora_inizio) >= datetime(?1)
           AND datetime(a.data_ora_inizio) <= datetime(?2)
         ORDER BY a.data_ora_inizio ASC
@@ -398,4 +470,21 @@ pub async fn get_appuntamenti_giorno(
     .await?;
 
     Ok(appuntamenti)
+}
+
+#[tauri::command]
+pub async fn get_appuntamento_trattamenti_ids(
+    db: tauri::State<'_, Arc<Mutex<crate::AppState>>>,
+    appuntamento_id: String,
+) -> AppResult<Vec<String>> {
+    let state = db.lock().await;
+
+    let ids = sqlx::query_scalar::<_, String>(
+        "SELECT trattamento_id FROM appuntamento_trattamenti WHERE appuntamento_id = ?1 ORDER BY ordine"
+    )
+    .bind(&appuntamento_id)
+    .fetch_all(&state.db.pool)
+    .await?;
+
+    Ok(ids)
 }

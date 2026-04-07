@@ -8,6 +8,7 @@ import { Toast } from '../components/ui/Toast';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { useConfirm } from '../hooks/useConfirm';
 import type { Operatrice } from '../types/agenda';
+import { operatriciService, CreateOperatriceInput, UpdateOperatriceInput } from '../services/operatrici';
 
 const SPEC_COLORS = [
   { bg: 'rgba(139, 92, 246, 0.1)', text: '#8b5cf6' },
@@ -47,7 +48,6 @@ const SpecBadge: React.FC<{ spec: string; size?: 'sm' | 'md' }> = ({ spec, size 
     </span>
   );
 };
-import { operatriciService, CreateOperatriceInput, UpdateOperatriceInput } from '../services/operatrici';
 
 interface ToastState { message: string; type: 'success' | 'error'; }
 
@@ -263,7 +263,7 @@ export const Operatrici: React.FC<OperatriciProps> = ({ onGoBack }) => {
   return (
     <>
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
-      <div className="flex h-full" style={{ height: 'calc(100vh - 80px)' }}>
+      <div className="flex flex-1 min-h-0">
         {/* ═══════════════ LEFT: OPERATOR LIST ═══════════════ */}
         <div className={`flex flex-col min-w-0 master-panel ${selectedOperatrice ? 'w-[420px] shrink-0' : 'flex-1'}`}>
           {/* Header */}
@@ -397,7 +397,7 @@ export const Operatrici: React.FC<OperatriciProps> = ({ onGoBack }) => {
 
         {/* ═══════════════ RIGHT: DETAIL PANEL ═══════════════ */}
         {selectedOperatrice && (
-          <div className="flex-1 min-w-[400px] border-l overflow-y-auto" style={{ borderColor: 'var(--glass-border)', background: 'var(--card-bg)' }}>
+          <div className="flex-1 min-w-[400px] min-h-0 flex flex-col border-l overflow-hidden" style={{ borderColor: 'var(--glass-border)', background: 'var(--card-bg)' }}>
             <OperatriceDetailPanel
               operatrice={selectedOperatrice}
               isEditing={isEditing}
@@ -486,10 +486,9 @@ const OperatriceDetailPanel: React.FC<DetailPanelProps> = ({
   const specs = parseSpecs(operatrice.specializzazioni);
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col flex-1 min-h-0">
       {/* Panel Header */}
-      <div className="p-4 pb-3">
-        <div className="max-w-2xl">
+      <div className="p-5 pb-3">
         <div className="flex items-start justify-between mb-4">
           <button onClick={onClose} className="p-1.5 rounded-lg transition-colors" style={{ color: 'var(--color-text-muted)' }}
             onMouseEnter={e => { e.currentTarget.style.background = 'var(--glass-border)'; }}
@@ -552,8 +551,8 @@ const OperatriceDetailPanel: React.FC<DetailPanelProps> = ({
             )}
           </div>
           <div className="min-w-0">
-            <h2 className="text-lg font-bold truncate" style={{ color: 'var(--color-text-primary)' }}>
-              {operatrice.cognome} {operatrice.nome}
+            <h2 className="text-xl font-bold truncate" style={{ color: 'var(--color-text-primary)' }}>
+              {operatrice.nome} {operatrice.cognome}
             </h2>
             <div className="flex items-center gap-2 mt-0.5 flex-wrap">
               <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold font-mono" style={{ background: 'var(--glass-border)', color: 'var(--color-text-muted)' }}>
@@ -579,12 +578,11 @@ const OperatriceDetailPanel: React.FC<DetailPanelProps> = ({
             </a>
           )}
         </div>
-        </div>
       </div>
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-5" style={{ borderTop: '1px solid var(--glass-border)' }}>
-        <div className="max-w-2xl">
+        <div>
           <AnagraficaTab
             operatrice={operatrice}
             isEditing={isEditing}
@@ -617,56 +615,61 @@ const AnagraficaTab: React.FC<{
 
   if (!isEditing) {
     // View mode
-    const fields = [
-      { label: 'Nome', value: operatrice.nome },
-      { label: 'Cognome', value: operatrice.cognome },
-      { label: 'Codice', value: operatrice.codice },
-      { label: 'Telefono', value: operatrice.telefono },
-      { label: 'Email', value: operatrice.email },
-      { label: 'Note', value: operatrice.note },
-    ];
+    const Field = ({ label, value }: { label: string; value: string | number | null | undefined }) => (
+      <div>
+        <label className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>{label}</label>
+        <p className="text-sm mt-0.5" style={{ color: value ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>{value || '—'}</p>
+      </div>
+    );
+    const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
+      <div className="mt-6 mb-3">
+        <h4 className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: 'var(--color-text-muted)' }}>{title}</h4>
+        {children}
+      </div>
+    );
 
     return (
-      <div className="space-y-5">
-        <div className="space-y-3">
-          {fields.map((f, i) => (
-            <div key={i}>
-              <label className="text-[10px] font-medium uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>{f.label}</label>
-              <p className="text-sm mt-0.5" style={{ color: f.value ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>
-                {f.value || '—'}
-              </p>
-            </div>
-          ))}
+      <div className="space-y-4">
+        {/* Anagrafica */}
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="Nome" value={operatrice.nome} />
+          <Field label="Cognome" value={operatrice.cognome} />
+          <Field label="Codice" value={operatrice.codice} />
         </div>
 
-        {/* Specializzazioni */}
-        <div>
-          <label className="text-[10px] font-medium uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Specializzazioni</label>
-          {specs.length > 0 ? (
-            <div className="flex flex-wrap gap-1.5 mt-1.5">
-              {specs.map((s, i) => <SpecBadge key={i} spec={s} size="md" />)}
-            </div>
-          ) : (
-            <p className="text-sm mt-0.5" style={{ color: 'var(--color-text-muted)' }}>—</p>
-          )}
-        </div>
-
-        {/* Colore Agenda */}
-        <div>
-          <label className="text-[10px] font-medium uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Colore Agenda</label>
-          <div className="flex items-center gap-2 mt-1.5">
-            <div className="w-6 h-6 rounded-lg" style={{ background: operatrice.colore_agenda, border: '1px solid rgba(0,0,0,0.1)' }} />
+        <Section title="Contatti">
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Telefono" value={operatrice.telefono} />
+            <Field label="Email" value={operatrice.email} />
           </div>
-        </div>
+        </Section>
+
+        <Section title="Professionale">
+          <div className="space-y-4">
+            <div>
+              <label className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Specializzazioni</label>
+              {specs.length > 0 ? (
+                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                  {specs.map((s, i) => <SpecBadge key={i} spec={s} size="md" />)}
+                </div>
+              ) : (
+                <p className="text-sm mt-0.5" style={{ color: 'var(--color-text-muted)' }}>—</p>
+              )}
+            </div>
+            <div>
+              <label className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Colore Agenda</label>
+              <div className="flex items-center gap-2 mt-1.5">
+                <div className="w-6 h-6 rounded-lg" style={{ background: operatrice.colore_agenda, border: '1px solid rgba(0,0,0,0.1)' }} />
+              </div>
+            </div>
+            <Field label="Note" value={operatrice.note} />
+          </div>
+        </Section>
 
         {/* Meta */}
-        <div className="pt-3 space-y-1" style={{ borderTop: '1px solid var(--glass-border)' }}>
-          <p className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>
-            Creato il {new Date(operatrice.created_at).toLocaleDateString('it-IT')}
-          </p>
-          <p className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>
-            Ultimo aggiornamento {new Date(operatrice.updated_at).toLocaleDateString('it-IT')}
-          </p>
+        <div className="pt-4 flex items-center gap-4 text-[10px]" style={{ borderTop: '1px solid var(--glass-border)', color: 'var(--color-text-muted)' }}>
+          <span>Creato {new Date(operatrice.created_at).toLocaleDateString('it-IT')}</span>
+          <span>Aggiornato {new Date(operatrice.updated_at).toLocaleDateString('it-IT')}</span>
         </div>
       </div>
     );

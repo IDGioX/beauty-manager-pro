@@ -144,23 +144,29 @@ pub async fn get_prossimi_appuntamenti(
         SELECT
             a.id,
             a.cliente_id,
-            c.nome as cliente_nome,
-            c.cognome as cliente_cognome,
+            COALESCE(c.nome, '') as cliente_nome,
+            COALESCE(c.cognome, '') as cliente_cognome,
             c.cellulare as cliente_cellulare,
-            a.operatrice_id,
-            o.nome as operatrice_nome,
-            o.cognome as operatrice_cognome,
-            o.colore_agenda as operatrice_colore,
-            a.trattamento_id,
-            t.nome as trattamento_nome,
-            t.durata_minuti as trattamento_durata,
+            COALESCE(a.operatrice_id, '') as operatrice_id,
+            COALESCE(o.nome, '') as operatrice_nome,
+            COALESCE(o.cognome, '') as operatrice_cognome,
+            COALESCE(o.colore_agenda, '#999999') as operatrice_colore,
+            COALESCE(a.trattamento_id, '') as trattamento_id,
+            COALESCE(
+                (SELECT GROUP_CONCAT(t2.nome, ', ') FROM appuntamento_trattamenti at2 JOIN trattamenti t2 ON t2.id = at2.trattamento_id WHERE at2.appuntamento_id = a.id ORDER BY at2.ordine),
+                COALESCE(t.nome, 'Rimosso')
+            ) as trattamento_nome,
+            COALESCE(
+                (SELECT SUM(t2.durata_minuti) FROM appuntamento_trattamenti at2 JOIN trattamenti t2 ON t2.id = at2.trattamento_id WHERE at2.appuntamento_id = a.id),
+                COALESCE(t.durata_minuti, 30)
+            ) as trattamento_durata,
             a.data_ora_inizio,
             a.data_ora_fine,
             a.stato,
             a.note_prenotazione,
             a.note_trattamento,
             a.prezzo_applicato,
-            a.omaggio,
+            COALESCE(a.omaggio, 0) as omaggio,
             a.created_at,
             a.updated_at
         FROM appuntamenti a

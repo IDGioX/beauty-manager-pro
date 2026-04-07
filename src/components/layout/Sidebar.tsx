@@ -166,7 +166,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate }) => 
                       background: isActive
                         ? `linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%)`
                         : 'transparent',
-                      boxShadow: isActive ? `0 4px 16px color-mix(in srgb, var(--color-primary) 30%, transparent)` : 'none',
+                      boxShadow: isActive ? `0 4px 20px color-mix(in srgb, var(--color-primary) 40%, transparent), 0 0 40px color-mix(in srgb, var(--color-primary) 15%, transparent)` : 'none',
+                      transform: isActive ? 'scale(1.02)' : undefined,
                     }}
                   >
                     {!isActive && (

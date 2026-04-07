@@ -96,32 +96,29 @@ html, body {
   h3 { font-size: 1.25rem; }
   h4 { font-size: 1.125rem; }
 
-  /* Scrollbar sottile e elegante — visibile su Windows per UX */
+  /* Scrollbar nascoste globalmente + no hard scroll */
   * {
-    scrollbar-width: thin; /* Firefox */
-    scrollbar-color: var(--glass-border) transparent;
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE/Edge */
+    overscroll-behavior: contain;
   }
-
   *::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
-
-  *::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-  *::-webkit-scrollbar-thumb {
-    background: var(--glass-border);
-    border-radius: 3px;
-  }
-
-  *::-webkit-scrollbar-thumb:hover {
-    background: var(--color-text-muted);
+    display: none; /* Chrome/Safari/Tauri WebView */
   }
 }
 
 @layer components {
+  /* ═══ PREMIUM SPRING TRANSITIONS ═══ */
+  /* Tutte le transizioni usano cubic-bezier spring per effetto naturale */
+  button, a, [role="button"] {
+    transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  button:active, a:active, [role="button"]:active {
+    transform: scale(0.97);
+    transition-duration: 0.1s;
+  }
+
   /* Modern glass card */
   .card {
     background: var(--card-bg);
@@ -129,7 +126,7 @@ html, body {
     border: 1px solid var(--glass-border);
     box-shadow: 0 4px 24px var(--glass-shadow), 0 1px 2px rgba(45, 42, 38, 0.04);
     padding: 1.5rem;
-    transition: all 0.3s ease;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
   }
 
   @supports (backdrop-filter: blur(1px)) {
@@ -141,8 +138,8 @@ html, body {
 
   .card:hover {
     background: var(--card-hover);
-    transform: translateY(-2px);
-    box-shadow: 0 8px 32px var(--glass-shadow), 0 2px 4px rgba(45, 42, 38, 0.06);
+    transform: translateY(-3px) scale(1.005);
+    box-shadow: 0 12px 40px var(--glass-shadow), 0 4px 8px rgba(45, 42, 38, 0.06);
   }
 
   /* Stat card with colored accent */
@@ -171,8 +168,8 @@ html, body {
   }
 
   .stat-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 12px 40px var(--glass-shadow);
+    transform: translateY(-4px) scale(1.01);
+    box-shadow: 0 16px 48px var(--glass-shadow), 0 0 0 1px color-mix(in srgb, var(--accent-color, var(--color-primary)) 15%, transparent);
   }
 
   .stat-card.primary { --accent-color: var(--color-primary); }
@@ -200,8 +197,9 @@ html, body {
   }
 
   .btn-primary:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    filter: brightness(1.05);
   }
 
   @supports (color: color-mix(in srgb, red 50%, blue)) {
@@ -211,7 +209,8 @@ html, body {
   }
 
   .btn-primary:active {
-    transform: translateY(0);
+    transform: translateY(0) scale(0.97);
+    transition-duration: 0.1s;
   }
 
   /* Secondary button */
@@ -267,7 +266,8 @@ html, body {
   .input:focus {
     outline: none;
     border-color: var(--color-primary);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 15%, transparent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 15%, transparent), 0 4px 12px color-mix(in srgb, var(--color-primary) 8%, transparent);
+    transform: translateY(-1px);
   }
 
   .input::placeholder {
@@ -295,20 +295,23 @@ html, body {
   .list-card {
     background: transparent;
     border: 1px solid transparent;
-    transition: background 0.15s ease, border-color 0.15s ease;
+    transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
   }
 
   .list-card:hover {
     background: var(--glass-border);
+    transform: translateX(2px);
   }
 
   .list-card-selected {
     background: color-mix(in srgb, var(--color-primary) 10%, transparent);
     border-color: color-mix(in srgb, var(--color-primary) 25%, transparent);
+    box-shadow: inset 3px 0 0 var(--color-primary), 0 2px 8px color-mix(in srgb, var(--color-primary) 10%, transparent);
   }
 
   .list-card-selected:hover {
     background: color-mix(in srgb, var(--color-primary) 15%, transparent);
+    transform: none;
   }
 
   @supports not (color: color-mix(in srgb, red 50%, blue)) {
@@ -416,7 +419,8 @@ html, body {
   .icon-btn:hover {
     background: var(--card-hover);
     color: var(--color-text-primary);
-    transform: translateY(-1px);
+    transform: translateY(-2px) scale(1.05);
+    box-shadow: 0 4px 12px var(--glass-shadow);
   }
 
   /* Avatar */
@@ -479,11 +483,16 @@ html, body {
   }
 
   .table-modern tbody tr {
-    transition: all 0.2s ease;
+    transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .table-modern tbody tr:hover {
+    transform: scale(1.005);
   }
 
   .table-modern tbody tr:hover td {
     background: var(--card-hover);
+    box-shadow: 0 2px 8px var(--glass-shadow);
   }
 }
 
@@ -671,16 +680,17 @@ html, body {
 
 .fc .fc-event {
   border: none !important;
-  border-radius: 6px !important;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.12) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.12) !important;
   cursor: pointer;
-  transition: box-shadow 0.15s ease, transform 0.15s ease !important;
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
 }
 
 .fc .fc-event:hover {
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
-  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.18) !important;
+  transform: translateY(-2px) scale(1.02);
   z-index: 10 !important;
+  filter: brightness(1.05);
 }
 
 /* Timegrid (vista giorno) - Layout appuntamento */
@@ -930,11 +940,11 @@ html, body {
   @keyframes animate-in {
     from {
       opacity: 0;
-      transform: scale(0.96);
+      transform: scale(0.97) translateY(8px);
     }
     to {
       opacity: 1;
-      transform: scale(1);
+      transform: scale(1) translateY(0);
     }
   }
 
@@ -1258,5 +1268,33 @@ html, body {
 
   .gradient-border:hover::before {
     opacity: 1;
+  }
+
+  /* Modal spring entrance */
+  @keyframes modal-spring {
+    0% {
+      opacity: 0;
+      transform: scale(0.92) translateY(20px);
+    }
+    60% {
+      opacity: 1;
+      transform: scale(1.02) translateY(-2px);
+    }
+    100% {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+  }
+
+  /* Dropdown spring entrance */
+  @keyframes dropdown-spring {
+    0% {
+      opacity: 0;
+      transform: scale(0.95) translateY(-4px);
+    }
+    100% {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
   }
 }

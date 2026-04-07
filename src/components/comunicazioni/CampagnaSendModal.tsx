@@ -12,6 +12,7 @@ interface CampagnaSendModalProps {
   onClose: () => void;
   campagna: CampagnaMarketing;
   onCompleted: () => void;
+  autoStart?: boolean; // Se true, salta la selezione e avvia subito
 }
 
 interface SendResult {
@@ -20,7 +21,7 @@ interface SendResult {
   error?: string;
 }
 
-export function CampagnaSendModal({ isOpen, onClose, campagna, onCompleted }: CampagnaSendModalProps) {
+export function CampagnaSendModal({ isOpen, onClose, campagna, onCompleted, autoStart = false }: CampagnaSendModalProps) {
   const [destinatari, setDestinatari] = useState<CampagnaDestinatario[]>([]);
   const [clients, setClients] = useState<Map<string, Cliente>>(new Map());
   const [results, setResults] = useState<SendResult[]>([]);
@@ -34,6 +35,7 @@ export function CampagnaSendModal({ isOpen, onClose, campagna, onCompleted }: Ca
   const [nomeCentro, setNomeCentro] = useState('');
   const [selectedClientIds, setSelectedClientIds] = useState<string[]>([]);
   const [preparingRecipients, setPreparingRecipients] = useState(false);
+  const autoStartTriggered = useRef(false);
 
   // Carica destinatari esistenti e messaggio
   useEffect(() => {
@@ -47,6 +49,7 @@ export function CampagnaSendModal({ isOpen, onClose, campagna, onCompleted }: Ca
     setAutoMode(false);
     autoModeRef.current = false;
     setResults([]);
+    autoStartTriggered.current = false;
 
     const load = async () => {
       try {
@@ -72,6 +75,13 @@ export function CampagnaSendModal({ isOpen, onClose, campagna, onCompleted }: Ca
           setEmailSubject(campagna.oggetto_email || '');
         }
 
+        // Se autoStart e ci sono destinatari, salta diretta alla fase invio
+        if (autoStart && dests.length > 0) {
+          setResults(dests.map(d => ({ clienteId: d.cliente_id, status: 'pending' as const })));
+          setPhase('sending');
+          autoStartTriggered.current = true;
+        }
+
         setStatus('ready');
       } catch (e) {
         console.error('Errore caricamento campagna:', e);
@@ -80,20 +90,32 @@ export function CampagnaSendModal({ isOpen, onClose, campagna, onCompleted }: Ca
     load();
   }, [isOpen, campagna.id]);
 
+  // Auto-avvio invio quando autoStart è attivo e i dati sono pronti
+  useEffect(() => {
+    if (autoStartTriggered.current && status === 'ready' && phase === 'sending' && destinatari.length > 0) {
+      autoStartTriggered.current = false;
+      // Avvia automaticamente in modalità auto
+      setAutoMode(true);
+      autoModeRef.current = true;
+      setStatus('sending');
+      comunicazioniService.updateCampagnaStato(campagna.id, 'in_corso').catch(() => {});
+    }
+  }, [status, phase, destinatari.length, campagna.id]);
+
   // Sostituisci placeholder nel messaggio per un cliente
   const resolveMessage = useCallback((client: Cliente): string => {
     return message
       .replace(/\{nome\}/g, client.nome)
       .replace(/\{cognome\}/g, client.cognome)
       .replace(/\{nome_centro\}/g, nomeCentro);
-  }, [message]);
+  }, [message, nomeCentro]);
 
   const resolveSubject = useCallback((client: Cliente): string => {
     return emailSubject
       .replace(/\{nome\}/g, client.nome)
       .replace(/\{cognome\}/g, client.cognome)
       .replace(/\{nome_centro\}/g, nomeCentro);
-  }, [emailSubject]);
+  }, [emailSubject, nomeCentro]);
 
   // Invia al prossimo cliente
   const sendNext = useCallback(async () => {
@@ -157,7 +179,8 @@ export function CampagnaSendModal({ isOpen, onClose, campagna, onCompleted }: Ca
   useEffect(() => {
     if (!autoMode || status !== 'sending' || currentIndex >= destinatari.length) return;
 
-    const delay = campagna.canale === 'whatsapp' ? 3000 : 1000;
+    // WhatsApp: delay più lungo per dare tempo all'utente di premere invio
+    const delay = campagna.canale === 'whatsapp' ? 5000 : 1000;
     const timer = setTimeout(() => {
       if (autoModeRef.current) sendNextRef.current();
     }, delay);
@@ -214,6 +237,9 @@ export function CampagnaSendModal({ isOpen, onClose, campagna, onCompleted }: Ca
   const total = results.length;
   const progress = total > 0 ? ((sent + errors) / total) * 100 : 0;
 
+  // Cliente attualmente in invio (per WhatsApp)
+  const currentClient = currentIndex < destinatari.length ? clients.get(destinatari[currentIndex]?.cliente_id) : null;
+
   return (
     <div className="fixed inset-0 z-[160] flex items-center justify-center">
       <div className="absolute inset-0 backdrop-blur-sm" style={{ background: 'rgba(0,0,0,0.4)' }} onClick={handleClose} />
@@ -232,7 +258,9 @@ export function CampagnaSendModal({ isOpen, onClose, campagna, onCompleted }: Ca
             )}
             <div>
               <h2 className="font-bold text-sm text-white truncate max-w-[260px]">{campagna.nome}</h2>
-              <p className="text-[10px] text-white/50">{total} destinatari</p>
+              <p className="text-[10px] text-white/50">
+                {phase === 'sending' ? `${sent + errors}/${total} inviati` : `${selectedClientIds.length} destinatari`}
+              </p>
             </div>
           </div>
           <button onClick={handleClose} className="p-1.5 rounded-lg hover:bg-white/10 text-white/60 hover:text-white transition-colors">
@@ -287,11 +315,26 @@ export function CampagnaSendModal({ isOpen, onClose, campagna, onCompleted }: Ca
               </div>
               {status === 'completed' && (
                 <div className="flex gap-4 mt-2">
-                  <span className="text-xs font-medium" style={{ color: 'var(--color-success)' }}>{sent} inviati</span>
-                  {errors > 0 && <span className="text-xs font-medium" style={{ color: 'var(--color-danger)' }}>{errors} errori</span>}
+                  <span className="text-xs font-medium" style={{ color: 'var(--color-success, #10b981)' }}>{sent} inviati</span>
+                  {errors > 0 && <span className="text-xs font-medium" style={{ color: 'var(--color-danger, #ef4444)' }}>{errors} errori</span>}
                 </div>
               )}
             </div>
+
+            {/* WhatsApp: messaggio di istruzioni durante l'invio */}
+            {campagna.canale === 'whatsapp' && status === 'sending' && currentClient && (
+              <div className="mx-6 mb-2 p-3 rounded-xl text-xs" style={{ background: 'rgba(37, 211, 102, 0.08)', border: '1px solid rgba(37, 211, 102, 0.15)' }}>
+                <div className="flex items-center gap-2 mb-1">
+                  <ExternalLink size={13} style={{ color: '#25D366' }} />
+                  <span className="font-medium" style={{ color: '#25D366' }}>
+                    Invio a {currentClient.nome} {currentClient.cognome}
+                  </span>
+                </div>
+                <p style={{ color: 'var(--color-text-muted)' }}>
+                  Si apre WhatsApp — premi Invio nella finestra per confermare. Il prossimo parte in automatico tra 5 secondi.
+                </p>
+              </div>
+            )}
 
             {/* Lista destinatari */}
             <div className="px-6 max-h-[300px] overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
@@ -303,13 +346,16 @@ export function CampagnaSendModal({ isOpen, onClose, campagna, onCompleted }: Ca
                     <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
                       {result.status === 'pending' && <div className="w-2 h-2 rounded-full" style={{ background: 'var(--glass-border)' }} />}
                       {result.status === 'sending' && <Loader2 size={14} className="animate-spin" style={{ color: 'var(--color-primary)' }} />}
-                      {result.status === 'sent' && <Check size={14} style={{ color: 'var(--color-success)' }} />}
-                      {result.status === 'error' && <AlertCircle size={14} style={{ color: 'var(--color-danger)' }} />}
+                      {result.status === 'sent' && <Check size={14} style={{ color: 'var(--color-success, #10b981)' }} />}
+                      {result.status === 'error' && <AlertCircle size={14} style={{ color: 'var(--color-danger, #ef4444)' }} />}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-medium truncate" style={{ color: 'var(--color-text-primary)' }}>{client.nome} {client.cognome}</p>
-                      {result.error && <p className="text-[10px] truncate" style={{ color: 'var(--color-danger)' }}>{result.error}</p>}
+                      {result.error && <p className="text-[10px] truncate" style={{ color: 'var(--color-danger, #ef4444)' }}>{result.error}</p>}
                     </div>
+                    <span className="text-[10px] shrink-0" style={{ color: 'var(--color-text-muted)' }}>
+                      {campagna.canale === 'whatsapp' ? (client.cellulare || '') : (client.email || '')}
+                    </span>
                   </div>
                 );
               })}

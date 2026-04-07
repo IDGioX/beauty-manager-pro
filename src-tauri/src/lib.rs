@@ -114,6 +114,7 @@ pub fn run() {
                 commands::appuntamenti::delete_appuntamento,
                 commands::appuntamenti::aggiorna_stati_automatici,
                 commands::appuntamenti::get_appuntamenti_giorno,
+                commands::appuntamenti::get_appuntamento_trattamenti_ids,
                 commands::trattamenti::get_categorie_trattamenti,
                 commands::trattamenti::get_trattamenti,
                 commands::trattamenti::get_trattamento,

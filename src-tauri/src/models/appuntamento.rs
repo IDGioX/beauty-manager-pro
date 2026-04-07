@@ -35,7 +35,8 @@ pub struct CreateAppuntamentoInput {
     pub cliente_id: String,
     pub operatrice_id: String,
     pub cabina_id: Option<String>,
-    pub trattamento_id: String,
+    pub trattamento_id: String,              // Retrocompat: primo trattamento
+    pub trattamento_ids: Option<Vec<String>>, // Multi-trattamento
     pub data_ora_inizio: DateTime<Utc>,
     pub data_ora_fine: DateTime<Utc>,
     pub stato: Option<String>,
@@ -51,6 +52,7 @@ pub struct UpdateAppuntamentoInput {
     pub operatrice_id: Option<String>,
     pub cabina_id: Option<String>,
     pub trattamento_id: Option<String>,
+    pub trattamento_ids: Option<Vec<String>>,
     pub data_ora_inizio: Option<DateTime<Utc>>,
     pub data_ora_fine: Option<DateTime<Utc>>,
     pub stato: Option<String>,
@@ -73,9 +75,9 @@ pub struct AppuntamentoWithDetails {
     pub operatrice_nome: String,
     pub operatrice_cognome: String,
     pub operatrice_colore: String,
-    pub trattamento_id: String,
-    pub trattamento_nome: String,
-    pub trattamento_durata: i32,
+    pub trattamento_id: String,       // Primo trattamento (retrocompat)
+    pub trattamento_nome: String,      // Nomi concatenati "Manicure, Pedicure"
+    pub trattamento_durata: i32,       // Somma durate
     pub data_ora_inizio: DateTime<Utc>,
     pub data_ora_fine: DateTime<Utc>,
     pub stato: String,

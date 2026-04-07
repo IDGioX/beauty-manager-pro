@@ -531,7 +531,7 @@ export function Settings() {
         </div>
       )}
 
-      <div className="flex gap-6" style={{ height: 'calc(100vh - 120px)' }}>
+      <div className="flex gap-6 flex-1 min-h-0">
         {/* Menu laterale sinistro */}
         <div className="w-52 shrink-0">
           <h1 className="text-lg font-bold mb-4 px-3" style={{ color: 'var(--color-text-primary)' }}>Impostazioni</h1>

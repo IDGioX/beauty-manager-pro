@@ -40,6 +40,7 @@ export function CampagneTab({ templates, showToast }: CampagneTabProps) {
   // Modals
   const [wizardOpen, setWizardOpen] = useState(false);
   const [sendingCampagna, setSendingCampagna] = useState<CampagnaMarketing | null>(null);
+  const [sendAutoStart, setSendAutoStart] = useState(false);
   const [detailCampagna, setDetailCampagna] = useState<CampagnaMarketing | null>(null);
 
   const loadCampagne = async () => {
@@ -64,6 +65,7 @@ export function CampagneTab({ templates, showToast }: CampagneTabProps) {
     setWizardOpen(false);
     loadCampagne();
     if (sendNow) {
+      setSendAutoStart(true);
       setSendingCampagna(campagna);
     }
   };
@@ -234,9 +236,10 @@ export function CampagneTab({ templates, showToast }: CampagneTabProps) {
       {sendingCampagna && (
         <CampagnaSendModal
           isOpen={!!sendingCampagna}
-          onClose={() => setSendingCampagna(null)}
+          onClose={() => { setSendingCampagna(null); setSendAutoStart(false); }}
           campagna={sendingCampagna}
-          onCompleted={() => { setSendingCampagna(null); loadCampagne(); showToast('Campagna completata!', 'success'); }}
+          onCompleted={() => { setSendingCampagna(null); setSendAutoStart(false); loadCampagne(); showToast('Campagna completata!', 'success'); }}
+          autoStart={sendAutoStart}
         />
       )}
 

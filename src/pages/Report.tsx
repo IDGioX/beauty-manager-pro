@@ -462,6 +462,13 @@ const InterrogazioneTab: React.FC = () => {
     }
   };
 
+  // Auto-rigenera report quando cambiano filtri (solo se c'è già un risultato)
+  useEffect(() => {
+    if (result) {
+      executeReport();
+    }
+  }, [selectedClienti, selectedTrattamenti]);
+
   const executeReport = async () => {
     setLoading(true);
     setError(null);
@@ -481,41 +488,51 @@ const InterrogazioneTab: React.FC = () => {
     }
   };
 
-  const setQuickRange = (range: 'today' | 'thisWeek' | 'thisMonth' | 'lastMonth' | 'last3Months' | 'thisYear') => {
+  const getQuickRangeDates = (range: 'today' | 'thisWeek' | 'thisMonth' | 'lastMonth' | 'last3Months' | 'thisYear'): { inizio: string; fine: string } => {
     const now = new Date();
     switch (range) {
       case 'today': {
         const d = format(now, 'yyyy-MM-dd');
-        setDataInizio(d);
-        setDataFine(d);
-        break;
+        return { inizio: d, fine: d };
       }
       case 'thisWeek': {
         const day = now.getDay();
         const diff = now.getDate() - day + (day === 0 ? -6 : 1);
         const monday = new Date(now); monday.setDate(diff);
         const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
-        setDataInizio(format(monday, 'yyyy-MM-dd'));
-        setDataFine(format(sunday, 'yyyy-MM-dd'));
-        break;
+        return { inizio: format(monday, 'yyyy-MM-dd'), fine: format(sunday, 'yyyy-MM-dd') };
       }
       case 'thisMonth':
-        setDataInizio(format(startOfMonth(now), 'yyyy-MM-dd'));
-        setDataFine(format(endOfMonth(now), 'yyyy-MM-dd'));
-        break;
+        return { inizio: format(startOfMonth(now), 'yyyy-MM-dd'), fine: format(endOfMonth(now), 'yyyy-MM-dd') };
       case 'lastMonth':
-        setDataInizio(format(startOfMonth(subMonths(now, 1)), 'yyyy-MM-dd'));
-        setDataFine(format(endOfMonth(subMonths(now, 1)), 'yyyy-MM-dd'));
-        break;
+        return { inizio: format(startOfMonth(subMonths(now, 1)), 'yyyy-MM-dd'), fine: format(endOfMonth(subMonths(now, 1)), 'yyyy-MM-dd') };
       case 'last3Months':
-        setDataInizio(format(startOfMonth(subMonths(now, 2)), 'yyyy-MM-dd'));
-        setDataFine(format(endOfMonth(now), 'yyyy-MM-dd'));
-        break;
+        return { inizio: format(startOfMonth(subMonths(now, 2)), 'yyyy-MM-dd'), fine: format(endOfMonth(now), 'yyyy-MM-dd') };
       case 'thisYear':
-        setDataInizio(`${now.getFullYear()}-01-01`);
-        setDataFine(`${now.getFullYear()}-12-31`);
-        break;
+        return { inizio: `${now.getFullYear()}-01-01`, fine: `${now.getFullYear()}-12-31` };
     }
+  };
+
+  const setQuickRange = (range: 'today' | 'thisWeek' | 'thisMonth' | 'lastMonth' | 'last3Months' | 'thisYear') => {
+    const { inizio, fine } = getQuickRangeDates(range);
+    setDataInizio(inizio);
+    setDataFine(fine);
+    // Auto-esegui il report con le nuove date
+    setLoading(true);
+    setError(null);
+    analyticsService.getReportFiltrato({
+      data_inizio: format(startOfDay(parseISO(inizio)), 'yyyy-MM-dd HH:mm:ss'),
+      data_fine: format(endOfDay(parseISO(fine)), 'yyyy-MM-dd HH:mm:ss'),
+      cliente_ids: selectedClienti.length > 0 ? selectedClienti.map(c => c.id) : undefined,
+      trattamento_ids: selectedTrattamenti.length > 0 ? selectedTrattamenti.map(t => t.id) : undefined,
+    }).then(data => {
+      setResult(data);
+    }).catch((err: any) => {
+      console.error('Errore report:', err);
+      setError(typeof err === 'string' ? err : err?.message || 'Errore durante la generazione del report');
+    }).finally(() => {
+      setLoading(false);
+    });
   };
 
   const toggleClienteFilter = (option: FilterOption) => {

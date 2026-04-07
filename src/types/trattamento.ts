@@ -43,6 +43,8 @@ export interface CreateTrattamentoInput {
   prezzo_listino?: number;
   attivo?: boolean;
   note_operative?: string;
+  controindicazioni?: string;
+  attrezzature_richieste?: string;
 }
 
 export interface UpdateTrattamentoInput {
@@ -53,6 +55,8 @@ export interface UpdateTrattamentoInput {
   prezzo_listino?: number;
   attivo?: boolean;
   note_operative?: string;
+  controindicazioni?: string;
+  attrezzature_richieste?: string;
 }
 
 export interface CreateCategoriaTrattamentoInput {

@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Search, TrendingUp, TrendingDown, RotateCcw, Eye, History, ArrowUpDown, X, User, Users, Truck, AlertTriangle } from 'lucide-react';
 import { MovimentoDetailModal } from './MovimentoDetailModal';
+import { SearchableSelect } from '../ui/SearchableSelect';
 import { magazzinoService } from '../../services/magazzino';
 import { operatriciService } from '../../services/operatrici';
 import { clientiService } from '../../services/clienti';
@@ -309,33 +310,39 @@ export function MovimentiTab({ onOpenCarico, onOpenScarico, onOpenAppuntamento }
         <div className="flex flex-wrap items-center gap-2 mt-2.5">
           {/* Tipo */}
           <select value={filtri.tipo || ''} onChange={e => setFilter('tipo', (e.target.value as TipoMovimento) || undefined)}
-            className="px-2.5 py-1 rounded-lg text-[12px]"
-            style={{ background: 'var(--input-bg, var(--glass-border))', border: '1px solid var(--glass-border)', color: filtri.tipo ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>
+            className="px-2.5 py-1.5 rounded-xl text-[12px] appearance-none pr-7 cursor-pointer"
+            style={{ background: 'var(--input-bg, var(--card-bg))', border: '2px solid var(--glass-border)', color: filtri.tipo ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
+              backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`,
+              backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center' }}>
             <option value="">Tipo movimento</option>
             {Object.entries(TIPI_MOVIMENTO_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
           </select>
 
-          {/* Operatrice */}
-          <select value={filtri.operatrice_id || ''} onChange={e => setFilter('operatrice_id', e.target.value || undefined)}
-            className="px-2.5 py-1 rounded-lg text-[12px]"
-            style={{ background: 'var(--input-bg, var(--glass-border))', border: '1px solid var(--glass-border)', color: filtri.operatrice_id ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>
-            <option value="">Operatrice</option>
-            {operatrici.map(op => <option key={op.id} value={op.id}>{op.nome} {op.cognome}</option>)}
-          </select>
+          {/* Operatore */}
+          <div className="w-44">
+            <SearchableSelect
+              value={filtri.operatrice_id || ''}
+              onChange={(v) => setFilter('operatrice_id', v || undefined)}
+              options={operatrici.map(op => ({ value: op.id, label: `${op.cognome} ${op.nome}` }))}
+              placeholder="Operatore..."
+            />
+          </div>
 
           {/* Cliente */}
-          <select value={filtri.cliente_id || ''} onChange={e => setFilter('cliente_id', e.target.value || undefined)}
-            className="px-2.5 py-1 rounded-lg text-[12px]"
-            style={{ background: 'var(--input-bg, var(--glass-border))', border: '1px solid var(--glass-border)', color: filtri.cliente_id ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>
-            <option value="">Cliente</option>
-            {clienti.map(cl => <option key={cl.id} value={cl.id}>{cl.nome} {cl.cognome}</option>)}
-          </select>
+          <div className="w-44">
+            <SearchableSelect
+              value={filtri.cliente_id || ''}
+              onChange={(v) => setFilter('cliente_id', v || undefined)}
+              options={clienti.map(cl => ({ value: cl.id, label: `${cl.cognome} ${cl.nome}`, subtitle: cl.cellulare || cl.email || undefined }))}
+              placeholder="Cliente..."
+            />
+          </div>
 
           {/* Fornitore */}
           <input type="text" placeholder="Fornitore..." value={filtri.fornitore || ''}
             onChange={e => setFilter('fornitore', e.target.value || undefined)}
-            className="px-2.5 py-1 rounded-lg text-[12px] w-32"
-            style={{ background: 'var(--input-bg, var(--glass-border))', border: '1px solid var(--glass-border)', color: 'var(--color-text-primary)' }} />
+            className="px-2.5 py-1.5 rounded-xl text-[12px] w-32"
+            style={{ background: 'var(--input-bg, var(--card-bg))', border: '2px solid var(--glass-border)', color: 'var(--color-text-primary)' }} />
 
           {/* Spacer + reset */}
           <div className="flex-1" />

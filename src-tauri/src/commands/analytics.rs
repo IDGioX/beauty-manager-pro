@@ -320,7 +320,7 @@ pub async fn get_report_filtrato(
             COALESCE(SUM(CASE WHEN a.stato IN ('completato', 'in_corso') THEN 1 ELSE 0 END), 0) as completati,
             COALESCE(SUM(CASE WHEN a.stato = 'annullato' THEN 1 ELSE 0 END), 0) as annullati,
             COALESCE(SUM(CASE WHEN a.stato = 'no_show' THEN 1 ELSE 0 END), 0) as no_show,
-            COALESCE(SUM(CASE WHEN a.stato IN ('completato', 'in_corso') AND (a.omaggio IS NULL OR a.omaggio = 0) THEN a.prezzo_applicato ELSE 0 END), 0.0) as ricavo
+            CAST(COALESCE(SUM(CASE WHEN a.stato IN ('completato', 'in_corso') AND (a.omaggio IS NULL OR a.omaggio = 0) THEN a.prezzo_applicato ELSE 0 END), 0.0) AS REAL) as ricavo
         FROM appuntamenti a
         WHERE {}"#,
         where_sql
@@ -385,7 +385,7 @@ pub async fn get_report_filtrato(
 
     // Average duration
     let durata_sql = format!(
-        r#"SELECT COALESCE(AVG(t.durata_minuti), 0.0)
+        r#"SELECT CAST(COALESCE(AVG(t.durata_minuti), 0.0) AS REAL)
         FROM appuntamenti a
         LEFT JOIN trattamenti t ON a.trattamento_id = t.id
         WHERE {} AND a.stato IN ('completato', 'in_corso')"#,
@@ -431,9 +431,9 @@ pub async fn get_report_filtrato(
             t.nome as trattamento_nome,
             ct.nome as categoria_nome,
             COUNT(a.id) as totale_appuntamenti,
-            COALESCE(SUM(a.prezzo_applicato), 0.0) as ricavo_totale,
-            COALESCE(AVG(a.prezzo_applicato), 0.0) as ricavo_medio,
-            AVG(t.durata_minuti) as durata_media_minuti
+            CAST(COALESCE(SUM(a.prezzo_applicato), 0.0) AS REAL) as ricavo_totale,
+            CAST(COALESCE(AVG(a.prezzo_applicato), 0.0) AS REAL) as ricavo_medio,
+            CAST(COALESCE(AVG(t.durata_minuti), 0.0) AS REAL) as durata_media_minuti
         FROM appuntamenti a
         LEFT JOIN trattamenti t ON a.trattamento_id = t.id
         LEFT JOIN categorie_trattamenti ct ON t.categoria_id = ct.id
@@ -466,9 +466,9 @@ pub async fn get_report_filtrato(
             c.cognome,
             c.email,
             c.cellulare,
-            COALESCE(SUM(a.prezzo_applicato), 0.0) as ricavo_totale,
+            CAST(COALESCE(SUM(a.prezzo_applicato), 0.0) AS REAL) as ricavo_totale,
             COUNT(a.id) as totale_appuntamenti,
-            COALESCE(AVG(a.prezzo_applicato), 0.0) as ricavo_medio
+            CAST(COALESCE(AVG(a.prezzo_applicato), 0.0) AS REAL) as ricavo_medio
         FROM appuntamenti a
         LEFT JOIN clienti c ON c.id = a.cliente_id
         WHERE {} AND a.stato IN ('completato', 'in_corso') AND (c.attivo = 1 OR c.attivo IS NULL)
@@ -499,14 +499,14 @@ pub async fn get_report_filtrato(
             o.nome as operatrice_nome,
             o.cognome as operatrice_cognome,
             COUNT(a.id) as totale_appuntamenti,
-            SUM(CASE WHEN a.stato IN ('completato', 'in_corso') THEN 1 ELSE 0 END) as appuntamenti_completati,
-            COALESCE(SUM(CASE WHEN a.stato IN ('completato', 'in_corso') THEN a.prezzo_applicato ELSE 0 END), 0.0) as ricavo_totale,
-            COALESCE(AVG(CASE WHEN a.stato IN ('completato', 'in_corso') THEN a.prezzo_applicato ELSE NULL END), 0.0) as ricavo_medio,
-            COALESCE(SUM(CASE WHEN a.stato IN ('completato', 'in_corso') THEN t.durata_minuti ELSE 0 END), 0.0) / 60.0 as ore_lavorate
+            CAST(COALESCE(SUM(CASE WHEN a.stato IN ('completato', 'in_corso') THEN 1 ELSE 0 END), 0) AS INTEGER) as appuntamenti_completati,
+            CAST(COALESCE(SUM(CASE WHEN a.stato IN ('completato', 'in_corso') THEN a.prezzo_applicato ELSE 0 END), 0.0) AS REAL) as ricavo_totale,
+            CAST(COALESCE(AVG(CASE WHEN a.stato IN ('completato', 'in_corso') THEN a.prezzo_applicato ELSE NULL END), 0.0) AS REAL) as ricavo_medio,
+            CAST(COALESCE(SUM(CASE WHEN a.stato IN ('completato', 'in_corso') THEN t.durata_minuti ELSE 0 END), 0.0) / 60.0 AS REAL) as ore_lavorate
         FROM appuntamenti a
         LEFT JOIN operatrici o ON a.operatrice_id = o.id
         LEFT JOIN trattamenti t ON a.trattamento_id = t.id
-        WHERE {}
+        WHERE {} AND a.operatrice_id IS NOT NULL
         GROUP BY o.id, o.nome, o.cognome
         ORDER BY ricavo_totale DESC"#,
         where_sql
@@ -531,8 +531,8 @@ pub async fn get_report_filtrato(
         r#"SELECT
             COALESCE(ct.nome, 'Senza categoria') as categoria_nome,
             COUNT(a.id) as totale_appuntamenti,
-            COALESCE(SUM(a.prezzo_applicato), 0.0) as ricavo_totale,
-            0.0 as percentuale
+            CAST(COALESCE(SUM(a.prezzo_applicato), 0.0) AS REAL) as ricavo_totale,
+            CAST(0.0 AS REAL) as percentuale
         FROM appuntamenti a
         LEFT JOIN trattamenti t ON a.trattamento_id = t.id
         LEFT JOIN categorie_trattamenti ct ON t.categoria_id = ct.id
@@ -573,9 +573,9 @@ pub async fn get_report_filtrato(
             COALESCE(ct.nome, '') as categoria_trattamento,
             COALESCE(o.nome, '') as operatrice_nome,
             COALESCE(o.cognome, '') as operatrice_cognome,
-            COALESCE(t.durata_minuti, 0) as durata_minuti,
+            CAST(COALESCE(t.durata_minuti, 0) AS REAL) as durata_minuti,
             a.stato,
-            COALESCE(a.prezzo_applicato, 0.0) as prezzo,
+            CAST(COALESCE(a.prezzo_applicato, 0.0) AS REAL) as prezzo,
             COALESCE(a.note_prenotazione, '') as note
         FROM appuntamenti a
         LEFT JOIN clienti c ON a.cliente_id = c.id

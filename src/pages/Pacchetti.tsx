@@ -426,7 +426,7 @@ export const Pacchetti: React.FC<{
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
       <ConfirmDialog {...confirmState} onCancel={handleCancel} />
 
-      <div className="flex h-full" style={{ height: 'calc(100vh - 80px)' }}>
+      <div className="flex flex-1 min-h-0">
         {/* ═══════════════ LEFT PANEL ═══════════════ */}
         <div className={`flex flex-col min-w-0 master-panel ${hasDetailOpen ? 'w-[420px] shrink-0' : 'flex-1'}`}>
 
@@ -639,7 +639,7 @@ export const Pacchetti: React.FC<{
 
         {/* Catalogo detail */}
         {selectedPacchetto && viewMode === 'catalogo' && (
-          <div className="flex-1 min-w-[400px] border-l overflow-y-auto" style={{ borderColor: 'var(--glass-border)', background: 'var(--card-bg)' }}>
+          <div className="flex-1 min-w-[400px] min-h-0 flex flex-col border-l overflow-hidden" style={{ borderColor: 'var(--glass-border)', background: 'var(--card-bg)' }}>
             <PacchettoDetailPanel
               pacchetto={selectedPacchetto}
               trattamenti={trattamenti}
@@ -661,7 +661,7 @@ export const Pacchetti: React.FC<{
 
         {/* Per Cliente detail */}
         {selectedCliente && viewMode === 'per_cliente' && (
-          <div className="flex-1 min-w-[400px] border-l overflow-y-auto" style={{ borderColor: 'var(--glass-border)', background: 'var(--card-bg)' }}>
+          <div className="flex-1 min-w-[400px] min-h-0 flex flex-col border-l overflow-hidden" style={{ borderColor: 'var(--glass-border)', background: 'var(--card-bg)' }}>
             <ClientePacchettiPanel
               cliente={selectedCliente}
               pacchetti={clientiPacchetti.get(selectedCliente.id) || []}
@@ -898,7 +898,7 @@ const ClientePacchettiPanel: React.FC<{
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col flex-1 min-h-0">
       {/* Header */}
       <div className="p-5 pb-4">
         <div className="max-w-2xl">
@@ -1287,112 +1287,137 @@ const PacchettoDetailPanel: React.FC<{
   toggleTrattamento: (ids: string[], id: string) => string[];
 }> = ({ pacchetto: p, trattamenti, isEditing, formData, setFormData, onStartEdit, onSave, onCancelEdit, onClose, onToggleAttivo, onAssegna, showOverflow, setShowOverflow, toggleTrattamento }) => {
 
+  const Field = ({ label, value }: { label: string; value: string | number | null | undefined }) => (
+    <div>
+      <label className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>{label}</label>
+      <p className="text-sm mt-0.5" style={{ color: value ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>{value || '—'}</p>
+    </div>
+  );
+  const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
+    <div className="mt-6 mb-3">
+      <h4 className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: 'var(--color-text-muted)' }}>{title}</h4>
+      {children}
+    </div>
+  );
+
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col flex-1 min-h-0">
       {/* Panel Header */}
-      <div className="p-5 pb-4">
-        <div className="max-w-2xl">
-          <div className="flex items-start justify-between mb-4">
-            <button onClick={onClose} className="p-1.5 rounded-lg transition-colors" style={{ color: 'var(--color-text-muted)' }}
-              onMouseEnter={e => { e.currentTarget.style.background = 'var(--glass-border)'; }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
-              <X size={18} />
-            </button>
-            <div className="flex items-center gap-1">
-              {!isEditing && (
-                <button onClick={onStartEdit} className="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
-                  style={{ color: 'var(--color-primary)', background: 'color-mix(in srgb, var(--color-primary) 8%, transparent)' }}>
-                  <Edit2 size={13} className="inline mr-1" />Modifica
-                </button>
+      <div className="p-5 pb-3">
+        <div className="flex items-start justify-between mb-4">
+          <button onClick={onClose} className="p-1.5 rounded-lg transition-colors" style={{ color: 'var(--color-text-muted)' }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'var(--glass-border)'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
+            <X size={18} />
+          </button>
+          <div className="flex items-center gap-1">
+            {!isEditing && (
+              <button onClick={onStartEdit} className="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
+                style={{ color: 'var(--color-primary)', background: 'color-mix(in srgb, var(--color-primary) 8%, transparent)' }}>
+                <Edit2 size={13} className="inline mr-1" />Modifica
+              </button>
+            )}
+            <div className="relative">
+              <button onClick={e => { e.stopPropagation(); setShowOverflow(!showOverflow); }} className="p-1.5 rounded-lg transition-colors" style={{ color: 'var(--color-text-muted)' }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'var(--glass-border)'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
+                <MoreHorizontal size={18} />
+              </button>
+              {showOverflow && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowOverflow(false)} />
+                  <div className="absolute right-0 top-full mt-1 w-44 rounded-xl shadow-lg py-1 z-50" style={{ background: 'var(--bg-base, var(--card-bg))', border: '1px solid var(--glass-border)' }}>
+                    <button onClick={() => { setShowOverflow(false); onAssegna(); }} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left transition-colors" style={{ color: 'var(--color-primary)' }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'var(--glass-border)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
+                      <Users size={14} />Assegna a cliente
+                    </button>
+                    <button onClick={() => { setShowOverflow(false); onToggleAttivo(); }} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left transition-colors" style={{ color: p.attivo ? '#ef4444' : '#10b981' }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'var(--glass-border)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
+                      {p.attivo ? <><EyeOff size={14} />Disattiva</> : <><Eye size={14} />Riattiva</>}
+                    </button>
+                  </div>
+                </>
               )}
-              <div className="relative">
-                <button onClick={e => { e.stopPropagation(); setShowOverflow(!showOverflow); }} className="p-1.5 rounded-lg transition-colors" style={{ color: 'var(--color-text-muted)' }}
-                  onMouseEnter={e => { e.currentTarget.style.background = 'var(--glass-border)'; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
-                  <MoreHorizontal size={18} />
-                </button>
-                {showOverflow && (
-                  <>
-                    <div className="fixed inset-0 z-40" onClick={() => setShowOverflow(false)} />
-                    <div className="absolute right-0 top-full mt-1 w-44 rounded-xl shadow-lg py-1 z-50" style={{ background: 'var(--card-bg)', border: '1px solid var(--glass-border)' }}>
-                      <button onClick={() => { setShowOverflow(false); onAssegna(); }} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left transition-colors" style={{ color: 'var(--color-primary)' }}
-                        onMouseEnter={e => { e.currentTarget.style.background = 'var(--glass-border)'; }}
-                        onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
-                        <Users size={14} />Assegna a cliente
-                      </button>
-                      <button onClick={() => { setShowOverflow(false); onToggleAttivo(); }} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left transition-colors" style={{ color: p.attivo ? '#ef4444' : '#10b981' }}
-                        onMouseEnter={e => { e.currentTarget.style.background = 'var(--glass-border)'; }}
-                        onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
-                        {p.attivo ? <><EyeOff size={14} />Disattiva</> : <><Eye size={14} />Riattiva</>}
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
             </div>
           </div>
-
-          {isEditing ? (
-            <form onSubmit={onSave} className="space-y-4">
-              <Input label="Nome *" value={formData.nome} onChange={e => setFormData({ ...formData, nome: e.target.value })} required />
-              <Textarea label="Descrizione" value={formData.descrizione} onChange={e => setFormData({ ...formData, descrizione: e.target.value })} rows={2} />
-              <div className="grid grid-cols-2 gap-3">
-                <Input label="Prezzo" type="number" min={0} step={0.01} value={formData.prezzo_totale || ''} onChange={e => setFormData({ ...formData, prezzo_totale: parseFloat(e.target.value) || 0 })} />
-                <Input label="Sedute" type="number" min={1} value={formData.num_sedute} onChange={e => setFormData({ ...formData, num_sedute: parseInt(e.target.value) || 1 })} />
-              </div>
-              <TrattamentiCheckList trattamenti={trattamenti} selectedIds={formData.trattamentiIds} onToggle={(id) => setFormData({ ...formData, trattamentiIds: toggleTrattamento(formData.trattamentiIds, id) })} />
-              <div className="flex gap-2 pt-3">
-                <Button type="submit" variant="primary" size="sm">Salva</Button>
-                <Button type="button" variant="ghost" size="sm" onClick={onCancelEdit}>Annulla</Button>
-              </div>
-            </form>
-          ) : (
-            <>
-              {/* View mode */}
-              <div className="flex items-center gap-3 mb-1">
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: 'color-mix(in srgb, var(--color-primary) 10%, transparent)' }}>
-                  <Package size={22} style={{ color: 'var(--color-primary)' }} />
-                </div>
-                <div>
-                  <h2 className="text-lg font-bold" style={{ color: 'var(--color-text-primary)' }}>{p.nome}</h2>
-                  {!p.attivo && <span className="text-[10px] px-1.5 py-0.5 rounded font-medium" style={{ background: 'var(--glass-border)', color: 'var(--color-text-muted)' }}>Disattivato</span>}
-                </div>
-              </div>
-              {p.descrizione && <p className="text-sm mt-2 mb-4" style={{ color: 'var(--color-text-secondary)' }}>{p.descrizione}</p>}
-
-              {/* Info rows */}
-              <div className="space-y-3 mt-4">
-                <div className="flex justify-between py-2" style={{ borderBottom: '1px solid var(--glass-border)' }}>
-                  <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Prezzo totale</span>
-                  <span className="text-sm font-semibold" style={{ color: 'var(--color-primary)' }}>{formatPrice(p.prezzo_totale)}</span>
-                </div>
-                <div className="flex justify-between py-2" style={{ borderBottom: '1px solid var(--glass-border)' }}>
-                  <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Numero sedute</span>
-                  <span className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>{p.num_sedute}</span>
-                </div>
-                <div className="flex justify-between py-2" style={{ borderBottom: '1px solid var(--glass-border)' }}>
-                  <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Prezzo per seduta</span>
-                  <span className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>{formatPrice(p.prezzo_totale / Math.max(p.num_sedute, 1))}</span>
-                </div>
-              </div>
-
-              {/* Treatments */}
-              {p.trattamenti_inclusi.length > 0 && (
-                <div className="mt-5">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--color-text-muted)' }}>Trattamenti inclusi</p>
-                  <div className="space-y-1">
-                    {p.trattamenti_inclusi.map(t => (
-                      <div key={t.id} className="flex items-center gap-2 px-3 py-2 rounded-lg" style={{ background: 'color-mix(in srgb, var(--glass-border) 50%, transparent)' }}>
-                        <div className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--color-primary)' }} />
-                        <span className="text-sm" style={{ color: 'var(--color-text-primary)' }}>{t.trattamento_nome}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </>
-          )}
         </div>
+
+        <div className="flex items-center gap-3 mb-1">
+          <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: 'color-mix(in srgb, var(--color-primary) 10%, transparent)' }}>
+            <Package size={22} style={{ color: 'var(--color-primary)' }} />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold" style={{ color: 'var(--color-text-primary)' }}>{p.nome}</h2>
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className="text-[10px] px-1.5 py-0.5 rounded font-medium" style={{
+                background: p.attivo ? 'color-mix(in srgb, var(--color-success) 15%, transparent)' : 'var(--glass-border)',
+                color: p.attivo ? 'var(--color-success)' : 'var(--color-text-muted)'
+              }}>
+                {p.attivo ? 'Attivo' : 'Disattivato'}
+              </span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded font-medium" style={{ background: 'color-mix(in srgb, var(--color-primary) 10%, transparent)', color: 'var(--color-primary)' }}>
+                {p.num_sedute} sedut{p.num_sedute === 1 ? 'a' : 'e'}
+              </span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded font-medium" style={{ background: 'color-mix(in srgb, var(--color-primary) 10%, transparent)', color: 'var(--color-primary)' }}>
+                {formatPrice(p.prezzo_totale)}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ borderTop: '1px solid var(--glass-border)' }} />
+
+      <div className="flex-1 overflow-y-auto p-5">
+        {isEditing ? (
+          <form onSubmit={onSave} className="space-y-4">
+            <Input label="Nome *" value={formData.nome} onChange={e => setFormData({ ...formData, nome: e.target.value })} required />
+            <Textarea label="Descrizione" value={formData.descrizione} onChange={e => setFormData({ ...formData, descrizione: e.target.value })} rows={2} />
+            <div className="grid grid-cols-2 gap-3">
+              <Input label="Prezzo" type="number" min={0} step={0.01} value={formData.prezzo_totale || ''} onChange={e => setFormData({ ...formData, prezzo_totale: parseFloat(e.target.value) || 0 })} />
+              <Input label="Sedute" type="number" min={1} value={formData.num_sedute} onChange={e => setFormData({ ...formData, num_sedute: parseInt(e.target.value) || 1 })} />
+            </div>
+            <TrattamentiCheckList trattamenti={trattamenti} selectedIds={formData.trattamentiIds} onToggle={(id) => setFormData({ ...formData, trattamentiIds: toggleTrattamento(formData.trattamentiIds, id) })} />
+            <div className="flex gap-2 pt-3">
+              <Button type="submit" variant="primary" size="sm">Salva</Button>
+              <Button type="button" variant="ghost" size="sm" onClick={onCancelEdit}>Annulla</Button>
+            </div>
+          </form>
+        ) : (
+          <>
+            {p.descrizione && <p className="text-sm mb-2" style={{ color: 'var(--color-text-secondary)' }}>{p.descrizione}</p>}
+
+            <Section title="Dettagli Pacchetto">
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Prezzo totale" value={formatPrice(p.prezzo_totale)} />
+                <Field label="Numero sedute" value={p.num_sedute} />
+                <Field label="Prezzo per seduta" value={formatPrice(p.prezzo_totale / Math.max(p.num_sedute, 1))} />
+                <Field label="Tipo pagamento" value={TIPO_LABELS[p.tipo_pagamento] || p.tipo_pagamento} />
+              </div>
+            </Section>
+
+            {p.trattamenti_inclusi.length > 0 && (
+              <Section title="Trattamenti inclusi">
+                <div className="space-y-1">
+                  {p.trattamenti_inclusi.map(t => (
+                    <div key={t.id} className="flex items-center gap-2 px-3 py-2 rounded-lg" style={{ background: 'color-mix(in srgb, var(--glass-border) 50%, transparent)' }}>
+                      <div className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--color-primary)' }} />
+                      <span className="text-sm" style={{ color: 'var(--color-text-primary)' }}>{t.trattamento_nome}</span>
+                    </div>
+                  ))}
+                </div>
+              </Section>
+            )}
+
+            {/* Meta footer */}
+            <div className="mt-8 pt-4 flex items-center gap-4 text-[10px]" style={{ borderTop: '1px solid var(--glass-border)', color: 'var(--color-text-muted)' }}>
+              {p.created_at && <span>Creato: {new Date(p.created_at).toLocaleDateString('it-IT')}</span>}
+              {p.updated_at && <span>Aggiornato: {new Date(p.updated_at).toLocaleDateString('it-IT')}</span>}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

@@ -733,7 +733,7 @@ export const Agenda: React.FC<AgendaProps> = ({ openAppuntamentoId, onAppuntamen
         />
       )}
 
-      <div className="flex-1 flex flex-col min-h-0">
+      <div className="flex-1 flex flex-col min-h-0 min-w-0">
         {/* Header con controlli */}
         <div className="mb-4 flex items-center justify-between animate-fade-in-up">
           <div>
@@ -969,7 +969,7 @@ export const Agenda: React.FC<AgendaProps> = ({ openAppuntamentoId, onAppuntamen
 
         {/* Calendario */}
         <div
-          className="flex-1 rounded-2xl overflow-hidden flex flex-col"
+          className="flex-1 rounded-2xl overflow-hidden flex flex-col min-w-0"
           style={{
             background: 'var(--card-bg)',
             border: '1px solid var(--glass-border)',
@@ -1072,12 +1072,27 @@ export const Agenda: React.FC<AgendaProps> = ({ openAppuntamentoId, onAppuntamen
               eventContent={(arg) => {
                 const app = arg.event.extendedProps.appuntamento;
                 const isOmaggio = app?.omaggio;
+                const isCancelled = app?.stato === 'annullato' || app?.stato === 'no_show';
+                const clienteName = app ? `${app.cliente_nome} ${app.cliente_cognome}` : '';
+                const trattamentiStr: string = app?.trattamento_nome || '';
+                const trattamentiList = trattamentiStr.split(', ').filter(Boolean);
+
                 return (
                   <div className="fc-event-main-frame" style={{ overflow: 'hidden', height: '100%', padding: '2px 4px', position: 'relative' }}>
                     <div className="fc-event-time" style={{ fontSize: '10px', fontWeight: 600, opacity: 0.85 }}>{arg.timeText}</div>
-                    <div className="fc-event-title" style={{ fontSize: '11px', lineHeight: 1.2 }}>
-                      {arg.event.title}
+                    <div style={{ fontSize: '11px', fontWeight: 600, lineHeight: 1.2, textDecoration: isCancelled ? 'line-through' : undefined, opacity: isCancelled ? 0.6 : 1 }}>
+                      {isCancelled ? '✕ ' : ''}{clienteName}
                     </div>
+                    {trattamentiList.length > 0 && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px', marginTop: '2px' }}>
+                        {trattamentiList.map((t, i) => (
+                          <span key={i} style={{
+                            fontSize: '9px', lineHeight: 1, padding: '1px 4px', borderRadius: '3px',
+                            background: 'rgba(255,255,255,0.2)', whiteSpace: 'nowrap',
+                          }}>{t}</span>
+                        ))}
+                      </div>
+                    )}
                     {isOmaggio && (
                       <span style={{
                         position: 'absolute', top: 2, right: 3,

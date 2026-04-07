@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Plus, Search, Edit2, Trash2, Phone, UserX, UserCheck, MessageCircle, Users, Mail, Shield, ArrowLeft, X, Calendar, Euro, Clock, Award, Scissors, Cake, Star, AlertTriangle, Sparkles, ChevronRight, Heart, MoreHorizontal, Loader2 } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Phone, UserX, UserCheck, MessageCircle, Users, Mail, Shield, ArrowLeft, X, Scissors, Cake, Star, AlertTriangle, Sparkles, ChevronRight, Heart, MoreHorizontal, Loader2, Package } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
@@ -10,8 +10,11 @@ import { useConfirm } from '../hooks/useConfirm';
 import { Cliente, CreateClienteInput } from '../types/cliente';
 import { clientiService } from '../services/clienti';
 import { analyticsService, ClienteCompleteProfile } from '../services/analytics';
+import { magazzinoService } from '../services/magazzino';
+import type { MovimentoMagazzino } from '../types/magazzino';
 import { format, parseISO } from 'date-fns';
 import { it } from 'date-fns/locale';
+import { BarChart, Bar, XAxis, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 
 interface ToastState { message: string; type: 'success' | 'error'; }
 interface ClientiProps { openClienteId?: string | null; onClienteOpened?: () => void; onGoBack?: () => void; }
@@ -275,7 +278,7 @@ export const Clienti: React.FC<ClientiProps> = ({ openClienteId, onClienteOpened
   return (
     <>
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
-      <div className="flex h-full" style={{ height: 'calc(100vh - 80px)' }}>
+      <div className="flex flex-1 min-h-0">
         {/* ═══════════════ LEFT: CLIENT LIST ═══════════════ */}
         <div className={`flex flex-col min-w-0 master-panel ${selectedCliente ? 'w-[420px] shrink-0' : 'flex-1'}`}>
           {/* Header */}
@@ -427,7 +430,7 @@ export const Clienti: React.FC<ClientiProps> = ({ openClienteId, onClienteOpened
 
         {/* ═══════════════ RIGHT: DETAIL PANEL ═══════════════ */}
         {selectedCliente && (
-          <div className="flex-1 min-w-[400px] border-l overflow-y-auto" style={{ borderColor: 'var(--glass-border)', background: 'var(--card-bg)' }}>
+          <div className="flex-1 min-w-[400px] min-h-0 flex flex-col border-l overflow-hidden" style={{ borderColor: 'var(--glass-border)', background: 'var(--card-bg)' }}>
             <ClientDetailPanel
               cliente={selectedCliente}
               profile={profile}
@@ -543,10 +546,10 @@ const ClientDetailPanel: React.FC<DetailPanelProps> = ({
   ];
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col flex-1 min-h-0">
       {/* Panel Header - Avatar & Name */}
-      <div className="p-4 pb-3">
-        <div className="max-w-2xl">
+      <div className="p-5 pb-3">
+        <div>
         <div className="flex items-start justify-between mb-4">
           <button onClick={onClose} className="p-1.5 rounded-lg transition-colors" style={{ color: 'var(--color-text-muted)' }}
             onMouseEnter={e => { e.currentTarget.style.background = 'var(--glass-border)'; }}
@@ -669,8 +672,8 @@ const ClientDetailPanel: React.FC<DetailPanelProps> = ({
 
       {/* Tab Content */}
       <div className="flex-1 overflow-y-auto p-5">
-        <div className="max-w-2xl">
-          {tab === 'panoramica' && <PanoramicaTab profile={profile} loading={profileLoading} />}
+        <div>
+          {tab === 'panoramica' && <PanoramicaTab profile={profile} loading={profileLoading} clienteId={cliente.id} />}
           {tab === 'anagrafica' && (
             <AnagraficaTab
               cliente={cliente}
@@ -694,7 +697,21 @@ const ClientDetailPanel: React.FC<DetailPanelProps> = ({
 // TAB: PANORAMICA
 // ═══════════════════════════════════════════════════
 
-const PanoramicaTab: React.FC<{ profile: ClienteCompleteProfile | null; loading: boolean }> = ({ profile, loading }) => {
+const MESI_BREVI = ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'];
+
+const PanoramicaTab: React.FC<{ profile: ClienteCompleteProfile | null; loading: boolean; clienteId: string }> = ({ profile, loading, clienteId }) => {
+  const [showAllApps, setShowAllApps] = useState(false);
+  const [showAllTratt, setShowAllTratt] = useState(false);
+  const [showAllProd, setShowAllProd] = useState(false);
+  const [movimenti, setMovimenti] = useState<MovimentoMagazzino[]>([]);
+  const [movLoading, setMovLoading] = useState(true);
+
+  useEffect(() => {
+    setMovLoading(true);
+    magazzinoService.getMovimenti({ tipo: 'scarico_vendita', cliente_id: clienteId }, 200, 0)
+      .then(setMovimenti).catch(() => {}).finally(() => setMovLoading(false));
+  }, [clienteId]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -709,120 +726,245 @@ const PanoramicaTab: React.FC<{ profile: ClienteCompleteProfile | null; loading:
 
   const { statistiche: s } = profile;
 
+  // "Cliente da" calculation
+  const clienteDa = (() => {
+    if (!s.primo_appuntamento) return null;
+    const first = new Date(s.primo_appuntamento);
+    const now = new Date();
+    const diffMonths = (now.getFullYear() - first.getFullYear()) * 12 + (now.getMonth() - first.getMonth());
+    if (diffMonths < 1) return 'Questo mese';
+    if (diffMonths < 12) return `${diffMonths} mesi`;
+    const years = Math.floor(diffMonths / 12);
+    const rem = diffMonths % 12;
+    return rem > 0 ? `${years}a ${rem}m` : `${years} ann${years === 1 ? 'o' : 'i'}`;
+  })();
+
+
+  // Articoli acquistati aggregation
+  const perProdotto = movimenti.reduce<Record<string, { nome: string; quantita: number; totale: number; ultimo: string }>>((acc, m) => {
+    const key = m.prodotto_id;
+    if (!acc[key]) acc[key] = { nome: m.prodotto_nome || 'Prodotto', quantita: 0, totale: 0, ultimo: m.created_at };
+    acc[key].quantita += m.quantita;
+    acc[key].totale += (m.prezzo_unitario || 0) * m.quantita;
+    if (m.created_at > acc[key].ultimo) acc[key].ultimo = m.created_at;
+    return acc;
+  }, {});
+  const prodotti = Object.entries(perProdotto).sort((a, b) => b[1].ultimo.localeCompare(a[1].ultimo));
+
+  const maxTrattCount = profile.trattamenti_frequenti.length > 0 ? profile.trattamenti_frequenti[0].count : 1;
+  const appsToShow = showAllApps ? profile.appuntamenti : profile.appuntamenti.slice(0, 3);
+
   return (
-    <div className="space-y-3">
-      {/* KPI Grid */}
-      <div className="grid grid-cols-2 gap-2.5">
+    <div className="space-y-4">
+      {/* ── KPI Grid ── */}
+      <div className="grid grid-cols-4 gap-2">
         {[
-          { icon: <Calendar size={14} />, label: 'Visite', value: s.totale_appuntamenti, color: '#6366f1' },
-          { icon: <Euro size={14} />, label: 'Speso totale', value: `€${s.spesa_totale.toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`, color: '#10b981' },
-          { icon: <Award size={14} />, label: 'Ticket medio', value: `€${s.spesa_media.toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`, color: '#f59e0b' },
-          {
-            icon: <Clock size={14} />,
-            label: 'Ultima visita',
-            value: s.giorni_da_ultimo_appuntamento !== null
-              ? s.giorni_da_ultimo_appuntamento === 0 ? 'Oggi' : `${s.giorni_da_ultimo_appuntamento} gg fa`
-              : 'Mai',
-            color: s.giorni_da_ultimo_appuntamento !== null && s.giorni_da_ultimo_appuntamento > 60 ? '#ef4444' : '#8b5cf6',
-          },
+          { label: 'Visite', value: String(s.totale_appuntamenti), color: '#6366f1' },
+          { label: 'Speso totale', value: `€${s.spesa_totale.toLocaleString('it-IT', { maximumFractionDigits: 0 })}`, color: '#10b981' },
+          { label: 'Media/visita', value: s.spesa_media > 0 ? `€${s.spesa_media.toLocaleString('it-IT', { maximumFractionDigits: 0 })}` : '—', color: '#f59e0b' },
+          { label: 'Cliente da', value: clienteDa || '—', color: '#8b5cf6' },
         ].map((kpi, i) => (
-          <div key={i} className="p-3 rounded-xl" style={{ background: 'var(--glass-border)' }}>
-            <div className="flex items-center gap-1.5 mb-1.5">
-              <span style={{ color: kpi.color }}>{kpi.icon}</span>
-              <span className="text-[10px] font-medium uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>{kpi.label}</span>
-            </div>
-            <p className="text-lg font-bold" style={{ color: 'var(--color-text-primary)' }}>{kpi.value}</p>
+          <div key={i} className="p-2.5 rounded-xl" style={{ background: 'var(--glass-border)' }}>
+            <p className="text-[10px] font-medium uppercase tracking-wider mb-1" style={{ color: 'var(--color-text-muted)' }}>{kpi.label}</p>
+            <p className="text-base font-bold" style={{ color: kpi.color }}>{kpi.value}</p>
           </div>
         ))}
       </div>
 
-      {/* No-show / Cancellations warning */}
+      {/* Warning no-show / annullati */}
       {(s.appuntamenti_no_show > 0 || s.appuntamenti_annullati > 0) && (
-        <div className="flex items-center gap-3 p-3 rounded-xl text-xs" style={{ background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.15)' }}>
-          <AlertTriangle size={14} style={{ color: '#f59e0b' }} />
-          <div style={{ color: '#d97706' }}>
-            {s.appuntamenti_no_show > 0 && <span>{s.appuntamenti_no_show} no-show</span>}
-            {s.appuntamenti_no_show > 0 && s.appuntamenti_annullati > 0 && <span> · </span>}
-            {s.appuntamenti_annullati > 0 && <span>{s.appuntamenti_annullati} annullat{s.appuntamenti_annullati === 1 ? 'o' : 'i'}</span>}
+      <div className="flex items-center gap-3 flex-wrap text-xs">
+        {s.appuntamenti_no_show > 0 && (
+          <span className="flex items-center gap-1 px-2 py-0.5 rounded-md" style={{ background: 'rgba(245,158,11,0.1)', color: '#d97706' }}>
+            <AlertTriangle size={11} />{s.appuntamenti_no_show} no-show
+          </span>
+        )}
+        {s.appuntamenti_annullati > 0 && (
+          <span className="flex items-center gap-1 px-2 py-0.5 rounded-md" style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444' }}>
+            {s.appuntamenti_annullati} annullat{s.appuntamenti_annullati === 1 ? 'o' : 'i'}
+          </span>
+        )}
+      </div>
+      )}
+
+      {/* ── Trend Spesa (mini bar chart) ── */}
+      {profile.spesa_per_mese.length > 1 && (
+        <div>
+          <h4 className="text-[10px] font-medium uppercase tracking-wider mb-2" style={{ color: 'var(--color-text-muted)' }}>Trend Spesa</h4>
+          <div className="rounded-xl p-3" style={{ background: 'var(--glass-border)' }}>
+            <ResponsiveContainer width="100%" height={110}>
+              <BarChart data={profile.spesa_per_mese.map(m => ({ mese: MESI_BREVI[m.mese - 1], spesa: m.spesa, app: m.appuntamenti }))}>
+                <XAxis dataKey="mese" tick={{ fontSize: 9, fill: 'var(--color-text-muted)' }} axisLine={false} tickLine={false} />
+                <RechartsTooltip
+                  contentStyle={{ background: 'var(--card-bg)', border: '1px solid var(--glass-border)', borderRadius: '8px', fontSize: '11px' }}
+                  formatter={(value: any) => [`€${Number(value || 0).toFixed(0)}`, 'Spesa']}
+                />
+                <Bar dataKey="spesa" fill="var(--color-primary)" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
         </div>
       )}
 
-      {/* Trattamenti Preferiti */}
+      {/* ── Trattamenti Preferiti (top 5) ── */}
       {profile.trattamenti_frequenti.length > 0 && (
         <div>
-          <h4 className="text-[10px] font-medium uppercase tracking-wider mb-2.5" style={{ color: 'var(--color-text-muted)' }}>
-            Trattamenti Preferiti
-          </h4>
+          <h4 className="text-[10px] font-medium uppercase tracking-wider mb-2" style={{ color: 'var(--color-text-muted)' }}>Trattamenti Preferiti</h4>
           <div className="space-y-1.5">
-            {profile.trattamenti_frequenti.slice(0, 4).map((t, i) => (
-              <div key={i} className="flex items-center justify-between p-2.5 rounded-lg" style={{ background: 'var(--glass-border)' }}>
-                <div className="flex items-center gap-2 min-w-0">
-                  <Scissors size={13} style={{ color: 'var(--color-text-muted)' }} />
-                  <span className="text-sm truncate" style={{ color: 'var(--color-text-primary)' }}>{t.trattamento_nome}</span>
+            {(showAllTratt ? profile.trattamenti_frequenti : profile.trattamenti_frequenti.slice(0, 3)).map((t, i) => (
+              <div key={i} className="p-2.5 rounded-lg" style={{ background: 'var(--glass-border)' }}>
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Scissors size={12} style={{ color: 'var(--color-primary)' }} />
+                    <span className="text-sm font-medium truncate" style={{ color: 'var(--color-text-primary)' }}>{t.trattamento_nome}</span>
+                    {t.categoria_nome && (
+                      <span className="text-[9px] px-1.5 py-0.5 rounded font-medium shrink-0" style={{ background: 'color-mix(in srgb, var(--color-primary) 8%, transparent)', color: 'var(--color-text-muted)' }}>
+                        {t.categoria_nome}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-[10px] font-bold" style={{ color: 'var(--color-primary)' }}>{t.count}x</span>
+                    <span className="text-[10px] font-medium" style={{ color: 'var(--color-text-muted)' }}>€{t.spesa_totale.toLocaleString('it-IT', { maximumFractionDigits: 0 })}</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-md font-semibold" style={{ background: 'color-mix(in srgb, var(--color-primary) 12%, transparent)', color: 'var(--color-primary)' }}>
-                    {t.count}x
-                  </span>
-                  <span className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>
-                    €{t.spesa_totale.toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                  </span>
+                <div className="h-1 rounded-full overflow-hidden" style={{ background: 'color-mix(in srgb, var(--color-primary) 10%, transparent)' }}>
+                  <div className="h-full rounded-full" style={{ width: `${(t.count / maxTrattCount) * 100}%`, background: 'var(--color-primary)', opacity: 1 - (i * 0.15) }} />
                 </div>
               </div>
             ))}
           </div>
+          {profile.trattamenti_frequenti.length > 3 && (
+            <button type="button" onClick={() => setShowAllTratt(!showAllTratt)}
+              className="w-full mt-1.5 py-2 text-xs font-medium rounded-lg transition-colors"
+              style={{ color: 'var(--color-primary)' }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'color-mix(in srgb, var(--color-primary) 8%, transparent)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
+              {showAllTratt ? 'Mostra meno' : `Mostra altro (${profile.trattamenti_frequenti.length})`}
+            </button>
+          )}
         </div>
       )}
 
-      {/* Ultimi Appuntamenti */}
+      {/* ── Storico Appuntamenti ── */}
       <div>
-        <h4 className="text-[10px] font-medium uppercase tracking-wider mb-2.5" style={{ color: 'var(--color-text-muted)' }}>
-          Ultimi Appuntamenti
+        <h4 className="text-[10px] font-medium uppercase tracking-wider mb-2" style={{ color: 'var(--color-text-muted)' }}>
+          Storico Appuntamenti {profile.appuntamenti.length > 0 && <span style={{ color: 'var(--color-primary)' }}>({profile.appuntamenti.length})</span>}
         </h4>
         {profile.appuntamenti.length === 0 ? (
           <div className="text-center py-6 rounded-lg text-xs" style={{ background: 'var(--glass-border)', color: 'var(--color-text-muted)' }}>
             Nessun appuntamento registrato
           </div>
         ) : (
-          <div className="space-y-1">
-            {profile.appuntamenti.map((app: any, i: number) => (
-              <div key={app.id || i} className="flex items-center gap-3 p-2.5 rounded-lg transition-colors"
-                onMouseEnter={e => { e.currentTarget.style.background = 'var(--glass-border)'; }}
-                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
-                {/* Date badge */}
-                <div className="w-10 h-10 rounded-lg flex flex-col items-center justify-center shrink-0" style={{ background: 'var(--glass-border)' }}>
-                  <span className="text-xs font-bold leading-none" style={{ color: 'var(--color-text-primary)' }}>
-                    {format(parseISO(app.data_ora_inizio), 'd')}
-                  </span>
-                  <span className="text-[9px] uppercase mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
-                    {format(parseISO(app.data_ora_inizio), 'MMM', { locale: it })}
-                  </span>
-                </div>
-                {/* Info */}
+          <>
+            <div className="space-y-1.5">
+              {appsToShow.map((app: any, i: number) => {
+                const statoMap: Record<string, { stripe: string; bg: string; color: string; label: string; icon: string }> = {
+                  completato:  { stripe: '#10b981', bg: 'rgba(16,185,129,0.10)',  color: '#10b981', label: 'Completato', icon: '✓' },
+                  annullato:   { stripe: '#ef4444', bg: 'rgba(239,68,68,0.08)',   color: '#ef4444', label: 'Annullato',  icon: '✕' },
+                  no_show:     { stripe: '#d97706', bg: 'rgba(245,158,11,0.08)',  color: '#d97706', label: 'No-show',    icon: '!' },
+                  prenotato:   { stripe: '#6366f1', bg: 'rgba(99,102,241,0.06)',  color: '#6366f1', label: 'Prenotato',  icon: '◦' },
+                  confermato:  { stripe: '#8b5cf6', bg: 'rgba(139,92,246,0.06)',  color: '#8b5cf6', label: 'Confermato', icon: '●' },
+                  in_corso:    { stripe: '#3b82f6', bg: 'rgba(59,130,246,0.08)',  color: '#3b82f6', label: 'In corso',   icon: '▸' },
+                  programmato: { stripe: '#64748b', bg: 'rgba(100,116,139,0.06)', color: '#64748b', label: 'Programmato', icon: '○' },
+                };
+                const sc = statoMap[app.stato] || statoMap.prenotato;
+                const isCancelled = app.stato === 'annullato' || app.stato === 'no_show';
+
+                return (
+                  <div
+                    key={app.id || i}
+                    className="rounded-lg overflow-hidden transition-colors"
+                    style={{ background: sc.bg, borderLeft: `3px solid ${sc.stripe}` }}
+                  >
+                    <div className="p-2.5">
+                      {/* Row 1: Status + Date + Price */}
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold" style={{ background: sc.stripe, color: 'white' }}>
+                          {sc.label}
+                        </span>
+                        <span className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
+                          {format(parseISO(app.data_ora_inizio), 'd MMM yyyy', { locale: it })} · {format(parseISO(app.data_ora_inizio), 'HH:mm')}
+                        </span>
+                        {app.omaggio && (
+                          <span className="text-[8px] px-1 py-0.5 rounded font-bold" style={{ background: 'rgba(168,85,247,0.2)', color: '#a855f7' }}>OMAGGIO</span>
+                        )}
+                        <span className="ml-auto text-sm font-bold shrink-0" style={{ color: isCancelled ? 'var(--color-text-muted)' : 'var(--color-text-primary)', textDecoration: isCancelled ? 'line-through' : undefined }}>
+                          {app.omaggio ? '—' : `€${(app.prezzo_applicato || 0).toLocaleString('it-IT', { maximumFractionDigits: 0 })}`}
+                        </span>
+                      </div>
+
+                      {/* Row 2: Treatment + Operator */}
+                      <div className="flex items-center gap-2">
+                        <Scissors size={12} style={{ color: sc.stripe, flexShrink: 0, opacity: 0.7 }} />
+                        <p className="text-sm font-medium truncate" style={{ color: 'var(--color-text-primary)', textDecoration: isCancelled ? 'line-through' : undefined, opacity: isCancelled ? 0.6 : 1 }}>
+                          {app.trattamento_nome}
+                        </p>
+                        {app.operatrice_nome && (
+                          <span className="text-[10px] shrink-0 ml-auto" style={{ color: 'var(--color-text-muted)' }}>
+                            {app.operatrice_nome} {app.operatrice_cognome || ''}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Row 3: Note (if any) */}
+                      {app.note_prenotazione && (
+                        <p className="mt-1.5 text-[10px] truncate" style={{ color: 'var(--color-text-muted)' }} title={app.note_prenotazione}>
+                          {app.note_prenotazione}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {profile.appuntamenti.length > 3 && (
+              <button
+                type="button"
+                onClick={() => setShowAllApps(!showAllApps)}
+                className="w-full mt-1.5 py-2 text-xs font-medium rounded-lg transition-colors"
+                style={{ color: 'var(--color-primary)' }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'color-mix(in srgb, var(--color-primary) 8%, transparent)'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+              >
+                {showAllApps ? 'Mostra meno' : `Mostra tutti (${profile.appuntamenti.length})`}
+              </button>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* ── Articoli Acquistati ── */}
+      {!movLoading && prodotti.length > 0 && (
+        <div>
+          <h4 className="text-[10px] font-medium uppercase tracking-wider mb-2" style={{ color: 'var(--color-text-muted)' }}>
+            Prodotti Acquistati <span style={{ color: 'var(--color-primary)' }}>({prodotti.length})</span>
+          </h4>
+          <div className="space-y-1.5">
+            {(showAllProd ? prodotti : prodotti.slice(0, 3)).map(([id, p]) => (
+              <div key={id} className="flex items-center gap-3 p-2.5 rounded-lg" style={{ background: 'var(--glass-border)' }}>
+                <Package size={13} style={{ color: 'var(--color-primary)' }} />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate" style={{ color: 'var(--color-text-primary)' }}>{app.trattamento_nome}</p>
-                  <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
-                    {format(parseISO(app.data_ora_inizio), 'HH:mm')}{app.operatrice_nome ? ` · ${app.operatrice_nome}` : ''}
+                  <p className="text-sm truncate" style={{ color: 'var(--color-text-primary)' }}>{p.nome}</p>
+                  <p className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>
+                    x{p.quantita} · {format(parseISO(p.ultimo), 'dd MMM yyyy', { locale: it })}
                   </p>
                 </div>
-                {/* Price + Status */}
-                <div className="text-right shrink-0">
-                  <p className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>
-                    €{(app.prezzo_applicato || 0).toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                  </p>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-md" style={{
-                    background: app.stato === 'completato' ? 'rgba(16, 185, 129, 0.12)' : app.stato === 'annullato' ? 'rgba(239, 68, 68, 0.12)' : 'var(--glass-border)',
-                    color: app.stato === 'completato' ? '#10b981' : app.stato === 'annullato' ? '#ef4444' : 'var(--color-text-muted)',
-                  }}>
-                    {app.stato === 'completato' ? 'Completato' : app.stato === 'annullato' ? 'Annullato' : app.stato === 'no_show' ? 'No-show' : app.stato}
-                  </span>
-                </div>
+                <span className="text-xs font-semibold shrink-0" style={{ color: 'var(--color-text-primary)' }}>€{p.totale.toFixed(2)}</span>
               </div>
             ))}
           </div>
-        )}
-      </div>
+          {prodotti.length > 3 && (
+            <button type="button" onClick={() => setShowAllProd(!showAllProd)}
+              className="w-full mt-1.5 py-2 text-xs font-medium rounded-lg transition-colors"
+              style={{ color: 'var(--color-primary)' }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'color-mix(in srgb, var(--color-primary) 8%, transparent)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
+              {showAllProd ? 'Mostra meno' : `Mostra altro (${prodotti.length})`}
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 };
@@ -1088,3 +1230,4 @@ const SchedaEsteticaTab: React.FC<{
     </div>
   );
 };
+

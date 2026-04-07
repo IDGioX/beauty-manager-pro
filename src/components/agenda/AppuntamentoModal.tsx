@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import ReactDOM from 'react-dom';
 import { invoke } from '@tauri-apps/api/core';
 import { Save, Trash2, Calendar, Clock, User, Scissors, UserPlus, X, Check, ExternalLink, Euro, AlertTriangle, FileText, ChevronDown, ChevronUp, Gift, Package } from 'lucide-react';
 import { Modal } from '../ui/Modal';
@@ -87,6 +88,219 @@ const ClienteInfoPanel: React.FC<{ cliente: Cliente }> = ({ cliente }) => {
   );
 };
 
+// Multi-select trattamenti — chip/pill UI con dropdown portal
+const TrattamentiMultiSelect: React.FC<{
+  trattamenti: Trattamento[];
+  selectedIds: string[];
+  onChange: (ids: string[]) => void;
+  disabled?: boolean;
+}> = ({ trattamenti, selectedIds, onChange, disabled }) => {
+  const [search, setSearch] = useState('');
+  const [isOpen, setIsOpen] = useState(false);
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null);
+  const triggerRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const updatePosition = useCallback(() => {
+    if (!triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    setDropdownPos({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (triggerRef.current && !triggerRef.current.contains(target) &&
+          dropdownRef.current && !dropdownRef.current.contains(target)) {
+        setIsOpen(false);
+        setSearch('');
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    updatePosition();
+    const handleUpdate = () => updatePosition();
+    window.addEventListener('scroll', handleUpdate, true);
+    window.addEventListener('resize', handleUpdate);
+    return () => { window.removeEventListener('scroll', handleUpdate, true); window.removeEventListener('resize', handleUpdate); };
+  }, [isOpen, updatePosition]);
+
+  const openDropdown = () => {
+    if (disabled) return;
+    updatePosition();
+    setIsOpen(true);
+    setTimeout(() => inputRef.current?.focus(), 50);
+  };
+
+  const filtered = trattamenti.filter(t =>
+    !search || t.nome.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const add = (id: string) => {
+    if (!selectedIds.includes(id)) onChange([...selectedIds, id]);
+    setSearch('');
+    inputRef.current?.focus();
+  };
+
+  const remove = (id: string) => {
+    onChange(selectedIds.filter(i => i !== id));
+  };
+
+  const selected = selectedIds.map(id => trattamenti.find(t => t.id === id)).filter(Boolean) as Trattamento[];
+  const durataTotale = selected.reduce((s, t) => s + t.durata_minuti, 0);
+  const prezzoTotale = selected.reduce((s, t) => s + (t.prezzo_listino || 0), 0);
+
+  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace' && !search && selectedIds.length > 0) {
+      remove(selectedIds[selectedIds.length - 1]);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsOpen(false);
+      setSearch('');
+    }
+  };
+
+  const renderDropdown = () => {
+    if (!isOpen || !dropdownPos) return null;
+    const available = filtered.filter(t => !selectedIds.includes(t.id));
+
+    return ReactDOM.createPortal(
+      <div
+        ref={dropdownRef}
+        className="fixed rounded-xl shadow-2xl overflow-hidden"
+        style={{ top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width, zIndex: 150,
+          background: 'var(--bg-base, #fff)', border: '2px solid var(--color-primary, #6366f1)' }}
+      >
+        <div className="max-h-52 overflow-y-auto">
+          {available.length === 0 ? (
+            <div className="px-4 py-5 text-center text-sm" style={{ color: 'var(--color-text-muted)' }}>
+              {search ? 'Nessun risultato' : 'Tutti i trattamenti selezionati'}
+            </div>
+          ) : (
+            available.map(t => (
+              <div
+                key={t.id}
+                onClick={() => add(t.id)}
+                className="px-4 py-2.5 cursor-pointer transition-colors flex items-center gap-3"
+                style={{ color: 'var(--color-text-primary)' }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'var(--glass-border)'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-sm truncate">{t.nome}</div>
+                </div>
+                <span className="text-xs shrink-0" style={{ color: 'var(--color-text-muted)' }}>
+                  {t.durata_minuti} min
+                </span>
+                {t.prezzo_listino != null && t.prezzo_listino > 0 && (
+                  <span className="text-xs shrink-0 font-medium" style={{ color: 'var(--color-text-secondary)' }}>
+                    €{t.prezzo_listino.toFixed(2)}
+                  </span>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+      </div>,
+      document.body
+    );
+  };
+
+  return (
+    <div className="space-y-2">
+      {/* Trigger / Input area */}
+      <div ref={triggerRef}>
+        <div
+          onClick={openDropdown}
+          className={`w-full rounded-xl cursor-pointer transition-all duration-200 ${disabled ? 'cursor-not-allowed opacity-60' : ''}`}
+          style={{
+            background: 'var(--input-bg, var(--card-bg))',
+            border: isOpen ? '2px solid var(--color-primary)' : '2px solid var(--glass-border)',
+            padding: selectedIds.length > 0 ? '8px 12px' : '0 12px',
+            minHeight: '42px',
+          }}
+        >
+          {/* Selected treatments list */}
+          {selectedIds.length > 0 && (
+            <div className="space-y-1 mb-1.5">
+              {selected.map(t => (
+                <div
+                  key={t.id}
+                  className="flex items-center gap-2 py-1.5 px-2 rounded-lg"
+                  style={{ background: 'color-mix(in srgb, var(--color-primary) 8%, transparent)' }}
+                >
+                  <Scissors size={12} style={{ color: 'var(--color-primary)', flexShrink: 0 }} />
+                  <span className="text-xs font-medium flex-1 truncate" style={{ color: 'var(--color-text-primary)' }}>{t.nome}</span>
+                  <span className="text-[10px] shrink-0" style={{ color: 'var(--color-text-muted)' }}>{t.durata_minuti} min</span>
+                  {t.prezzo_listino != null && t.prezzo_listino > 0 && (
+                    <span className="text-[10px] font-medium shrink-0" style={{ color: 'var(--color-text-secondary)' }}>€{t.prezzo_listino.toFixed(2)}</span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); remove(t.id); }}
+                    className="p-0.5 rounded-md transition-colors shrink-0"
+                    style={{ color: 'var(--color-text-muted)' }}
+                    onMouseEnter={e => { e.currentTarget.style.color = '#ef4444'; e.currentTarget.style.background = 'rgba(239,68,68,0.1)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.color = 'var(--color-text-muted)'; e.currentTarget.style.background = 'transparent'; }}
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Search input inline */}
+          {isOpen ? (
+            <input
+              ref={inputRef}
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              onKeyDown={handleInputKeyDown}
+              placeholder={selectedIds.length > 0 ? 'Aggiungi...' : 'Cerca trattamento...'}
+              className="w-full bg-transparent text-sm outline-none"
+              style={{ color: 'var(--color-text-primary)', height: '26px' }}
+            />
+          ) : (
+            <div className="flex items-center gap-2" style={{ height: selectedIds.length > 0 ? undefined : '38px' }}>
+              {selectedIds.length === 0 && (
+                <span className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Cerca trattamento...</span>
+              )}
+              <ChevronDown size={14} className="ml-auto shrink-0" style={{ color: 'var(--color-text-muted)' }} />
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Summary bar */}
+      {selectedIds.length > 0 && (
+        <div className="flex items-center gap-3 px-1">
+          <div className="flex items-center gap-1.5">
+            <Clock size={12} style={{ color: 'var(--color-text-muted)' }} />
+            <span className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>{durataTotale} min</span>
+          </div>
+          {prezzoTotale > 0 && (
+            <div className="flex items-center gap-1.5">
+              <Euro size={12} style={{ color: 'var(--color-text-muted)' }} />
+              <span className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>€{prezzoTotale.toFixed(2)}</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {renderDropdown()}
+    </div>
+  );
+};
+
 export const AppuntamentoModal: React.FC = () => {
   const {
     isModalOpen,
@@ -120,7 +334,7 @@ export const AppuntamentoModal: React.FC = () => {
   // Form state
   const [clienteId, setClienteId] = useState('');
   const [operatriceId, setOperatriceId] = useState('');
-  const [trattamentoId, setTrattamentoId] = useState('');
+  const [trattamentoIds, setTrattamentoIds] = useState<string[]>([]);
   const [dataOraInizio, setDataOraInizio] = useState('');
   const [dataOraFine, setDataOraFine] = useState('');
   const [stato, setStato] = useState<'prenotato' | 'in_corso' | 'completato' | 'annullato' | 'no_show'>('prenotato');
@@ -168,7 +382,7 @@ export const AppuntamentoModal: React.FC = () => {
   const [selectedTrattamentiPkgIds, setSelectedTrattamentiPkgIds] = useState<string[]>([]);
   const [wasUnlinked, setWasUnlinked] = useState(false);
   const prezzoPrePacchettoRef = useRef<string>('');
-  const trattamentoPrePacchettoRef = useRef<string>('');
+  const trattamentoIdsPrePacchettoRef = useRef<string[]>([]);
 
   // Carica clienti e trattamenti quando il modal si apre
   useEffect(() => {
@@ -198,17 +412,27 @@ export const AppuntamentoModal: React.FC = () => {
       skipAutoCalculateRef.current = true;
       setClienteId(selectedAppuntamento.cliente_id);
       setOperatriceId(selectedAppuntamento.operatrice_id);
-      setTrattamentoId(selectedAppuntamento.trattamento_id);
       setDataOraInizio(formatDateTimeForInput(new Date(selectedAppuntamento.data_ora_inizio)));
       setDataOraFine(formatDateTimeForInput(new Date(selectedAppuntamento.data_ora_fine)));
       setStato(selectedAppuntamento.stato);
       setNote(selectedAppuntamento.note_prenotazione || '');
       setPrezzoApplicato(selectedAppuntamento.prezzo_applicato?.toString() || '');
       setOmaggio(selectedAppuntamento.omaggio || false);
-      // Resetta il flag dopo un breve delay per permettere il rendering
-      setTimeout(() => {
-        skipAutoCalculateRef.current = false;
-      }, 100);
+      // Carica trattamento_ids dalla junction table, poi resetta il flag
+      invoke<string[]>('get_appuntamento_trattamenti_ids', { appuntamentoId: selectedAppuntamento.id })
+        .then(ids => {
+          if (ids.length > 0) {
+            setTrattamentoIds(ids);
+          } else {
+            setTrattamentoIds([selectedAppuntamento.trattamento_id]);
+          }
+          // Resetta il flag DOPO che i dati sono stati caricati
+          setTimeout(() => { skipAutoCalculateRef.current = false; }, 50);
+        })
+        .catch(() => {
+          setTrattamentoIds([selectedAppuntamento.trattamento_id]);
+          setTimeout(() => { skipAutoCalculateRef.current = false; }, 50);
+        });
     }
   }, [isModalOpen, modalMode, modalInitialTime, selectedAppuntamento]);
 
@@ -220,21 +444,29 @@ export const AppuntamentoModal: React.FC = () => {
       return;
     }
 
-    if (trattamentoId && dataOraInizio) {
-      const trattamento = trattamenti.find((t) => t.id === trattamentoId);
-      if (trattamento) {
+    if (trattamentoIds.length > 0 && dataOraInizio) {
+      const durataTotale = trattamentoIds.reduce((sum, id) => {
+        const t = trattamenti.find(tr => tr.id === id);
+        return sum + (t?.durata_minuti || 0);
+      }, 0);
+      const prezzoTotale = trattamentoIds.reduce((sum, id) => {
+        const t = trattamenti.find(tr => tr.id === id);
+        return sum + (t?.prezzo_listino || 0);
+      }, 0);
+
+      if (durataTotale > 0) {
         const start = new Date(dataOraInizio);
         const end = new Date(start);
-        end.setMinutes(end.getMinutes() + trattamento.durata_minuti);
+        end.setMinutes(end.getMinutes() + durataTotale);
         setDataOraFine(formatDateTimeForInput(end));
+      }
 
-        // Imposta prezzo se non già impostato
-        if (!prezzoApplicato && trattamento.prezzo_listino) {
-          setPrezzoApplicato(trattamento.prezzo_listino.toString());
-        }
+      // Imposta prezzo se non già impostato
+      if (!prezzoApplicato && prezzoTotale > 0) {
+        setPrezzoApplicato(prezzoTotale.toString());
       }
     }
-  }, [trattamentoId, dataOraInizio, trattamenti]);
+  }, [trattamentoIds, dataOraInizio, trattamenti]);
 
   // Ricalcola durata quando cambiano i trattamenti selezionati del pacchetto
   useEffect(() => {
@@ -311,7 +543,7 @@ export const AppuntamentoModal: React.FC = () => {
       const allIds = tratt.map(t => t.trattamento_id);
       setSelectedTrattamentiPkgIds(allIds);
       if (allIds.length > 0) {
-        setTrattamentoId(allIds[0]);
+        setTrattamentoIds(allIds);
       }
     }).catch(() => {});
   }, [collegaPacchetto, selectedPacchettoClienteId, pacchettiCliente]);
@@ -343,7 +575,7 @@ export const AppuntamentoModal: React.FC = () => {
   const resetForm = () => {
     setClienteId('');
     setOperatriceId('');
-    setTrattamentoId('');
+    setTrattamentoIds([]);
     setDataOraInizio('');
     setDataOraFine('');
     setStato('prenotato');
@@ -366,7 +598,7 @@ export const AppuntamentoModal: React.FC = () => {
     setWasUnlinked(false);
     setShowDeleteConfirm(false);
     prezzoPrePacchettoRef.current = '';
-    trattamentoPrePacchettoRef.current = '';
+    trattamentoIdsPrePacchettoRef.current = [];
     // Reset quick add client form
     setShowQuickAddClient(false);
     setQuickClientNome('');
@@ -455,7 +687,7 @@ export const AppuntamentoModal: React.FC = () => {
     setIsLoading(true);
 
     try {
-      if (!clienteId || !operatriceId || !trattamentoId || !dataOraInizio || !dataOraFine) {
+      if (!clienteId || !operatriceId || trattamentoIds.length === 0 || !dataOraInizio || !dataOraFine) {
         throw new Error('Compilare tutti i campi obbligatori');
       }
 
@@ -480,7 +712,8 @@ export const AppuntamentoModal: React.FC = () => {
         const input: CreateAppuntamentoInput = {
           cliente_id: clienteId,
           operatrice_id: operatriceId,
-          trattamento_id: trattamentoId,
+          trattamento_id: trattamentoIds[0] || '',
+          trattamento_ids: trattamentoIds,
           data_ora_inizio: startDate.toISOString(),
           data_ora_fine: endDate.toISOString(),
           stato: stato,
@@ -505,7 +738,8 @@ export const AppuntamentoModal: React.FC = () => {
         const input: UpdateAppuntamentoInput = {
           cliente_id: clienteId,
           operatrice_id: operatriceId,
-          trattamento_id: trattamentoId,
+          trattamento_id: trattamentoIds[0] || '',
+          trattamento_ids: trattamentoIds,
           data_ora_inizio: startDate.toISOString(),
           data_ora_fine: endDate.toISOString(),
           stato: stato,
@@ -536,7 +770,7 @@ export const AppuntamentoModal: React.FC = () => {
       // Reso automatico prodotti se si torna da completato a un altro stato
       if (modalMode === 'edit' && selectedAppuntamento?.stato === 'completato' && stato !== 'completato') {
         const appId = selectedAppuntamento.id;
-        const trattamentoNome = trattamenti.find(t => t.id === trattamentoId)?.nome || 'Trattamento';
+        const trattamentoNome = trattamentoIds.map(id => trattamenti.find(t => t.id === id)?.nome).filter(Boolean).join(', ') || 'Trattamento';
         try {
           const movimenti = await magazzinoService.getMovimentiAppuntamento(appId);
           for (const mov of movimenti) {
@@ -561,7 +795,7 @@ export const AppuntamentoModal: React.FC = () => {
       // Gestione prodotti usati quando l'appuntamento è completato
       if (stato === 'completato') {
         const appId = selectedAppuntamento?.id;
-        const trattamentoNome = trattamenti.find(t => t.id === trattamentoId)?.nome || 'Trattamento';
+        const trattamentoNome = trattamentoIds.map(id => trattamenti.find(t => t.id === id)?.nome).filter(Boolean).join(', ') || 'Trattamento';
 
         for (const prodotto of prodottiUsati) {
           try {
@@ -665,7 +899,12 @@ export const AppuntamentoModal: React.FC = () => {
 
       closeModal();
     } catch (err: any) {
-      setError(err?.message || 'Errore durante il salvataggio');
+      const msg = err?.message || 'Errore durante il salvataggio';
+      setError(msg);
+      // Scroll all'errore
+      setTimeout(() => {
+        document.getElementById('appuntamento-error')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 50);
     } finally {
       setIsLoading(false);
     }
@@ -724,26 +963,32 @@ export const AppuntamentoModal: React.FC = () => {
     };
   });
 
-  const trattamentiOptions = trattamenti.map((t) => ({
-    value: t.id,
-    label: t.nome,
-    subtitle: `${t.durata_minuti} min${t.prezzo_listino ? ` — €${t.prezzo_listino.toFixed(2)}` : ''}`,
-  }));
 
   // Quick nav button component
+  const QUICKNAV_CONFIG: Record<string, { icon: React.ReactNode; label: string }> = {
+    clienti: { icon: <User size={12} />, label: 'Scheda' },
+    pacchetti: { icon: <Package size={12} />, label: 'Pacchetti' },
+    operatrici: { icon: <User size={12} />, label: 'Scheda' },
+  };
   const QuickNavButton = ({ page, entityId, title }: { page: string; entityId?: string; title: string }) => {
     if (!entityId) return null;
+    const cfg = QUICKNAV_CONFIG[page];
     return (
       <button
         type="button"
         onClick={() => handleNavigateTo(page, entityId)}
-        className="p-1 rounded-md transition-colors"
-        style={{ color: 'var(--color-text-muted)' }}
-        onMouseEnter={e => { e.currentTarget.style.color = 'var(--color-primary)'; e.currentTarget.style.background = 'color-mix(in srgb, var(--color-primary) 10%, transparent)'; }}
-        onMouseLeave={e => { e.currentTarget.style.color = 'var(--color-text-muted)'; e.currentTarget.style.background = 'transparent'; }}
+        className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-medium transition-all"
+        style={{
+          color: 'var(--color-primary)',
+          background: 'color-mix(in srgb, var(--color-primary) 8%, transparent)',
+          border: '1px solid color-mix(in srgb, var(--color-primary) 15%, transparent)',
+        }}
+        onMouseEnter={e => { e.currentTarget.style.background = 'color-mix(in srgb, var(--color-primary) 18%, transparent)'; e.currentTarget.style.transform = 'scale(1.03)'; }}
+        onMouseLeave={e => { e.currentTarget.style.background = 'color-mix(in srgb, var(--color-primary) 8%, transparent)'; e.currentTarget.style.transform = 'scale(1)'; }}
         title={title}
       >
-        <ExternalLink size={13} />
+        {cfg?.icon || <ExternalLink size={12} />}
+        {cfg?.label || 'Apri'}
       </button>
     );
   };
@@ -758,6 +1003,7 @@ export const AppuntamentoModal: React.FC = () => {
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
           <div
+            id="appuntamento-error"
             className="p-3 rounded-lg text-sm"
             style={{
               background: 'color-mix(in srgb, rgb(239, 68, 68) 10%, transparent)',
@@ -997,13 +1243,13 @@ export const AppuntamentoModal: React.FC = () => {
               setSelectedNumeroSeduta(nextSeduta.numero_seduta);
               // Salva prezzo e trattamento corrente, azzera prezzo
               prezzoPrePacchettoRef.current = prezzoApplicato;
-              trattamentoPrePacchettoRef.current = trattamentoId;
+              trattamentoIdsPrePacchettoRef.current = trattamentoIds;
               setPrezzoApplicato('0');
             } else {
               setCollegaPacchetto(false);
               // Ripristina prezzo e trattamento precedenti
               setPrezzoApplicato(prezzoPrePacchettoRef.current);
-              setTrattamentoId(trattamentoPrePacchettoRef.current);
+              setTrattamentoIds(trattamentoIdsPrePacchettoRef.current);
               setSelectedPacchettoClienteId('');
               setSelectedNumeroSeduta(0);
               setTrattamentiPacchetto([]);
@@ -1074,7 +1320,7 @@ export const AppuntamentoModal: React.FC = () => {
                     </div>
 
                     {sedutaLinkata.stato_seduta === 'pianificata' && (
-                      <button type="button" onClick={() => { setCollegaPacchetto(false); setWasUnlinked(true); setSedutaLinkata(null); setPrezzoApplicato(prezzoPrePacchettoRef.current); setTrattamentoId(trattamentoPrePacchettoRef.current); setTrattamentiPacchetto([]); setSelectedTrattamentiPkgIds([]); }}
+                      <button type="button" onClick={() => { setCollegaPacchetto(false); setWasUnlinked(true); setSedutaLinkata(null); setPrezzoApplicato(prezzoPrePacchettoRef.current); setTrattamentoIds(trattamentoIdsPrePacchettoRef.current); setTrattamentiPacchetto([]); setSelectedTrattamentiPkgIds([]); }}
                         className="text-[10px] font-medium" style={{ color: 'var(--color-text-muted)' }}>
                         Scollega dal pacchetto
                       </button>
@@ -1139,8 +1385,8 @@ export const AppuntamentoModal: React.FC = () => {
                                   ? selectedTrattamentiPkgIds.filter(id => id !== t.trattamento_id)
                                   : [...selectedTrattamentiPkgIds, t.trattamento_id];
                                 setSelectedTrattamentiPkgIds(newIds);
-                                // Il primo selezionato diventa il trattamentoId principale
-                                setTrattamentoId(newIds[0] || '');
+                                // I selezionati diventano i trattamentoIds
+                                setTrattamentoIds(newIds);
                               }}
                               className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-colors"
                               style={{ background: checked ? 'color-mix(in srgb, var(--color-primary) 10%, transparent)' : 'transparent' }}>
@@ -1224,19 +1470,18 @@ export const AppuntamentoModal: React.FC = () => {
                 disabled={isLoading}
               />
             </div>
-            {/* Trattamento: nascosto quando collegato a pacchetto (il trattamento si sceglie nella sezione Pacchetto) */}
+            {/* Trattamenti: nascosto quando collegato a pacchetto */}
             {!collegaPacchetto && (
               <div>
                 <div className="flex items-center gap-1.5 mb-1.5">
-                  <label className="block text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>Trattamento *</label>
-                  <QuickNavButton page="trattamenti" entityId={trattamentoId} title="Apri scheda trattamento" />
+                  <label className="block text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>
+                    Trattamenti * {trattamentoIds.length > 0 && <span style={{ color: 'var(--color-primary)' }}>({trattamentoIds.length})</span>}
+                  </label>
                 </div>
-                <SearchableSelect
-                  value={trattamentoId}
-                  onChange={(value) => setTrattamentoId(value)}
-                  options={trattamentiOptions}
-                  placeholder="Cerca trattamento..."
-                  required
+                <TrattamentiMultiSelect
+                  trattamenti={trattamenti}
+                  selectedIds={trattamentoIds}
+                  onChange={setTrattamentoIds}
                   disabled={isLoading}
                 />
               </div>

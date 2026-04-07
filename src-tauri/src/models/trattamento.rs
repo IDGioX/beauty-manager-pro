@@ -74,6 +74,8 @@ pub struct CreateTrattamentoInput {
     pub prezzo_listino: Option<f64>,
     pub attivo: Option<bool>,
     pub note_operative: Option<String>,
+    pub controindicazioni: Option<String>,
+    pub attrezzature_richieste: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -85,6 +87,8 @@ pub struct UpdateTrattamentoInput {
     pub prezzo_listino: Option<f64>,
     pub attivo: Option<bool>,
     pub note_operative: Option<String>,
+    pub controindicazioni: Option<String>,
+    pub attrezzature_richieste: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

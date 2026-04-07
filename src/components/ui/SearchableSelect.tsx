@@ -165,7 +165,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
           left: dropdownPos.left,
           width: dropdownPos.width,
           zIndex: 150,
-          background: 'var(--card-bg, #fff)',
+          background: 'var(--bg-base, #fff)',
           border: '2px solid var(--color-primary, #6366f1)',
         }}
       >

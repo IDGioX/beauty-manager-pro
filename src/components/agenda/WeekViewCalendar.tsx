@@ -84,8 +84,8 @@ export const WeekViewCalendar: React.FC<WeekViewCalendarProps> = ({
   };
 
   return (
-    <div className="flex flex-1 min-h-0">
-      <div className="flex-1 flex">
+    <div className="flex flex-1 min-h-0 min-w-0 overflow-hidden">
+      <div className="flex-1 flex min-w-0 overflow-hidden">
         {weekDays.map((day, index) => {
           const dayAppuntamenti = getAppuntamentiForDay(day);
           const isTodayDate = isToday(day);

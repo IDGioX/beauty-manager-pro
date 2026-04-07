@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { ArrowLeft, X, ChevronRight, MoreHorizontal, Plus, Search, Edit2, Trash2, Clock, Euro, Sparkles, FolderOpen, EyeOff, Eye, ChevronsUpDown } from 'lucide-react';
+import { ArrowLeft, X, ChevronRight, MoreHorizontal, Plus, Search, Edit2, Trash2, Clock, Euro, Sparkles, FolderOpen, EyeOff, Eye, ChevronsUpDown, Scissors } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
@@ -15,14 +15,6 @@ import { Trattamento, CategoriaTrattamento, CreateTrattamentoInput } from '../ty
 interface ToastState { message: string; type: 'success' | 'error'; }
 interface TrattamentiProps { onGoBack?: () => void; }
 
-// Color palette for categories
-const catColors = [
-  { bg: 'rgba(99, 102, 241, 0.1)', text: '#6366f1' }, { bg: 'rgba(236, 72, 153, 0.1)', text: '#ec4899' },
-  { bg: 'rgba(16, 185, 129, 0.1)', text: '#10b981' }, { bg: 'rgba(245, 158, 11, 0.1)', text: '#f59e0b' },
-  { bg: 'rgba(59, 130, 246, 0.1)', text: '#3b82f6' }, { bg: 'rgba(139, 92, 246, 0.1)', text: '#8b5cf6' },
-  { bg: 'rgba(239, 68, 68, 0.1)', text: '#ef4444' }, { bg: 'rgba(6, 182, 212, 0.1)', text: '#06b6d4' },
-];
-const getCatColor = (name: string) => { let h = 0; for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h); return catColors[Math.abs(h) % catColors.length]; };
 
 export const Trattamenti: React.FC<TrattamentiProps> = ({ onGoBack }) => {
   const [trattamenti, setTrattamenti] = useState<Trattamento[]>([]);
@@ -112,6 +104,8 @@ export const Trattamenti: React.FC<TrattamentiProps> = ({ onGoBack }) => {
       prezzo_listino: selectedTrattamento.prezzo_listino || 0,
       attivo: selectedTrattamento.attivo,
       note_operative: selectedTrattamento.note_operative || '',
+      controindicazioni: selectedTrattamento.controindicazioni || '',
+      attrezzature_richieste: selectedTrattamento.attrezzature_richieste || '',
     });
     setIsEditing(true);
   };
@@ -133,6 +127,8 @@ export const Trattamenti: React.FC<TrattamentiProps> = ({ onGoBack }) => {
         prezzo_listino: editFormData.prezzo_listino,
         attivo: editFormData.attivo,
         note_operative: editFormData.note_operative || undefined,
+        controindicazioni: editFormData.controindicazioni || undefined,
+        attrezzature_richieste: editFormData.attrezzature_richieste || undefined,
       });
       showToast('Trattamento aggiornato con successo', 'success');
       setSelectedTrattamento(updated);
@@ -217,7 +213,7 @@ export const Trattamenti: React.FC<TrattamentiProps> = ({ onGoBack }) => {
   return (
     <>
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
-      <div className="flex h-full" style={{ height: 'calc(100vh - 80px)' }}>
+      <div className="flex flex-1 min-h-0">
         {/* ═══════════════ LEFT: TREATMENT LIST ═══════════════ */}
         <div className={`flex flex-col min-w-0 master-panel ${selectedTrattamento ? 'w-[420px] shrink-0' : 'flex-1'}`}>
           {/* Header */}
@@ -315,7 +311,6 @@ export const Trattamenti: React.FC<TrattamentiProps> = ({ onGoBack }) => {
                 {groupedFiltered.map(group => {
                   const catId = group.categoria?.id || '_none';
                   const catName = group.categoria?.nome || 'Senza categoria';
-                  const cc = getCatColor(catName);
                   const isCollapsed = collapsedCategories.has(catId);
 
                   return (
@@ -323,28 +318,29 @@ export const Trattamenti: React.FC<TrattamentiProps> = ({ onGoBack }) => {
                       {/* Category header */}
                       <button
                         onClick={() => toggleCategory(catId)}
-                        className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left transition-colors hover:opacity-80"
-                        style={{ background: cc.bg }}
+                        className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-left transition-colors"
+                        style={{ background: 'var(--glass-border)' }}
+                        onMouseEnter={e => { e.currentTarget.style.opacity = '0.8'; }}
+                        onMouseLeave={e => { e.currentTarget.style.opacity = '1'; }}
                       >
-                        <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: cc.text }} />
-                        <span className="text-xs font-bold flex-1" style={{ color: cc.text }}>{catName}</span>
-                        <span className="text-[10px] font-medium" style={{ color: cc.text, opacity: 0.7 }}>{group.trattamenti.length}</span>
                         <ChevronRight
                           size={13}
-                          style={{ color: cc.text, transform: isCollapsed ? 'rotate(0deg)' : 'rotate(90deg)', transition: 'transform 150ms' }}
+                          style={{ color: 'var(--color-text-muted)', transform: isCollapsed ? 'rotate(0deg)' : 'rotate(90deg)', transition: 'transform 150ms', flexShrink: 0 }}
                         />
+                        <span className="text-[11px] font-semibold uppercase tracking-wide flex-1" style={{ color: 'var(--color-text-secondary)' }}>{catName}</span>
+                        <span className="text-[10px] font-medium" style={{ color: 'var(--color-text-muted)' }}>{group.trattamenti.length}</span>
                       </button>
 
                       {/* Treatments in category */}
                       {!isCollapsed && (
-                        <div className="mt-1 space-y-0.5 ml-1" style={{ borderLeft: `2px solid ${cc.text}20` }}>
+                        <div className="mt-0.5 space-y-0.5">
                           {group.trattamenti.map(t => {
                             const isSelected = selectedTrattamento?.id === t.id;
                             return (
                               <button
                                 key={t.id}
                                 onClick={() => selectTrattamento(t)}
-                                className={`w-full flex items-center gap-3 p-2.5 pl-4 rounded-r-xl text-left group list-card ${isSelected ? 'list-card-selected' : ''}`}
+                                className={`w-full flex items-center gap-3 p-2.5 px-3 rounded-xl text-left group list-card ${isSelected ? 'list-card-selected' : ''}`}
                                 style={{ opacity: t.attivo ? 1 : 0.5 }}
                               >
                                 <div className="flex-1 min-w-0">
@@ -374,7 +370,7 @@ export const Trattamenti: React.FC<TrattamentiProps> = ({ onGoBack }) => {
 
         {/* ═══════════════ RIGHT: DETAIL PANEL ═══════════════ */}
         {selectedTrattamento && (
-          <div className="flex-1 min-w-[400px] border-l overflow-y-auto" style={{ borderColor: 'var(--glass-border)', background: 'var(--card-bg)' }}>
+          <div className="flex-1 min-w-[400px] min-h-0 flex flex-col border-l overflow-hidden" style={{ borderColor: 'var(--glass-border)', background: 'var(--card-bg)' }}>
             <TrattamentoDetailPanel
               trattamento={selectedTrattamento}
               categorie={categorie}
@@ -409,6 +405,8 @@ export const Trattamenti: React.FC<TrattamentiProps> = ({ onGoBack }) => {
             <Input type="number" label={`Prezzo (\u20AC)`} value={createFormData.prezzo_listino || 0} onChange={e => setCreateFormData({ ...createFormData, prezzo_listino: parseFloat(e.target.value) || 0 })} step="0.01" min="0" />
           </div>
           <Textarea label="Note Operative" value={createFormData.note_operative || ''} onChange={e => setCreateFormData({ ...createFormData, note_operative: e.target.value })} rows={2} placeholder="Note per gli operatori..." />
+          <Textarea label="Controindicazioni" value={createFormData.controindicazioni || ''} onChange={e => setCreateFormData({ ...createFormData, controindicazioni: e.target.value })} rows={2} placeholder="Eventuali controindicazioni..." />
+          <Textarea label="Attrezzature Richieste" value={createFormData.attrezzature_richieste || ''} onChange={e => setCreateFormData({ ...createFormData, attrezzature_richieste: e.target.value })} rows={2} placeholder="Attrezzature necessarie..." />
           <label className="flex items-center gap-2">
             <input type="checkbox" checked={createFormData.attivo} onChange={e => setCreateFormData({ ...createFormData, attivo: e.target.checked })} className="rounded" />
             <span className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>Trattamento attivo</span>
@@ -445,13 +443,10 @@ const TrattamentoDetailPanel: React.FC<{
   showOverflow: boolean;
   setShowOverflow: (v: boolean) => void;
 }> = ({ trattamento, categorie, isEditing, formData, setFormData, onStartEdit, onSave, onCancelEdit, onClose, onDelete, onToggleAttivo, showOverflow, setShowOverflow }) => {
-  const cc = getCatColor(trattamento.categoria_nome || 'N/A');
-
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col flex-1 min-h-0">
       {/* Panel Header */}
-      <div className="p-4 pb-3">
-        <div className="max-w-2xl">
+      <div className="p-5 pb-3">
         <div className="flex items-start justify-between mb-4">
           <button onClick={onClose} className="p-1.5 rounded-lg transition-colors" style={{ color: 'var(--color-text-muted)' }}
             onMouseEnter={e => { e.currentTarget.style.background = 'var(--glass-border)'; }}
@@ -492,13 +487,16 @@ const TrattamentoDetailPanel: React.FC<{
         </div>
 
         {/* Treatment Name + Badges */}
-        <div>
-          <h2 className="text-lg font-bold" style={{ color: 'var(--color-text-primary)' }}>
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0" style={{ background: 'color-mix(in srgb, var(--color-primary) 12%, transparent)' }}>
+            <Scissors size={20} style={{ color: 'var(--color-primary)' }} />
+          </div>
+          <div className="min-w-0">
+          <h2 className="text-xl font-bold truncate" style={{ color: 'var(--color-text-primary)' }}>
             {trattamento.nome}
           </h2>
           <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold" style={{ background: cc.bg, color: cc.text }}>
-              <span className="w-1.5 h-1.5 rounded-full" style={{ background: cc.text }} />
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold" style={{ background: 'var(--glass-border)', color: 'var(--color-text-secondary)' }}>
               {trattamento.categoria_nome || 'N/A'}
             </span>
             <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{
@@ -509,27 +507,27 @@ const TrattamentoDetailPanel: React.FC<{
               {trattamento.attivo ? 'Attivo' : 'Inattivo'}
             </span>
           </div>
-
-          {/* Quick Info Pills */}
-          <div className="flex items-center gap-2 mt-3">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium" style={{ background: 'var(--glass-border)', color: 'var(--color-text-secondary)' }}>
-              <Clock size={13} style={{ color: 'var(--color-text-muted)' }} />
-              {trattamento.durata_minuti} min
-            </span>
-            {trattamento.prezzo_listino != null && (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium" style={{ background: 'var(--glass-border)', color: 'var(--color-text-secondary)' }}>
-                <Euro size={13} style={{ color: 'var(--color-text-muted)' }} />
-                {'\u20AC'}{trattamento.prezzo_listino.toFixed(2)}
-              </span>
-            )}
           </div>
         </div>
+
+        {/* Quick Info Pills */}
+        <div className="flex items-center gap-2 mt-3">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium" style={{ background: 'var(--glass-border)', color: 'var(--color-text-secondary)' }}>
+            <Clock size={13} style={{ color: 'var(--color-text-muted)' }} />
+            {trattamento.durata_minuti} min
+          </span>
+          {trattamento.prezzo_listino != null && (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium" style={{ background: 'var(--glass-border)', color: 'var(--color-text-secondary)' }}>
+              <Euro size={13} style={{ color: 'var(--color-text-muted)' }} />
+              {'\u20AC'}{trattamento.prezzo_listino.toFixed(2)}
+            </span>
+          )}
         </div>
       </div>
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-5" style={{ borderTop: '1px solid var(--glass-border)' }}>
-        <div className="max-w-2xl">
+        <div>
           <AnagraficaTrattamentoTab
             trattamento={trattamento}
             categorie={categorie}
@@ -562,38 +560,42 @@ const AnagraficaTrattamentoTab: React.FC<{
     // View mode
     const catNome = categorie.find(c => c.id === trattamento.categoria_id)?.nome || trattamento.categoria_nome || 'N/A';
 
-    const fields: { label: string; value: string | number | null | undefined }[] = [
-      { label: 'Nome', value: trattamento.nome },
-      { label: 'Categoria', value: catNome },
-      { label: 'Descrizione', value: trattamento.descrizione },
-      { label: 'Durata', value: `${trattamento.durata_minuti} minuti` },
-      { label: 'Prezzo', value: trattamento.prezzo_listino != null ? `\u20AC ${trattamento.prezzo_listino.toFixed(2)}` : null },
-      { label: 'Note Operative', value: trattamento.note_operative },
-      { label: 'Controindicazioni', value: trattamento.controindicazioni },
-      { label: 'Attrezzature Richieste', value: trattamento.attrezzature_richieste },
-    ];
+    const Field = ({ label, value }: { label: string; value: string | number | null | undefined }) => (
+      <div>
+        <label className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>{label}</label>
+        <p className="text-sm mt-0.5 whitespace-pre-wrap" style={{ color: value ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>{value || '—'}</p>
+      </div>
+    );
+    const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
+      <div className="mt-6 mb-3">
+        <h4 className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: 'var(--color-text-muted)' }}>{title}</h4>
+        {children}
+      </div>
+    );
 
     return (
-      <div className="space-y-5">
-        <div className="space-y-3">
-          {fields.map((f, i) => (
-            <div key={i}>
-              <label className="text-[10px] font-medium uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>{f.label}</label>
-              <p className="text-sm mt-0.5 whitespace-pre-wrap" style={{ color: f.value ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>
-                {f.value || '\u2014'}
-              </p>
-            </div>
-          ))}
+      <div className="space-y-4">
+        {/* Info Base */}
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="Nome" value={trattamento.nome} />
+          <Field label="Categoria" value={catNome} />
+          <Field label="Durata" value={`${trattamento.durata_minuti} minuti`} />
+          <Field label="Prezzo" value={trattamento.prezzo_listino != null ? `€ ${trattamento.prezzo_listino.toFixed(2)}` : null} />
         </div>
+        <Field label="Descrizione" value={trattamento.descrizione} />
+
+        <Section title="Dettagli Operativi">
+          <div className="space-y-4">
+            <Field label="Note Operative" value={trattamento.note_operative} />
+            <Field label="Controindicazioni" value={trattamento.controindicazioni} />
+            <Field label="Attrezzature Richieste" value={trattamento.attrezzature_richieste} />
+          </div>
+        </Section>
 
         {/* Meta */}
-        <div className="pt-3 space-y-1" style={{ borderTop: '1px solid var(--glass-border)' }}>
-          <p className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>
-            Creato il {new Date(trattamento.created_at).toLocaleDateString('it-IT')}
-          </p>
-          <p className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>
-            Ultimo aggiornamento {new Date(trattamento.updated_at).toLocaleDateString('it-IT')}
-          </p>
+        <div className="pt-4 flex items-center gap-4 text-[10px]" style={{ borderTop: '1px solid var(--glass-border)', color: 'var(--color-text-muted)' }}>
+          <span>Creato {new Date(trattamento.created_at).toLocaleDateString('it-IT')}</span>
+          <span>Aggiornato {new Date(trattamento.updated_at).toLocaleDateString('it-IT')}</span>
         </div>
       </div>
     );
@@ -613,6 +615,8 @@ const AnagraficaTrattamentoTab: React.FC<{
         <Input type="number" label={`Prezzo (\u20AC)`} value={formData.prezzo_listino || 0} onChange={e => setFormData({ ...formData, prezzo_listino: parseFloat(e.target.value) || 0 })} step="0.01" min="0" />
       </div>
       <Textarea label="Note Operative" value={formData.note_operative || ''} onChange={e => setFormData({ ...formData, note_operative: e.target.value })} rows={2} placeholder="Note per gli operatori..." />
+      <Textarea label="Controindicazioni" value={formData.controindicazioni || ''} onChange={e => setFormData({ ...formData, controindicazioni: e.target.value })} rows={2} placeholder="Eventuali controindicazioni..." />
+      <Textarea label="Attrezzature Richieste" value={formData.attrezzature_richieste || ''} onChange={e => setFormData({ ...formData, attrezzature_richieste: e.target.value })} rows={2} placeholder="Attrezzature necessarie..." />
       <label className="flex items-center gap-2 p-2 rounded-lg cursor-pointer" style={{ border: '1px solid var(--glass-border)', background: formData.attivo ? 'rgba(16, 185, 129, 0.08)' : 'transparent' }}>
         <input type="checkbox" checked={formData.attivo} onChange={e => setFormData({ ...formData, attivo: e.target.checked })} className="rounded" />
         <span className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>Trattamento attivo</span>
