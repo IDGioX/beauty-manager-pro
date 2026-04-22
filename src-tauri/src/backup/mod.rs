@@ -4,8 +4,19 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use sqlx::{Row, SqlitePool};
-use std::fs::{self, File};
+use std::fs::{self, File, OpenOptions};
 use std::io::{Read, Write};
+
+/// Scrive una linea di log nel file di log del restore.
+/// File: <app_data_dir>/restore.log
+fn log_restore(app_data_dir: &Path, line: &str) {
+    let ts = Utc::now().format("%Y-%m-%d %H:%M:%S%.3f");
+    let path = app_data_dir.join("restore.log");
+    if let Ok(mut f) = OpenOptions::new().create(true).append(true).open(&path) {
+        let _ = writeln!(f, "[{}] {}", ts, line);
+    }
+    println!("[restore] {}", line);
+}
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use zip::write::SimpleFileOptions;
@@ -268,14 +279,38 @@ pub async fn restore_backup_selective(
     mode: RestoreMode,
     app_data_dir: &Path,
 ) -> AppResult<RestoreResult> {
+    // Reset log file per questa sessione di restore
+    let log_path = app_data_dir.join("restore.log");
+    let _ = std::fs::write(&log_path, "");
+    log_restore(app_data_dir, &format!("=== RESTORE START === path={} mode={:?}", backup_path.display(), mode));
+
     if !backup_path.exists() {
+        log_restore(app_data_dir, "ERRORE: backup file non trovato");
         return Err(AppError::NotFound(format!("Backup non trovato: {}", backup_path.display())));
+    }
+
+    // Pre-restore safety backup del DB main corrente
+    let main_db_path = app_data_dir.join("beauty_manager.db");
+    let safety_path = app_data_dir.join(format!(
+        "beauty_manager.db.pre_restore_{}",
+        Utc::now().format("%Y%m%d_%H%M%S")
+    ));
+    if main_db_path.exists() {
+        if let Err(e) = fs::copy(&main_db_path, &safety_path) {
+            log_restore(app_data_dir, &format!("WARN: copia safety fallita: {}", e));
+        } else {
+            log_restore(app_data_dir, &format!("Safety backup creato: {}", safety_path.display()));
+        }
     }
 
     // Estrai il DB dal ZIP in un file temporaneo (cleanup automatico)
     let temp_db_path = app_data_dir.join("_restore_temp.db");
     let _cleanup = TempDbCleanup { path: temp_db_path.clone() };
     let metadata = extract_db_from_zip(backup_path, &temp_db_path)?;
+    log_restore(app_data_dir, &format!(
+        "Backup estratto: version={} app_version={} size={} bytes",
+        metadata.version, metadata.app_version, metadata.database_size
+    ));
 
     // Esegui ensure_backup_compatibility sul temp DB
     {
@@ -292,6 +327,7 @@ pub async fn restore_backup_selective(
         ensure_backup_compatibility(&temp_pool).await;
         temp_pool.close().await;
     }
+    log_restore(app_data_dir, "ensure_backup_compatibility OK");
 
     // Determina quali tabelle ripristinare
     let mut tables_to_restore: Vec<&str> = DATA_TABLES.to_vec();
@@ -299,6 +335,7 @@ pub async fn restore_backup_selective(
     if is_full {
         tables_to_restore.extend_from_slice(AUTH_CONFIG_TABLES);
     }
+    log_restore(app_data_dir, &format!("Tabelle da ripristinare: {}", tables_to_restore.len()));
 
     // Acquisisci una singola connessione (ATTACH è a livello connessione)
     let mut conn = pool.acquire().await
@@ -313,21 +350,14 @@ pub async fn restore_backup_selective(
     sqlx::query(&attach_sql).execute(&mut *conn).await
         .map_err(|e| AppError::Internal(format!("Errore ATTACH: {}", e)))?;
 
-    // Leggi tabelle backup e colonne main (per main usiamo PRAGMA, per backup_db usiamo sqlite_master)
     let backup_tables: Vec<(String,)> = sqlx::query_as(
         "SELECT name FROM backup_db.sqlite_master WHERE type='table'"
     ).fetch_all(&mut *conn).await.unwrap_or_default();
     let backup_table_names: Vec<String> = backup_tables.into_iter().map(|t| t.0).collect();
 
-    // Pre-calcola le colonne del backup usando il temp pool (già chiuso — riapriamolo brevemente)
-    // Nota: PRAGMA non funziona con schema prefix per attached DB.
-    // Usiamo un approccio diverso: SELECT * LIMIT 0 e leggiamo i nomi colonne dai risultati.
-    // Oppure, dato che abbiamo il temp DB, leggiamo da main + descriviamo le differenze.
-    // Approccio più semplice e sicuro: per le colonne del main usiamo PRAGMA,
-    // per il backup usiamo "SELECT * FROM backup_db.table LIMIT 0" e parsiamo la risposta.
-
     let mut restored: Vec<String> = Vec::new();
     let mut skipped: Vec<String> = Vec::new();
+    let mut insert_errors: Vec<(String, String)> = Vec::new();
 
     // BEGIN TRANSACTION
     sqlx::query("BEGIN TRANSACTION").execute(&mut *conn).await
@@ -341,7 +371,7 @@ pub async fn restore_backup_selective(
         }
         let sql = format!("DELETE FROM main.\"{}\"", table);
         if let Err(e) = sqlx::query(&sql).execute(&mut *conn).await {
-            println!("Warning: DELETE failed for {}: {}", table, e);
+            log_restore(app_data_dir, &format!("WARN DELETE {}: {}", table, e));
         }
     }
 
@@ -349,20 +379,22 @@ pub async fn restore_backup_selective(
     for table in &tables_to_restore {
         if !backup_table_names.contains(&table.to_string()) {
             skipped.push(table.to_string());
+            log_restore(app_data_dir, &format!("SKIP {} (non presente nel backup)", table));
             continue;
         }
 
-        // Colonne main (PRAGMA funziona per main)
         let main_cols = get_main_columns(&mut conn, table).await;
-        // Colonne backup (usiamo SELECT * LIMIT 0 sulla tabella attached)
         let backup_cols = get_attached_columns(&mut conn, table).await;
 
         if main_cols.is_empty() || backup_cols.is_empty() {
             skipped.push(table.to_string());
+            log_restore(app_data_dir, &format!(
+                "SKIP {} (main_cols={} backup_cols={})",
+                table, main_cols.len(), backup_cols.len()
+            ));
             continue;
         }
 
-        // Intersezione colonne (escludi GENERATED)
         let common: Vec<String> = main_cols.iter()
             .filter(|c| backup_cols.contains(c))
             .filter(|c| !GENERATED_COLUMNS.iter().any(|(t, col)| *t == *table && *col == c.as_str()))
@@ -371,7 +403,18 @@ pub async fn restore_backup_selective(
 
         if common.is_empty() {
             skipped.push(table.to_string());
+            log_restore(app_data_dir, &format!("SKIP {} (nessuna colonna comune)", table));
             continue;
+        }
+
+        // Log colonne extra rispetto al backup / main
+        let only_in_main: Vec<&String> = main_cols.iter().filter(|c| !backup_cols.contains(c)).collect();
+        let only_in_backup: Vec<&String> = backup_cols.iter().filter(|c| !main_cols.contains(c)).collect();
+        if !only_in_main.is_empty() || !only_in_backup.is_empty() {
+            log_restore(app_data_dir, &format!(
+                "DIFF {}: solo_main={:?} solo_backup={:?}",
+                table, only_in_main, only_in_backup
+            ));
         }
 
         let cols_str = common.iter().map(|c| format!("\"{}\"", c)).collect::<Vec<_>>().join(", ");
@@ -381,21 +424,65 @@ pub async fn restore_backup_selective(
         );
 
         match sqlx::query(&insert_sql).execute(&mut *conn).await {
-            Ok(_) => restored.push(table.to_string()),
+            Ok(r) => {
+                restored.push(table.to_string());
+                log_restore(app_data_dir, &format!("OK {} ({} righe, {} colonne)", table, r.rows_affected(), common.len()));
+            }
             Err(e) => {
-                println!("Errore restore tabella {}: {}", table, e);
+                let err_str = format!("{}", e);
+                log_restore(app_data_dir, &format!("ERR INSERT {}: {}", table, err_str));
+                insert_errors.push((table.to_string(), err_str));
                 skipped.push(table.to_string());
             }
         }
     }
 
+    // Check FK PRIMA del COMMIT: se ci sono violazioni, ROLLBACK.
+    // foreign_key_check ritorna righe per ogni violazione: (table, rowid, parent, fkid)
+    let fk_violations: Vec<(String, Option<i64>, String, i64)> = sqlx::query_as(
+        "PRAGMA foreign_key_check"
+    ).fetch_all(&mut *conn).await.unwrap_or_default();
+
+    if !fk_violations.is_empty() {
+        log_restore(app_data_dir, &format!("FK VIOLATIONS: {} record inconsistenti", fk_violations.len()));
+        // Log primi 20 per diagnostica
+        for v in fk_violations.iter().take(20) {
+            log_restore(app_data_dir, &format!("  {} rowid={:?} -> {} fkid={}", v.0, v.1, v.2, v.3));
+        }
+        // Aggrega per tabella -> parent
+        let mut agg: std::collections::BTreeMap<(String, String), i64> = std::collections::BTreeMap::new();
+        for v in &fk_violations {
+            *agg.entry((v.0.clone(), v.2.clone())).or_insert(0) += 1;
+        }
+        for ((t, p), n) in &agg {
+            log_restore(app_data_dir, &format!("  SUMMARY {} -> {}: {} righe orfane", t, p, n));
+        }
+
+        // ROLLBACK + cleanup
+        let _ = sqlx::query("ROLLBACK").execute(&mut *conn).await;
+        let _ = sqlx::query("DETACH DATABASE backup_db").execute(&mut *conn).await;
+        let _ = sqlx::query("PRAGMA foreign_keys = ON").execute(&mut *conn).await;
+
+        let summary: Vec<String> = agg.iter().take(5).map(|((t, p), n)| format!("{}→{} ({})", t, p, n)).collect();
+        return Err(AppError::Internal(format!(
+            "Backup incompatibile: {} violazioni di integrità rilevate. Tabelle coinvolte: {}. Dettagli in restore.log",
+            fk_violations.len(), summary.join(", ")
+        )));
+    }
+    log_restore(app_data_dir, "FK check OK (zero violazioni)");
+
     // COMMIT
     if let Err(e) = sqlx::query("COMMIT").execute(&mut *conn).await {
+        log_restore(app_data_dir, &format!("ERR COMMIT: {}", e));
         let _ = sqlx::query("ROLLBACK").execute(&mut *conn).await;
         let _ = sqlx::query("DETACH DATABASE backup_db").execute(&mut *conn).await;
         let _ = sqlx::query("PRAGMA foreign_keys = ON").execute(&mut *conn).await;
         return Err(AppError::Internal(format!("Errore COMMIT restore: {}", e)));
     }
+    log_restore(app_data_dir, &format!(
+        "=== RESTORE COMPLETATO === restored={} skipped={} errors={}",
+        restored.len(), skipped.len(), insert_errors.len()
+    ));
 
     // Cleanup: DETACH + re-enable FK
     let _ = sqlx::query("DETACH DATABASE backup_db").execute(&mut *conn).await;

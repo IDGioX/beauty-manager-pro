@@ -62,4 +62,8 @@ export const backupService = {
   async restoreBackupFirstSetup(backupPath: string): Promise<RestoreResult> {
     return await invoke('restore_backup_first_setup', { backupPath });
   },
+
+  async readRestoreLog(): Promise<string> {
+    return await invoke('read_restore_log');
+  },
 };

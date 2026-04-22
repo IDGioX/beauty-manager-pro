@@ -147,6 +147,7 @@ pub fn run() {
                 commands::backup::restore_backup_first_setup,
                 commands::backup::import_backup_from_file,
                 commands::backup::open_backup_folder,
+                commands::backup::read_restore_log,
                 commands::azienda::get_azienda,
                 commands::azienda::update_azienda,
                 commands::azienda::get_orari_centro,

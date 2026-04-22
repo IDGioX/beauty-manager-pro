@@ -216,6 +216,7 @@ export function Settings() {
 
   const [confirmAction, setConfirmAction] = useState<{ type: string; path: string } | null>(null);
   const [restoreModal, setRestoreModal] = useState<{ path: string; mode: 'smart' | 'full' } | null>(null);
+  const [restoreLogModal, setRestoreLogModal] = useState<string | null>(null);
 
   const openRestoreModal = (path: string) => {
     setRestoreModal({ path, mode: 'smart' });
@@ -242,8 +243,16 @@ export function Settings() {
       }
     } catch (error: any) {
       console.error('Errore ripristino backup:', error);
-      showToast(typeof error === 'string' ? error : error?.message || 'Errore durante il ripristino', 'error');
+      const msg = typeof error === 'string' ? error : error?.message || 'Errore durante il ripristino';
+      showToast(msg, 'error');
       setLoading(false);
+      // Carica il log di diagnostica e offri all'utente di vederlo
+      try {
+        const log = await backupService.readRestoreLog();
+        if (log && log.trim().length > 0) {
+          setRestoreLogModal(log);
+        }
+      } catch { /* log non disponibile */ }
     }
   };
 
@@ -526,6 +535,36 @@ export function Settings() {
             <div className="px-6 py-4 flex justify-end gap-2" style={{ borderTop: '1px solid var(--glass-border)' }}>
               <button onClick={() => setRestoreModal(null)} className="px-4 py-2 rounded-lg text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>Annulla</button>
               <button onClick={handleConfirmRestore} className="px-5 py-2 rounded-lg text-xs font-medium text-white" style={{ background: 'var(--color-primary)' }}>Ripristina</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal log diagnostica restore (mostrato quando il restore fallisce) */}
+      {restoreLogModal !== null && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center">
+          <div className="absolute inset-0 backdrop-blur-sm" style={{ background: 'rgba(0,0,0,0.4)' }} onClick={() => setRestoreLogModal(null)} />
+          <div className="relative w-full max-w-3xl mx-4 rounded-2xl overflow-hidden shadow-2xl" style={{ background: 'var(--card-bg)', border: '1px solid var(--glass-border)' }}>
+            <div className="px-6 py-4 flex items-center justify-between" style={{ background: 'var(--sidebar-bg)' }}>
+              <div>
+                <h3 className="font-bold text-base text-white">Log Diagnostica Ripristino</h3>
+                <p className="text-xs text-white/50 mt-0.5">Dettagli del tentativo di ripristino per supporto tecnico</p>
+              </div>
+              <button
+                onClick={() => { navigator.clipboard.writeText(restoreLogModal).then(() => showToast('Log copiato', 'success')); }}
+                className="px-3 py-1.5 rounded-lg text-[11px] font-medium text-white"
+                style={{ background: 'rgba(255,255,255,0.1)' }}
+              >
+                Copia
+              </button>
+            </div>
+            <div className="px-6 py-4 max-h-[60vh] overflow-y-auto">
+              <pre className="text-[11px] font-mono whitespace-pre-wrap" style={{ color: 'var(--color-text-primary)', background: 'var(--glass-border)', padding: 12, borderRadius: 8 }}>
+                {restoreLogModal}
+              </pre>
+            </div>
+            <div className="px-6 py-4 flex justify-end" style={{ borderTop: '1px solid var(--glass-border)' }}>
+              <button onClick={() => setRestoreLogModal(null)} className="px-5 py-2 rounded-lg text-xs font-medium text-white" style={{ background: 'var(--color-primary)' }}>Chiudi</button>
             </div>
           </div>
         </div>

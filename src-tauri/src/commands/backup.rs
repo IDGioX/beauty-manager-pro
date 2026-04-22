@@ -158,3 +158,19 @@ pub async fn open_backup_folder(app: AppHandle) -> AppResult<()> {
 
     Ok(())
 }
+
+/// Legge il file di log dell'ultimo restore (ultimo restore_backup_selective).
+/// Il log viene riscritto ad ogni tentativo di restore.
+#[tauri::command]
+pub async fn read_restore_log(app: AppHandle) -> AppResult<String> {
+    let app_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| crate::error::AppError::Internal(format!("Unable to resolve app data dir: {}", e)))?;
+    let log_path = app_dir.join("restore.log");
+    if !log_path.exists() {
+        return Ok(String::new());
+    }
+    std::fs::read_to_string(&log_path)
+        .map_err(|e| crate::error::AppError::Internal(format!("Errore lettura log: {}", e)))
+}
