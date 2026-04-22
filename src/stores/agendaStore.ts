@@ -7,6 +7,38 @@ import type {
   UpdateAppuntamentoInput,
 } from '../types/agenda';
 
+// Helper: calcola il range date in base alla vista.
+// - day: singolo giorno
+// - month: griglia allineata lun-dom (copre tutti i giorni visibili in FullCalendar dayGridMonth)
+// - week: intero mese (fallback)
+function getRangeForView(selectedDate: Date, viewMode: 'day' | 'week' | 'month'): [Date, Date] {
+  if (viewMode === 'day') {
+    const s = new Date(selectedDate); s.setHours(0, 0, 0, 0);
+    const e = new Date(selectedDate); e.setHours(23, 59, 59, 999);
+    return [s, e];
+  }
+  if (viewMode === 'month') {
+    const firstOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+    const lastOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
+    const startDay = firstOfMonth.getDay();
+    const offsetStart = (startDay === 0 ? -6 : 1 - startDay);
+    const rangeStart = new Date(firstOfMonth);
+    rangeStart.setDate(firstOfMonth.getDate() + offsetStart);
+    rangeStart.setHours(0, 0, 0, 0);
+    const endDay = lastOfMonth.getDay();
+    const offsetEnd = (endDay === 0 ? 0 : 7 - endDay);
+    const rangeEnd = new Date(lastOfMonth);
+    rangeEnd.setDate(lastOfMonth.getDate() + offsetEnd);
+    rangeEnd.setHours(23, 59, 59, 999);
+    return [rangeStart, rangeEnd];
+  }
+  const s = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+  s.setHours(0, 0, 0, 0);
+  const e = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
+  e.setHours(23, 59, 59, 999);
+  return [s, e];
+}
+
 interface AgendaState {
   operatrici: Operatrice[];
   appuntamenti: AppuntamentoWithDetails[];
@@ -92,20 +124,8 @@ export const useAgendaStore = create<AgendaState>((set, get) => ({
         // Ricarica appuntamenti per mostrare i cambiamenti, rispettando la vista corrente
         const { selectedDate, viewMode, loadAppuntamenti } = get();
 
-        if (viewMode === 'day') {
-          const startOfDay = new Date(selectedDate);
-          startOfDay.setHours(0, 0, 0, 0);
-          const endOfDay = new Date(selectedDate);
-          endOfDay.setHours(23, 59, 59, 999);
-          await loadAppuntamenti(startOfDay, endOfDay);
-        } else {
-          // Vista settimana/mese: carica l'intero mese
-          const startOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
-          startOfMonth.setHours(0, 0, 0, 0);
-          const endOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
-          endOfMonth.setHours(23, 59, 59, 999);
-          await loadAppuntamenti(startOfMonth, endOfMonth);
-        }
+        const [rs, re] = getRangeForView(selectedDate, viewMode);
+        await loadAppuntamenti(rs, re);
       }
     } catch (error: any) {
       console.error('Errore aggiornamento stati automatici:', error);
@@ -120,20 +140,8 @@ export const useAgendaStore = create<AgendaState>((set, get) => ({
       // Ricarica gli appuntamenti dopo la creazione, rispettando la vista corrente
       const { selectedDate, viewMode, loadAppuntamenti } = get();
 
-      if (viewMode === 'day') {
-        const startOfDay = new Date(selectedDate);
-        startOfDay.setHours(0, 0, 0, 0);
-        const endOfDay = new Date(selectedDate);
-        endOfDay.setHours(23, 59, 59, 999);
-        await loadAppuntamenti(startOfDay, endOfDay);
-      } else {
-        // Vista settimana/mese: carica l'intero mese
-        const startOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
-        startOfMonth.setHours(0, 0, 0, 0);
-        const endOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
-        endOfMonth.setHours(23, 59, 59, 999);
-        await loadAppuntamenti(startOfMonth, endOfMonth);
-      }
+      const [rs, re] = getRangeForView(selectedDate, viewMode);
+      await loadAppuntamenti(rs, re);
 
       set({ isLoading: false, isModalOpen: false, modalMode: null, modalInitialTime: null });
       return created.id;
@@ -152,20 +160,8 @@ export const useAgendaStore = create<AgendaState>((set, get) => ({
       // Ricarica gli appuntamenti dopo l'aggiornamento, rispettando la vista corrente
       const { selectedDate, viewMode, loadAppuntamenti } = get();
 
-      if (viewMode === 'day') {
-        const startOfDay = new Date(selectedDate);
-        startOfDay.setHours(0, 0, 0, 0);
-        const endOfDay = new Date(selectedDate);
-        endOfDay.setHours(23, 59, 59, 999);
-        await loadAppuntamenti(startOfDay, endOfDay);
-      } else {
-        // Vista settimana/mese: carica l'intero mese
-        const startOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
-        startOfMonth.setHours(0, 0, 0, 0);
-        const endOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
-        endOfMonth.setHours(23, 59, 59, 999);
-        await loadAppuntamenti(startOfMonth, endOfMonth);
-      }
+      const [rs, re] = getRangeForView(selectedDate, viewMode);
+      await loadAppuntamenti(rs, re);
 
       set({
         isLoading: false,
@@ -188,20 +184,8 @@ export const useAgendaStore = create<AgendaState>((set, get) => ({
       // Ricarica gli appuntamenti dopo l'eliminazione, rispettando la vista corrente
       const { selectedDate, viewMode, loadAppuntamenti } = get();
 
-      if (viewMode === 'day') {
-        const startOfDay = new Date(selectedDate);
-        startOfDay.setHours(0, 0, 0, 0);
-        const endOfDay = new Date(selectedDate);
-        endOfDay.setHours(23, 59, 59, 999);
-        await loadAppuntamenti(startOfDay, endOfDay);
-      } else {
-        // Vista settimana/mese: carica l'intero mese
-        const startOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
-        startOfMonth.setHours(0, 0, 0, 0);
-        const endOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
-        endOfMonth.setHours(23, 59, 59, 999);
-        await loadAppuntamenti(startOfMonth, endOfMonth);
-      }
+      const [rs, re] = getRangeForView(selectedDate, viewMode);
+      await loadAppuntamenti(rs, re);
 
       set({
         isLoading: false,

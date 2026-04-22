@@ -178,8 +178,25 @@ export const Agenda: React.FC<AgendaProps> = ({ openAppuntamentoId, onAppuntamen
         const endOfDay = new Date(selectedDate);
         endOfDay.setHours(23, 59, 59, 999);
         await loadAppuntamenti(startOfDay, endOfDay);
+      } else if (viewMode === 'month') {
+        // Vista mese: FullCalendar dayGridMonth mostra una griglia di ~6 settimane
+        // che include giorni del mese precedente e successivo. Allineamo il range
+        // al lunedì precedente e alla domenica successiva per coprire TUTTA la griglia.
+        const firstOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+        const lastOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
+        const startDay = firstOfMonth.getDay(); // 0=dom, 1=lun, ... 6=sab
+        const offsetStart = (startDay === 0 ? -6 : 1 - startDay);
+        const rangeStart = new Date(firstOfMonth);
+        rangeStart.setDate(firstOfMonth.getDate() + offsetStart);
+        rangeStart.setHours(0, 0, 0, 0);
+        const endDay = lastOfMonth.getDay();
+        const offsetEnd = (endDay === 0 ? 0 : 7 - endDay);
+        const rangeEnd = new Date(lastOfMonth);
+        rangeEnd.setDate(lastOfMonth.getDate() + offsetEnd);
+        rangeEnd.setHours(23, 59, 59, 999);
+        await loadAppuntamenti(rangeStart, rangeEnd);
       } else {
-        // Vista settimana/mese: carica l'intero mese per avere tutti i dati
+        // Vista settimana: carica l'intero mese
         const startOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
         startOfMonth.setHours(0, 0, 0, 0);
         const endOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
